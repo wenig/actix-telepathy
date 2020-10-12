@@ -7,3 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+actix = "0.10"
+actix-rt = "1.1"
+actix-telepathy = { path="../.." }
+
+structopt = "0.3"
+structopt-derive = "0.4"
