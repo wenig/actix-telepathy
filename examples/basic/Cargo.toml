@@ -11,5 +11,8 @@ actix = "0.10"
 actix-rt = "1.1"
 actix-telepathy = { path="../.." }
 
+log = "0.4"
+env_logger = "0.7"
+
 structopt = "0.3"
 structopt-derive = "0.4"

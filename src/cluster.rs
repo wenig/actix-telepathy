@@ -11,6 +11,7 @@ use std::str::FromStr;
 use futures::StreamExt;
 use crate::messages::TcpConnect;
 use futures::executor::block_on;
+use std::net::SocketAddr;
 
 
 pub struct Cluster {
@@ -25,8 +26,9 @@ impl Actor for Cluster {
     fn started(&mut self, _ctx: &mut Self::Context) {
         debug!("Connecting with seed nodes");
         for node_addr in self.addrs.iter() {
-            let cloned_node_addr = node_addr.clone();
-            let node = Supervisor::start(move |_| NetworkInterface::new(cloned_node_addr));
+            let cloned_node_addr = SocketAddr::from_str(&node_addr).unwrap();
+            //let node = Supervisor::start(move |_| NetworkInterface::new(cloned_node_addr));
+            let node = NetworkInterface::new(cloned_node_addr).start();
             self.nodes.push(node);
         }
     }
@@ -35,17 +37,21 @@ impl Actor for Cluster {
 impl Handler<TcpConnect> for Cluster {
     type Result = ();
 
-    fn handle(&mut self, _msg: TcpConnect, _ctx: &mut Self::Context) -> Self::Result {
-        println!("Incoming TcpConnect");
+    fn handle(&mut self, msg: TcpConnect, _ctx: &mut Self::Context) -> Self::Result {
+        debug!("Incoming TcpConnect");
+        let stream = msg.0;
+        let addr = msg.1;
+        //let node = Supervisor::start(move |_| NetworkInterface::from_stream(addr, stream));
+        let node = NetworkInterface::from_stream(addr, stream).start();
+        self.nodes.push(node);
     }
 }
 
 impl Cluster {
     pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>) -> Addr<Cluster> {
-        let addr = net::SocketAddr::from_str(&ip_address).unwrap();
-        let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
+        let listener = Cluster::bind(ip_address.clone()).unwrap();
 
-        println!("Listening on {}", ip_address);
+        debug!("Listening on {}", ip_address);
         Cluster::create(move |ctx| {
             ctx.add_message_stream(Box::leak(listener).incoming().map(|st| {
                 let st = st.unwrap();
@@ -61,6 +67,12 @@ impl Cluster {
 
             Cluster {ip_address, addrs, nodes: vec![]}
         })
+    }
+
+    fn bind(addr: String) -> Result<Box<TcpListener>> {
+        let addr = net::SocketAddr::from_str(&addr).unwrap();
+        let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
+        Ok(listener)
     }
 }
 
