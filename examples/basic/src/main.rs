@@ -2,7 +2,7 @@
 
 use actix_rt;
 use actix_telepathy::*;
-use actix::System;
+use actix::{System, Actor, Handler, Context, Supervisor};
 use structopt::StructOpt;
 use log::Level;
 
@@ -24,8 +24,12 @@ fn main() {
     //let sys = actix::System::new("remote-example");
 
     actix::System::run(|| {
-        Cluster::new(local_ip, seed_nodes);
+        let cluster_listener = Supervisor::start(|_| ClusterListener::new(
+            Box::new(|msg| {
+                debug!("Callback called");
+            })
+        ));
+        let cluster = Cluster::new(local_ip, seed_nodes, Some(cluster_listener));
     });
-
     //let _ = sys.run();
 }

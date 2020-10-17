@@ -13,8 +13,8 @@ const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 #[rtype(result = "()")]
 pub enum JoinCluster {
     Request(String),
-    Response(String),
-    Message(u64, String, String, String),
+    Response,
+    Message(String),
 }
 
 pub struct ConnectCodec {
@@ -65,8 +65,10 @@ impl Encoder<JoinCluster> for ConnectCodec {
     type Error = Error;
 
     fn encode(&mut self, item: JoinCluster, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        if let JoinCluster::Request(_) = item {
-            dst.extend_from_slice(PREFIX);
+        match item {
+            JoinCluster::Request(_) => dst.extend_from_slice(PREFIX),
+            JoinCluster::Response => dst.extend_from_slice(PREFIX),
+            _ => {}
         }
 
         let msg = serde_json::to_string(&item).unwrap();

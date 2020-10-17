@@ -5,18 +5,20 @@ use tokio::net::TcpListener;
 use std::collections::{HashMap, VecDeque};
 use log::*;
 
-use crate::utils;
+use crate::{utils, ClusterLog, ClusterListener};
 use crate::network::NetworkInterface;
 use std::str::FromStr;
 use futures::StreamExt;
-use crate::messages::TcpConnect;
+use crate::messages::{TcpConnect, RemoteMessage};
 use futures::executor::block_on;
 use std::net::SocketAddr;
+use std::any::Any;
 
 
 pub struct Cluster {
     ip_address: String,
     pub addrs: Vec<String>,
+    listener: Option<Addr<ClusterListener>>,
     nodes: Vec<Addr<NetworkInterface>>,
 }
 
@@ -24,11 +26,10 @@ impl Actor for Cluster {
     type Context = Context<Self>;
 
     fn started(&mut self, _ctx: &mut Self::Context) {
-        debug!("Connecting with seed nodes");
         for node_addr in self.addrs.iter() {
-            let cloned_node_addr = SocketAddr::from_str(&node_addr).unwrap();
-            //let node = Supervisor::start(move |_| NetworkInterface::new(cloned_node_addr));
-            let node = NetworkInterface::new(cloned_node_addr).start();
+            let addr = SocketAddr::from_str(&node_addr).unwrap();
+            let listener = self.listener.clone();
+            let node = Supervisor::start(move |_| NetworkInterface::new(addr, listener));
             self.nodes.push(node);
         }
     }
@@ -41,14 +42,14 @@ impl Handler<TcpConnect> for Cluster {
         debug!("Incoming TcpConnect");
         let stream = msg.0;
         let addr = msg.1;
-        //let node = Supervisor::start(move |_| NetworkInterface::from_stream(addr, stream));
-        let node = NetworkInterface::from_stream(addr, stream).start();
+        let listener = self.listener.clone();
+        let node = Supervisor::start(move |_| NetworkInterface::from_stream(addr, stream, listener));
         self.nodes.push(node);
     }
 }
 
 impl Cluster {
-    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>) -> Addr<Cluster> {
+    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listener: Option<Addr<ClusterListener>>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -65,7 +66,7 @@ impl Cluster {
                 addrs.push(node_addr.clone());
             });
 
-            Cluster {ip_address, addrs, nodes: vec![]}
+            Cluster {ip_address, addrs, listener: cluster_listener, nodes: vec![]}
         })
     }
 
@@ -75,5 +76,3 @@ impl Cluster {
         Ok(listener)
     }
 }
-
-
