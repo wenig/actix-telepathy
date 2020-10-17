@@ -22,6 +22,7 @@ use tokio::net::tcp::OwnedWriteHalf;
 use actix::fut::err;
 use crate::cluster::ClusterListener;
 use crate::ClusterLog;
+use futures::future::Remote;
 
 
 pub struct NetworkInterface {
@@ -135,7 +136,7 @@ impl StreamHandler<Result<JoinCluster, Error>> for NetworkInterface {
             Ok(msg) => match msg {
                 JoinCluster::Request(addr) => self.requested(addr),
                 JoinCluster::Response => self.responsed(),
-                _ => debug!("Other stuff"),
+                JoinCluster::Message(str_msg) => debug!("received '{}'", str_msg),
             },
             Err(err) => error!("{}", err)
         }

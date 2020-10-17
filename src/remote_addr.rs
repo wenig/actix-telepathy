@@ -2,6 +2,7 @@ use actix::prelude::*;
 use std::net::SocketAddr;
 use crate::network::NetworkInterface;
 use crate::codec::JoinCluster;
+use crate::messages::RemoteMessage;
 
 pub struct RemoteAddr {
     socket: SocketAddr,
@@ -13,9 +14,8 @@ impl RemoteAddr {
         RemoteAddr{socket, network_interface}
     }
 
-    pub fn send(&mut self, msg: String) {
-        let msg = JoinCluster::Message(msg);
-        self.network_interface.send(msg);
+    pub fn do_send(&mut self, msg: String) -> () {
+        self.network_interface.do_send(JoinCluster::Message(msg));
     }
 }
 

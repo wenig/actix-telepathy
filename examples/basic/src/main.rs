@@ -27,6 +27,9 @@ fn main() {
         let cluster_listener = Supervisor::start(|_| ClusterListener::new(
             Box::new(|msg| {
                 debug!("Callback called");
+                match msg {
+                    ClusterLog::NewMember(mut remote_addr) => remote_addr.do_send(String::from("This is a remote test"))
+                }
             })
         ));
         let cluster = Cluster::new(local_ip, seed_nodes, Some(cluster_listener));
