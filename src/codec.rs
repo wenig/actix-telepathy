@@ -15,6 +15,7 @@ pub enum JoinCluster {
     Request(String),
     Response,
     Message(String),
+    NewMember()
 }
 
 pub struct ConnectCodec {

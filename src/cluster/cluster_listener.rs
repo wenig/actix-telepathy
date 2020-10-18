@@ -1,6 +1,12 @@
 use actix::prelude::*;
-use crate::ClusterLog;
 use log::*;
+use crate::remote_addr::RemoteAddr;
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub enum ClusterLog {
+    NewMember(RemoteAddr),
+}
 
 pub struct ClusterListener {
     callback: Box<dyn Fn(ClusterLog)>

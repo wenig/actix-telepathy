@@ -2,7 +2,6 @@ use actix::prelude::*;
 use std::net::SocketAddr;
 use crate::network::NetworkInterface;
 use crate::codec::JoinCluster;
-use crate::messages::RemoteMessage;
 
 pub struct RemoteAddr {
     socket: SocketAddr,
