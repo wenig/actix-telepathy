@@ -2,7 +2,7 @@
 
 use actix_rt;
 use actix_telepathy::*;
-use actix::{System, Actor, Handler, Context, Supervisor};
+use actix::{System, Actor, Handler, Context, Supervisor, Supervised};
 use structopt::StructOpt;
 use log::Level;
 
@@ -11,6 +11,23 @@ use log::Level;
 struct Parameters {
     local_ip: String,
     seed_nodes: Option<String>,
+}
+
+struct OwnListener {}
+
+impl ClusterListener for OwnListener {}
+impl Supervised for OwnListener {}
+
+impl Actor for OwnListener {
+    type Context = Context<Self>;
+}
+
+impl Handler<ClusterLog> for OwnListener {
+    type Result = ();
+
+    fn handle(&mut self, _msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Clusterlog");
+    }
 }
 
 
@@ -24,15 +41,8 @@ fn main() {
     //let sys = actix::System::new("remote-example");
 
     actix::System::run(|| {
-        let cluster_listener = Supervisor::start(|_| ClusterListener::new(
-            Box::new(|msg| {
-                debug!("Callback called");
-                match msg {
-                    ClusterLog::NewMember(mut remote_addr) => remote_addr.do_send(String::from("This is a remote test"))
-                }
-            })
-        ));
-        let cluster = Cluster::new(local_ip, seed_nodes, Some(cluster_listener));
+        let cluster_listener = Supervisor::start(|_| OwnListener {});
+        let cluster = Cluster::new(local_ip, seed_nodes, vec![cluster_listener.recipient()]);
     });
     //let _ = sys.run();
 }

@@ -11,6 +11,13 @@ pub enum GossipEvent {
     MemberDown(String, Vec<String>),
 }
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub enum GossipIgniting {
+    MemberUp(String, Addr<NetworkInterface>),
+    MemberDown(String)
+}
+
 pub struct Gossip {
     own_addr: String,
     members: HashMap<String, Addr<NetworkInterface>>
@@ -24,7 +31,13 @@ impl Gossip {
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
         debug!("Member {} added!", new_addr.clone());
         self.members.insert(new_addr.clone(), node);
-        self.gossip_event(GossipEvent::MemberUp(new_addr.clone(), vec![self.own_addr.clone(), new_addr]))
+        self.gossip_event(GossipEvent::MemberUp(new_addr.clone(), vec![self.own_addr.clone(), new_addr]));
+    }
+
+    fn remove_member(&mut self, addr: String) {
+        debug!("Member {} removed", addr.clone());
+        self.members.remove(&addr);
+        self.gossip_event(GossipEvent::MemberDown(addr, vec![self.own_addr.clone()]));
     }
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
@@ -53,19 +66,19 @@ impl Handler<GossipEvent> for Gossip {
 
     fn handle(&mut self, msg: GossipEvent, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            GossipEvent::MemberUp(new_addr, seen_addrs) => debug!("New member joined cluster"),
+            GossipEvent::MemberUp(new_addr, seen_addrs) => debug!("Member joined cluster"),
             GossipEvent::MemberDown(addr, seen_addrs) => debug!("Member left cluster"),
         }
     }
 }
 
-impl Handler<NodeEvents> for Gossip {
+impl Handler<GossipIgniting> for Gossip {
     type Result = ();
 
-    fn handle(&mut self, msg: NodeEvents, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: GossipIgniting, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            NodeEvents::MemberUp(new_addr, node) => self.add_member(new_addr, node),
-            NodeEvents::MemberDown(addr) => debug!("Member left cluster"),
+            GossipIgniting::MemberUp(new_addr, node) => self.add_member(new_addr, node),
+            GossipIgniting::MemberDown(addr) => self.remove_member(addr),
         }
     }
 }

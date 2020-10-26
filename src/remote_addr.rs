@@ -23,3 +23,9 @@ impl ToString for RemoteAddr {
         self.socket.to_string()
     }
 }
+
+impl Clone for RemoteAddr {
+    fn clone(&self) -> Self {
+        RemoteAddr::new(self.socket.clone(), self.network_interface.clone())
+    }
+}

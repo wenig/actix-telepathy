@@ -12,7 +12,8 @@ use futures::StreamExt;
 use futures::executor::block_on;
 use std::net::SocketAddr;
 use std::any::Any;
-use crate::cluster::gossip::{Gossip};
+use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
+use crate::remote_addr::RemoteAddr;
 
 
 #[derive(Message)]
@@ -22,17 +23,20 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents{
-    MemberUp(String, Addr<NetworkInterface>),
+    MemberUp(String, Addr<NetworkInterface>, RemoteAddr),
     MemberDown(String)
 }
 
 pub struct Cluster {
     ip_address: String,
     addrs: Vec<String>,
-    listener: Option<Addr<ClusterListener>>,
+    listeners: Vec<Recipient<ClusterLog>>,
     gossip: Addr<Gossip>,
     own_addr: Option<Addr<Cluster>>,
+    nodes: Vec<Addr<NetworkInterface>>
 }
+
+pub type CL = dyn ClusterListener<Context=dyn Any, Result=()>;
 
 impl Actor for Cluster {
     type Context = Context<Self>;
@@ -41,10 +45,10 @@ impl Actor for Cluster {
         self.own_addr = Some(ctx.address());
         for node_addr in self.addrs.iter() {
             let addr = SocketAddr::from_str(&node_addr).unwrap();
-            let listener = self.listener.clone();
             let own_ip = self.ip_address.clone();
             let parent = self.own_addr.clone().unwrap();
-            let node = Supervisor::start(move |_| NetworkInterface::new(own_ip, addr, listener, parent));
+            let node = Supervisor::start(move |_| NetworkInterface::new(own_ip, addr, parent));
+            self.nodes.push(node);
         }
     }
 }
@@ -56,10 +60,10 @@ impl Handler<TcpConnect> for Cluster {
         debug!("Incoming TcpConnect");
         let stream = msg.0;
         let addr = msg.1;
-        let listener = self.listener.clone();
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
-        let node = Supervisor::start(move |_| NetworkInterface::from_stream(own_ip, addr, stream, listener, parent));
+        let node = Supervisor::start(move |_| NetworkInterface::from_stream(own_ip, addr, stream, parent));
+        self.nodes.push(node);
     }
 }
 
@@ -67,12 +71,26 @@ impl Handler<NodeEvents> for Cluster {
     type Result = ();
 
     fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
-        self.gossip.do_send(msg)
+        match msg {
+            NodeEvents::MemberUp(host, node, remote_addr) => {
+                self.gossip.do_send(GossipIgniting::MemberUp(host.clone(), node));
+                for listener in self.listeners.iter() {
+                    listener.do_send(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
+                }
+            },
+            NodeEvents::MemberDown(host) => {
+                self.gossip.do_send(GossipIgniting::MemberDown(host.clone()));
+                for listener in self.listeners.iter() {
+                    listener.do_send(ClusterLog::MemberLeft(host.clone()));
+                }
+            }
+        }
+
     }
 }
 
 impl Cluster {
-    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listener: Option<Addr<ClusterListener>>) -> Addr<Cluster> {
+    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -91,7 +109,7 @@ impl Cluster {
 
             let own_ip_addres = ip_address.clone();
             let gossip = Supervisor::start(move |_| Gossip::new(own_ip_addres));
-            Cluster {ip_address, addrs, listener: cluster_listener, gossip, own_addr: None}
+            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, own_addr: None, nodes: vec![]}
         })
     }
 
