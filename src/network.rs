@@ -22,6 +22,8 @@ use tokio::net::tcp::OwnedWriteHalf;
 use actix::fut::err;
 use futures::future::Remote;
 use std::ops::Add;
+use std::thread::sleep;
+use actix::clock::Duration;
 
 
 pub struct NetworkInterface {
@@ -31,7 +33,8 @@ pub struct NetworkInterface {
     framed: Vec<actix::io::FramedWrite<JoinCluster, OwnedWriteHalf, ConnectCodec>>,
     connected: bool,
     own_addr: Option<Addr<NetworkInterface>>,
-    parent: Addr<Cluster>
+    parent: Addr<Cluster>,
+    counter: i8
 }
 
 
@@ -41,18 +44,33 @@ impl Actor for NetworkInterface {
     fn started(&mut self, ctx: &mut Context<Self>) {
         debug!("NetworkInterface started!");
         self.own_addr = Some(ctx.address());
+        self.counter = 0;
         if self.stream.is_empty() {
             self.connect_to_stream(ctx);
         } else {
             self.frame_stream(ctx);
         }
     }
+
+    fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
+        if self.counter < 5 {
+            self.stream = vec![];
+            self.connect_to_stream(ctx);
+            return Running::Continue
+        }
+        Running::Stop
+    }
+
+    fn stopped(&mut self, ctx: &mut Context<Self>) {
+        debug!("NetworkInterface stopped! {}", self.addr);
+        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+    }
 }
 
 
 impl NetworkInterface {
     pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>) -> NetworkInterface {
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent }
+        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, counter: 0 }
     }
 
     pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>) -> NetworkInterface {
@@ -79,19 +97,27 @@ impl NetworkInterface {
             .into_actor(self)
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
-                    debug!("Connected to network node: {}", act.addr.clone().to_string());
+                    if stream.is_err() {
+                        debug!("Connection refused! Trying to reconnect!");
+                        act.counter += 1;
+                        sleep(Duration::from_secs(1));
+                        ctx.stop();
+                    } else {
+                        debug!("Connected to network node: {}", act.addr.clone().to_string());
 
-                    let mut stream = stream.expect("error");
-                    let (mut r, w) = stream.into_split();
+                        let mut stream = stream.unwrap();
 
-                    // configure write side of the connection
-                    let mut framed =
-                        actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-                    framed.write(JoinCluster::Request(act.own_ip.clone()));
-                    act.framed.push(framed);
+                        let (mut r, w) = stream.into_split();
 
-                    // read side of the connection
-                    ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
+                        // configure write side of the connection
+                        let mut framed =
+                            actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
+                        framed.write(JoinCluster::Request(act.own_ip.clone()));
+                        act.framed.push(framed);
+
+                        // read side of the connection
+                        ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
+                    }
                 },
                 Err(err) => error!("{}", err),
             })
@@ -105,7 +131,10 @@ impl NetworkInterface {
             Some(addr) => {
                 let remote_address = RemoteAddr::new(self.addr, addr);
                 let peer_addr = match peer_addr {
-                    Some(p_a) => p_a,
+                    Some(p_a) => {
+                        self.addr = SocketAddr::from_str(&p_a).unwrap();
+                        self.addr.to_string()
+                    },
                     None => self.addr.to_string()
                 };
                 match &self.own_addr {

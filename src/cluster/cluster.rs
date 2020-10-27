@@ -33,7 +33,7 @@ pub struct Cluster {
     listeners: Vec<Recipient<ClusterLog>>,
     gossip: Addr<Gossip>,
     own_addr: Option<Addr<Cluster>>,
-    nodes: Vec<Addr<NetworkInterface>>
+    nodes: HashMap<String, Addr<NetworkInterface>>
 }
 
 pub type CL = dyn ClusterListener<Context=dyn Any, Result=()>;
@@ -47,8 +47,8 @@ impl Actor for Cluster {
             let addr = SocketAddr::from_str(&node_addr).unwrap();
             let own_ip = self.ip_address.clone();
             let parent = self.own_addr.clone().unwrap();
-            let node = Supervisor::start(move |_| NetworkInterface::new(own_ip, addr, parent));
-            self.nodes.push(node);
+            let node = NetworkInterface::new(own_ip, addr, parent).start();
+            self.nodes.insert(node_addr.clone(), node);
         }
     }
 }
@@ -62,8 +62,8 @@ impl Handler<TcpConnect> for Cluster {
         let addr = msg.1;
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
-        let node = Supervisor::start(move |_| NetworkInterface::from_stream(own_ip, addr, stream, parent));
-        self.nodes.push(node);
+        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent).start();
+        self.nodes.insert(addr.to_string(), node);
     }
 }
 
@@ -109,7 +109,7 @@ impl Cluster {
 
             let own_ip_addres = ip_address.clone();
             let gossip = Supervisor::start(move |_| Gossip::new(own_ip_addres));
-            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, own_addr: None, nodes: vec![]}
+            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, own_addr: None, nodes: HashMap::new()}
         })
     }
 
