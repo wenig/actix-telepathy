@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use log::*;
-use crate::remote_addr::RemoteAddr;
+use crate::remote::RemoteAddr;
 use actix::dev::channel::AddressReceiver;
 
 #[derive(Message)]

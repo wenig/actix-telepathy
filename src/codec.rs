@@ -6,16 +6,16 @@ use futures::io::Error;
 use bytes::{BytesMut, BufMut};
 use byteorder::{NetworkEndian, ByteOrder};
 use serde::{Serialize, Deserialize};
+use crate::remote::RemoteMessage;
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 
-#[derive(Debug, Message, Deserialize, Serialize)]
+#[derive(Message, Deserialize, Serialize)]
 #[rtype(result = "()")]
-pub enum JoinCluster {
+pub enum ClusterMessage {
     Request(String),
     Response,
-    Message(String),
-    NewMember()
+    Message(RemoteMessage)
 }
 
 pub struct ConnectCodec {
@@ -29,7 +29,7 @@ impl ConnectCodec {
 }
 
 impl Decoder for ConnectCodec {
-    type Item = JoinCluster;
+    type Item = ClusterMessage;
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -55,20 +55,20 @@ impl Decoder for ConnectCodec {
         if src.len() >= size + 2 {
             src.split_to(2);
             let buf = src.split_to(size);
-            Ok(Some(serde_json::from_slice::<JoinCluster>(&buf)?))
+            Ok(Some(serde_json::from_slice::<ClusterMessage>(&buf)?))
         } else {
             Ok(None)
         }
     }
 }
 
-impl Encoder<JoinCluster> for ConnectCodec {
+impl Encoder<ClusterMessage> for ConnectCodec {
     type Error = Error;
 
-    fn encode(&mut self, item: JoinCluster, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: ClusterMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
         match item {
-            JoinCluster::Request(_) => dst.extend_from_slice(PREFIX),
-            JoinCluster::Response => dst.extend_from_slice(PREFIX),
+            ClusterMessage::Request(_) => dst.extend_from_slice(PREFIX),
+            ClusterMessage::Response => dst.extend_from_slice(PREFIX),
             _ => {}
         }
 

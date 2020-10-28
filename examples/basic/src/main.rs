@@ -25,8 +25,13 @@ impl Actor for OwnListener {
 impl Handler<ClusterLog> for OwnListener {
     type Result = ();
 
-    fn handle(&mut self, _msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Clusterlog");
+    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            ClusterLog::NewMember(addr, mut remote_addr) => {
+                //remote_addr.do_send_remote(RemoteMessage::new(Box::new("welcome")));
+            },
+            ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
+        }
     }
 }
 

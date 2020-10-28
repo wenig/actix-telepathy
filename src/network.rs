@@ -10,9 +10,9 @@ use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError, FramedWrite};
 use std::io::{Error};
 use futures::TryFutureExt;
 
-use crate::cluster::{Cluster, ClusterLog, NodeEvents};
-use crate::codec::{JoinCluster, ConnectCodec};
-use crate::remote_addr::RemoteAddr;
+use crate::cluster::{Cluster, ClusterLog, NodeEvents, Gossip};
+use crate::codec::{ClusterMessage, ConnectCodec};
+use crate::remote::{RemoteAddr, RemoteMessage, AddrRepresentation};
 use futures::TryStreamExt;
 use tokio::prelude::io::AsyncBufReadExt;
 use actix::io::{WriteHandler};
@@ -30,10 +30,11 @@ pub struct NetworkInterface {
     own_ip: String,
     pub addr: SocketAddr,
     stream: Vec<TcpStream>,
-    framed: Vec<actix::io::FramedWrite<JoinCluster, OwnedWriteHalf, ConnectCodec>>,
+    framed: Vec<actix::io::FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
     connected: bool,
     own_addr: Option<Addr<NetworkInterface>>,
     parent: Addr<Cluster>,
+    gossip: Addr<Gossip>,
     counter: i8
 }
 
@@ -69,12 +70,12 @@ impl Actor for NetworkInterface {
 
 
 impl NetworkInterface {
-    pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>) -> NetworkInterface {
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, counter: 0 }
+    pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>) -> NetworkInterface {
+        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, counter: 0 }
     }
 
-    pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>) -> NetworkInterface {
-        let mut ni = Self::new(own_ip, addr, parent);
+    pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>) -> NetworkInterface {
+        let mut ni = Self::new(own_ip, addr, parent, gossip);
         ni.stream.push(stream);
         ni
     }
@@ -84,7 +85,7 @@ impl NetworkInterface {
         let (mut r, w) = stream.into_split();
 
         let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-        framed.write(JoinCluster::Response);
+        framed.write(ClusterMessage::Response);
         self.framed.push(framed);
 
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
@@ -112,7 +113,7 @@ impl NetworkInterface {
                         // configure write side of the connection
                         let mut framed =
                             actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-                        framed.write(JoinCluster::Request(act.own_ip.clone()));
+                        framed.write(ClusterMessage::Request(act.own_ip.clone()));
                         act.framed.push(framed);
 
                         // read side of the connection
@@ -129,7 +130,7 @@ impl NetworkInterface {
 
         match self.own_addr.clone() {
             Some(addr) => {
-                let remote_address = RemoteAddr::new(self.addr, addr);
+                let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr), AddrRepresentation::NetworkInterface);
                 let peer_addr = match peer_addr {
                     Some(p_a) => {
                         self.addr = SocketAddr::from_str(&p_a).unwrap();
@@ -156,31 +157,39 @@ impl NetworkInterface {
         self.finish_connecting(None);
     }
 
-    fn transmit_message(&mut self, msg: JoinCluster){
+    fn transmit_message(&mut self, msg: ClusterMessage) {
         &self.framed[0].write(msg);
+    }
+
+    fn received_message(&mut self, mut msg: RemoteMessage) {
+        debug!("Received Remote Message {}", msg.message);
+        match msg.destination.id {
+            AddrRepresentation::NetworkInterface => debug!("Send to self"), //self.own_addr.unwrap().do_send(msg.message)
+            AddrRepresentation::Gossip => debug!("Send to gossip"), //self.gossip.do_send(msg.message),
+            AddrRepresentation::Uuid(id) => debug!("AddressResolver returns Addr")
+        };
     }
 }
 
-impl StreamHandler<Result<JoinCluster, Error>> for NetworkInterface {
-    fn handle(&mut self, item: Result<JoinCluster, Error>, _ctx: &mut Context<Self>) {
+impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
+    fn handle(&mut self, item: Result<ClusterMessage, Error>, _ctx: &mut Context<Self>) {
         match item {
             Ok(msg) => match msg {
-                JoinCluster::Request(addr) => self.requested(addr),
-                JoinCluster::Response => self.responsed(),
-                JoinCluster::Message(str_msg) => debug!("received '{}'", str_msg),
-                _ => {}
+                ClusterMessage::Request(addr) => self.requested(addr),
+                ClusterMessage::Response => self.responsed(),
+                ClusterMessage::Message(remote_message) => self.received_message(remote_message),
             },
             Err(err) => error!("{}", err)
         }
     }
 }
 
-impl Handler<JoinCluster> for NetworkInterface {
+impl Handler<ClusterMessage> for NetworkInterface {
     type Result = ();
 
-    fn handle(&mut self, msg: JoinCluster, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Received local message");
-        self.transmit_message(msg)
+        self.transmit_message(msg);
     }
 }
 

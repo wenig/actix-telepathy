@@ -13,7 +13,7 @@ use futures::executor::block_on;
 use std::net::SocketAddr;
 use std::any::Any;
 use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
-use crate::remote_addr::RemoteAddr;
+use crate::remote::RemoteAddr;
 
 
 #[derive(Message)]
@@ -47,7 +47,8 @@ impl Actor for Cluster {
             let addr = SocketAddr::from_str(&node_addr).unwrap();
             let own_ip = self.ip_address.clone();
             let parent = self.own_addr.clone().unwrap();
-            let node = NetworkInterface::new(own_ip, addr, parent).start();
+            let gossip = self.gossip.clone();
+            let node = NetworkInterface::new(own_ip, addr, parent, gossip).start();
             self.nodes.insert(node_addr.clone(), node);
         }
     }
@@ -62,7 +63,8 @@ impl Handler<TcpConnect> for Cluster {
         let addr = msg.1;
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
-        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent).start();
+        let gossip = self.gossip.clone();
+        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip).start();
         self.nodes.insert(addr.to_string(), node);
     }
 }

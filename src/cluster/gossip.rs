@@ -1,14 +1,56 @@
 use log::*;
 use actix::prelude::*;
-use crate::network::NetworkInterface;
 use std::collections::HashMap;
+use serde::{Serialize, Deserialize};
+use std::str::FromStr;
+use rand::thread_rng;
+use rand::seq::SliceRandom;
+use crate::network::NetworkInterface;
 use crate::cluster::cluster::NodeEvents;
+use crate::codec::ClusterMessage;
+use crate::remote::{RemoteMessage, Sendable, AddrRepresentation};
+use crate::RemoteAddr;
 
-#[derive(Message)]
+#[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub enum GossipEvent {
-    MemberUp(String, Vec<String>),
-    MemberDown(String, Vec<String>),
+pub struct GossipEvent {
+    addr: String,
+    seen_addrs: Vec<String>,
+    add: bool
+}
+
+impl GossipEvent {
+    pub fn member_up(addr: String, seen_addrs: Vec<String>) -> GossipEvent {
+        GossipEvent {addr, seen_addrs, add: true}
+    }
+
+    pub fn member_down(addr: String, seen_addrs: Vec<String>) -> GossipEvent {
+        GossipEvent {addr, seen_addrs, add: false}
+    }
+}
+
+impl Sendable for GossipEvent {}
+
+impl ToString for GossipEvent {
+    fn to_string(&self) -> String {
+        serde_json::to_string(self).expect("Could not serialize GossipEvent")
+    }
+}
+
+impl FromStr for GossipEvent {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<GossipEvent, Self::Err> {
+        debug!("'{}'", s);
+        let deserialized: GossipEvent = serde_json::from_str(s).expect("Could not deserialize RemoteMessage!");
+        Ok(deserialized)
+    }
+}
+
+impl Clone for GossipEvent {
+    fn clone(&self) -> Self {
+        GossipEvent {addr: self.addr.clone(), seen_addrs: self.seen_addrs.clone(), add: self.add}
+    }
 }
 
 #[derive(Message)]
@@ -31,25 +73,33 @@ impl Gossip {
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
         debug!("Member {} added!", new_addr.clone());
         self.members.insert(new_addr.clone(), node);
-        self.gossip_event(GossipEvent::MemberUp(new_addr.clone(), vec![self.own_addr.clone(), new_addr]));
+        self.gossip_event(GossipEvent::member_up(new_addr.clone(), vec![self.own_addr.clone(), new_addr]));
     }
 
     fn remove_member(&mut self, addr: String) {
         debug!("Member {} removed", addr.clone());
         self.members.remove(&addr);
-        self.gossip_event(GossipEvent::MemberDown(addr, vec![self.own_addr.clone()]));
+        self.gossip_event(GossipEvent::member_down(addr, vec![self.own_addr.clone()]));
     }
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
-        // todo: tell cluster to add NetworkInterface
+        // todo: tell cluster to add NetworkInterface (randomly choose nodes from seen_addrs)
+        /*let mut rng = &mut thread_rng();
+        let chosen_addrs: Vec<String> = seen_addrs.choose_multiple(rng, 3);*/
     }
 
     fn member_down(&mut self, new_addr: String, seen_addrs: Vec<String>) {
-        // todo: tell cluster to remove NetworkInterface
+        // todo: tell cluster to remove NetworkInterface (randomly choose nodes from seen_addrs)
     }
 
     fn gossip_event(&mut self, event: GossipEvent) {
-        // todo: Randomly choose members to gossip to
+        for (addr, network_interface) in self.members.iter() {
+            network_interface.do_send(ClusterMessage::Message(
+                RemoteMessage::new(
+                    RemoteAddr::new_gossip(addr.clone(), None),
+                    Box::new(event.clone()))
+            ));
+        }
     }
 }
 
@@ -65,10 +115,20 @@ impl Handler<GossipEvent> for Gossip {
     type Result = ();
 
     fn handle(&mut self, msg: GossipEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        match msg {
-            GossipEvent::MemberUp(new_addr, seen_addrs) => debug!("Member joined cluster"),
-            GossipEvent::MemberDown(addr, seen_addrs) => debug!("Member left cluster"),
+        if msg.add {
+            debug!("Member joined cluster");
+        } else {
+            debug!("Member left cluster");
         }
+    }
+}
+
+impl Handler<RemoteMessage> for Gossip {
+    type Result = ();
+
+    fn handle(&mut self, msg: RemoteMessage, ctx: &mut Context<Self>) -> Self::Result {
+        let gossip_event = GossipEvent::from_str(&msg.message).expect("Could not deserialize GossipEvent");
+        ctx.address().do_send(gossip_event);
     }
 }
 
