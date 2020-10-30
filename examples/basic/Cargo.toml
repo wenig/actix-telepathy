@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 actix = "0.10"
 actix-rt = "1.1"
-actix-telepathy = { path="../.." }
+actix-telepathy = { path="../..", features = ["derive"] }
 
 log = "0.4"
 env_logger = "0.7"

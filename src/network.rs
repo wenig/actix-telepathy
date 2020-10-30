@@ -12,7 +12,7 @@ use futures::TryFutureExt;
 
 use crate::cluster::{Cluster, ClusterLog, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
-use crate::remote::{RemoteAddr, RemoteMessage, AddrRepresentation};
+use crate::remote::{RemoteAddr, RemoteMessage, AddrRepresentation, AddressResolver, AddressRequest};
 use futures::TryStreamExt;
 use tokio::prelude::io::AsyncBufReadExt;
 use actix::io::{WriteHandler};
@@ -24,6 +24,7 @@ use futures::future::Remote;
 use std::ops::Add;
 use std::thread::sleep;
 use actix::clock::Duration;
+use futures::task::Poll;
 
 
 pub struct NetworkInterface {
@@ -35,6 +36,7 @@ pub struct NetworkInterface {
     own_addr: Option<Addr<NetworkInterface>>,
     parent: Addr<Cluster>,
     gossip: Addr<Gossip>,
+    address_resolver: Addr<AddressResolver>,
     counter: i8
 }
 
@@ -70,12 +72,12 @@ impl Actor for NetworkInterface {
 
 
 impl NetworkInterface {
-    pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>) -> NetworkInterface {
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, counter: 0 }
+    pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
+        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0 }
     }
 
-    pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>) -> NetworkInterface {
-        let mut ni = Self::new(own_ip, addr, parent, gossip);
+    pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
+        let mut ni = Self::new(own_ip, addr, parent, gossip, address_resolver);
         ni.stream.push(stream);
         ni
     }
@@ -164,9 +166,12 @@ impl NetworkInterface {
     fn received_message(&mut self, mut msg: RemoteMessage) {
         debug!("Received Remote Message {}", msg.message);
         match msg.destination.id {
-            AddrRepresentation::NetworkInterface => debug!("Send to self"), //self.own_addr.unwrap().do_send(msg.message)
-            AddrRepresentation::Gossip => debug!("Send to gossip"), //self.gossip.do_send(msg.message),
-            AddrRepresentation::Uuid(id) => debug!("AddressResolver returns Addr")
+            AddrRepresentation::NetworkInterface => self.own_addr.as_ref().unwrap().do_send(msg),
+            AddrRepresentation::Gossip => self.gossip.do_send(msg),
+            AddrRepresentation::Uuid(id) => {
+                let request = self.address_resolver.send(AddressRequest::ResolveStr(id));
+
+            }
         };
     }
 }
@@ -190,6 +195,14 @@ impl Handler<ClusterMessage> for NetworkInterface {
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Received local message");
         self.transmit_message(msg);
+    }
+}
+
+impl Handler<RemoteMessage> for NetworkInterface {
+    type Result = ();
+
+    fn handle(&mut self, msg: RemoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!("Deserialize wrapped message");
     }
 }
 

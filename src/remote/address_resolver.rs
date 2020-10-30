@@ -47,9 +47,17 @@ impl Clone for AddrRepresentation {
 
 
 #[derive(Message)]
-#[rtype(result = "()")]
-pub struct AddressRegistering {
-    addr: Recipient<RemoteMessage>,
+#[rtype(result = "Result<AddressResponse, ()>")]
+pub enum AddressRequest {
+    Register(Recipient<RemoteMessage>),
+    ResolveStr(String),
+    ResolveRec(Recipient<RemoteMessage>)
+}
+
+pub enum AddressResponse {
+    Register,
+    ResolveStr(Recipient<RemoteMessage>),
+    ResolveRec(String)
 }
 
 pub struct AddressResolver {
@@ -58,6 +66,10 @@ pub struct AddressResolver {
 }
 
 impl AddressResolver {
+    pub fn new() -> Self {
+        AddressResolver {str2rec: HashMap::new(), rec2str: HashMap::new()}
+    }
+
     pub fn resolve_str(&mut self, id: String) -> Option<&Recipient<RemoteMessage>> {
         match self.str2rec.get(&id) {
             Some(rec) => Some(rec),
@@ -83,21 +95,44 @@ impl Actor for AddressResolver {
     type Context = Context<Self>;
 }
 
-impl Handler<AddressRegistering> for AddressResolver {
-    type Result = ();
+impl Handler<AddressRequest> for AddressResolver {
+    type Result = Result<AddressResponse, ()>;
 
-    fn handle(&mut self, msg: AddressRegistering, ctx: &mut Context<Self>) -> Self::Result {
-        let is_new = match self.rec2str.get(&msg.addr) {
-            Some(_) => false,
-            None => true,
-        };
+    fn handle(&mut self, msg: AddressRequest, ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            AddressRequest::Register(rec) => {
+                let is_new = match self.rec2str.get(&rec) {
+                    Some(_) => false,
+                    None => true,
+                };
 
-        if is_new {
-            let id = Uuid::new_v4().to_string();
-            self.str2rec.insert(id.clone(), msg.addr.clone());
-            self.rec2str.insert(msg.addr, id);
-        } else {
-            debug!("Recipient is already added");
+                if is_new {
+                    let id = Uuid::new_v4().to_string();
+                    self.str2rec.insert(id.clone(), rec.clone());
+                    self.rec2str.insert(rec, id);
+                    debug!("Actor registered");
+                    Ok(AddressResponse::Register)
+                } else {
+                    debug!("Recipient is already added");
+                    Err(())
+                }
+            },
+            AddressRequest::ResolveStr(id) => {
+                let rec = self.resolve_str(id);
+                match rec {
+                    Some(r) => Ok(AddressResponse::ResolveStr((*r).clone())),
+                    None => Err(())
+                }
+            },
+            AddressRequest::ResolveRec(rec) => {
+                let id = self.resolve_rec(&rec);
+                match id {
+                    Some(i) => Ok(AddressResponse::ResolveRec(i.clone())),
+                    None => Err(())
+                }
+            }
         }
     }
 }
+
+impl Supervised for AddressResolver {}

@@ -1,6 +1,7 @@
 use log::*;
 use actix::prelude::*;
-use serde::{Serialize, Deserialize, };
+use serde::{Serialize, Deserialize};
+use serde_json::{Value};
 use std::str::FromStr;
 use crate::RemoteAddr;
 
@@ -34,4 +35,11 @@ impl FromStr for RemoteMessage {
     }
 }
 
-pub trait Sendable: ToString + FromStr {}
+pub trait Sendable: ToString + FromStr {
+    fn get_identifier() -> String;
+
+    fn is_message(serialized_msg: &String) -> bool {
+        let v: Value = serde_json::from_str(serialized_msg).expect("String is no valid JSON");
+        v["identifier"] == Self::get_identifier()
+    }
+}

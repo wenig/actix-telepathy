@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use std::net;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, ErrorKind, Result as IoResult};
 use tokio::net::{TcpListener, TcpStream};
 use std::collections::{HashMap, VecDeque};
 use log::*;
@@ -13,7 +13,8 @@ use futures::executor::block_on;
 use std::net::SocketAddr;
 use std::any::Any;
 use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
-use crate::remote::RemoteAddr;
+use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteMessage};
+use serde::de::IgnoredAny;
 
 
 #[derive(Message)]
@@ -32,6 +33,7 @@ pub struct Cluster {
     addrs: Vec<String>,
     listeners: Vec<Recipient<ClusterLog>>,
     gossip: Addr<Gossip>,
+    address_resolver: Addr<AddressResolver>,
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<String, Addr<NetworkInterface>>
 }
@@ -48,7 +50,8 @@ impl Actor for Cluster {
             let own_ip = self.ip_address.clone();
             let parent = self.own_addr.clone().unwrap();
             let gossip = self.gossip.clone();
-            let node = NetworkInterface::new(own_ip, addr, parent, gossip).start();
+            let address_resolver = self.address_resolver.clone();
+            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver).start();
             self.nodes.insert(node_addr.clone(), node);
         }
     }
@@ -64,7 +67,8 @@ impl Handler<TcpConnect> for Cluster {
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone();
-        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip).start();
+        let address_resolver = self.address_resolver.clone();
+        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip, address_resolver).start();
         self.nodes.insert(addr.to_string(), node);
     }
 }
@@ -91,6 +95,15 @@ impl Handler<NodeEvents> for Cluster {
     }
 }
 
+impl Handler<AddressRequest> for Cluster {
+    type Result = Result<AddressResponse, ()>;
+
+    fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        self.address_resolver.send(msg);
+        Ok(AddressResponse::Register)
+    }
+}
+
 impl Cluster {
     pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
@@ -111,13 +124,28 @@ impl Cluster {
 
             let own_ip_addres = ip_address.clone();
             let gossip = Supervisor::start(move |_| Gossip::new(own_ip_addres));
-            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, own_addr: None, nodes: HashMap::new()}
+            let address_resolver = Supervisor::start(|_| AddressResolver::new());
+            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, address_resolver, own_addr: None, nodes: HashMap::new()}
         })
     }
 
-    fn bind(addr: String) -> Result<Box<TcpListener>> {
+    fn bind(addr: String) -> IoResult<Box<TcpListener>> {
         let addr = net::SocketAddr::from_str(&addr).unwrap();
         let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
         Ok(listener)
+    }
+
+    fn register_actor(&self, rec: Recipient<RemoteMessage>) {
+        self.own_addr.as_ref().unwrap().send(AddressRequest::Register(rec));
+    }
+}
+
+pub trait AddrApi {
+    fn register_actor(&self, rec: Recipient<RemoteMessage>);
+}
+
+impl AddrApi for Addr<Cluster> {
+    fn register_actor(&self, addr: Recipient<RemoteMessage>) -> () {
+        self.send(AddressRequest::Register(addr));
     }
 }

@@ -29,7 +29,11 @@ impl GossipEvent {
     }
 }
 
-impl Sendable for GossipEvent {}
+impl Sendable for GossipEvent {
+    fn get_identifier() -> String {
+        String::from("gossip_event")
+    }
+}
 
 impl ToString for GossipEvent {
     fn to_string(&self) -> String {
