@@ -169,7 +169,7 @@ impl NetworkInterface {
             AddrRepresentation::NetworkInterface => self.own_addr.as_ref().unwrap().do_send(msg),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
             AddrRepresentation::Uuid(id) => {
-                let request = self.address_resolver.send(AddressRequest::ResolveStr(id));
+                //let request = self.address_resolver.send(AddressRequest::ResolveStr(id));
 
             }
         };

@@ -13,14 +13,12 @@ use std::any::TypeId;
 struct Welcome {}
 
 impl Sendable for Welcome {
-    fn get_identifier() -> String {
-        String::from("welcome")
-    }
+    const IDENTIFIER: String = "welcome".to_string();
 }
 
 impl ToString for Welcome {
     fn to_string(&self) -> String {
-        Self::get_identifier()
+        format!("{{\"identifier\": \"{}\"}}", Self::IDENTIFIER)
     }
 }
 
@@ -40,6 +38,7 @@ struct Parameters {
 }
 
 #[derive(RemoteActor)]
+#[remote_messages(Welcome)]
 struct OwnListener {}
 
 impl OwnListener {
@@ -58,10 +57,10 @@ impl Actor for OwnListener {
 impl Handler<ClusterLog> for OwnListener {
     type Result = ();
 
-    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(addr, mut remote_addr) => {
-                remote_addr.do_send(Box::new(Welcome {}));
+                ctx.address().do_send(RemoteMessage::new(remote_addr, Box::new(Welcome {})));
             },
             ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
         }
@@ -79,18 +78,6 @@ impl Handler<Welcome> for OwnListener {
 
 fn test(s: &String) {
     debug!("{}", s)
-}
-
-
-impl Handler<RemoteMessage> for OwnListener {
-    type Result = ();
-
-    fn handle(&mut self, mut msg: RemoteMessage, ctx: &mut Context<Self>) -> Self::Result {
-        if Welcome::is_message(&(msg.message)) {
-            let deserialized_msg = Welcome::from_str(&(msg.message)).expect("Cannot deserialized Welcome message");
-            ctx.address().send(deserialized_msg);
-        }
-    }
 }
 
 

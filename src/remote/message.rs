@@ -36,10 +36,11 @@ impl FromStr for RemoteMessage {
 }
 
 pub trait Sendable: ToString + FromStr {
-    fn get_identifier() -> String;
+    const IDENTIFIER: String;
 
     fn is_message(serialized_msg: &String) -> bool {
         let v: Value = serde_json::from_str(serialized_msg).expect("String is no valid JSON");
-        v["identifier"] == Self::get_identifier()
+        debug!("identifier is {}", v["identifier"]);
+        v["identifier"] == Self::IDENTIFIER
     }
 }
