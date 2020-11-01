@@ -13,6 +13,7 @@ use futures::TryFutureExt;
 use crate::cluster::{Cluster, ClusterLog, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteMessage, AddrRepresentation, AddressResolver, AddressRequest};
+use actix_telepathy_derive::RemoteActor;
 use futures::TryStreamExt;
 use tokio::prelude::io::AsyncBufReadExt;
 use actix::io::{WriteHandler};
@@ -164,9 +165,8 @@ impl NetworkInterface {
     }
 
     fn received_message(&mut self, mut msg: RemoteMessage) {
-        debug!("Received Remote Message {}", msg.message);
         match msg.destination.id {
-            AddrRepresentation::NetworkInterface => self.own_addr.as_ref().unwrap().do_send(msg),
+            AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
             AddrRepresentation::Uuid(id) => {
                 //let request = self.address_resolver.send(AddressRequest::ResolveStr(id));
@@ -193,16 +193,7 @@ impl Handler<ClusterMessage> for NetworkInterface {
     type Result = ();
 
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Received local message");
         self.transmit_message(msg);
-    }
-}
-
-impl Handler<RemoteMessage> for NetworkInterface {
-    type Result = ();
-
-    fn handle(&mut self, msg: RemoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Deserialize wrapped message");
     }
 }
 

@@ -13,12 +13,12 @@ use std::any::TypeId;
 struct Welcome {}
 
 impl Sendable for Welcome {
-    const IDENTIFIER: String = "welcome".to_string();
+    const IDENTIFIER: &'static str = "welcome";
 }
 
 impl ToString for Welcome {
     fn to_string(&self) -> String {
-        format!("{{\"identifier\": \"{}\"}}", Self::IDENTIFIER)
+        "{}".to_string()
     }
 }
 
@@ -60,7 +60,7 @@ impl Handler<ClusterLog> for OwnListener {
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(addr, mut remote_addr) => {
-                ctx.address().do_send(RemoteMessage::new(remote_addr, Box::new(Welcome {})));
+                remote_addr.do_send(Box::new(Welcome {}));
             },
             ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
         }
@@ -73,11 +73,6 @@ impl Handler<Welcome> for OwnListener {
     fn handle(&mut self, msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
         debug!("Welcome said")
     }
-}
-
-
-fn test(s: &String) {
-    debug!("{}", s)
 }
 
 

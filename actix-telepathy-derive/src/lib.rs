@@ -23,7 +23,7 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
         if first {
             chained_if = quote! {
                 if #name::is_message(&(msg.message)) {
-                    let deserialized_msg = #name::from_str(&(msg.message)).expect("Cannot deserialized #name message");
+                    let deserialized_msg: #name = #name::from_packed(&(msg.message)).expect("Cannot deserialized #name message");
                     ctx.address().do_send(deserialized_msg);
                 }
             };
@@ -32,10 +32,18 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
             chained_if = quote! {
                 #chained_if
                 else if #name::is_message(&(msg.message)) {
-                    let deserialized_msg: #name = #name::from_str(&(msg.message)).expect("Cannot deserialized #name message");
+                    let deserialized_msg: #name = #name::from_packed(&(msg.message)).expect("Cannot deserialized #name message");
                     ctx.address().do_send(deserialized_msg);
                 }
             };
+        }
+    }
+    if !first {
+        chained_if = quote! {
+            #chained_if
+            else {
+                warn!("Message dropped because identifier of {} is unknown", &(msg.message));
+            }
         }
     }
 

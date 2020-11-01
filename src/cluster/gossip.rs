@@ -10,6 +10,7 @@ use crate::cluster::cluster::NodeEvents;
 use crate::codec::ClusterMessage;
 use crate::remote::{RemoteMessage, Sendable, AddrRepresentation};
 use crate::RemoteAddr;
+use actix_telepathy_derive::{RemoteActor};
 
 #[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -30,9 +31,7 @@ impl GossipEvent {
 }
 
 impl Sendable for GossipEvent {
-    fn get_identifier() -> String {
-        String::from("gossip_event")
-    }
+    const IDENTIFIER: &'static str = "gossip_event";
 }
 
 impl ToString for GossipEvent {
@@ -45,7 +44,6 @@ impl FromStr for GossipEvent {
     type Err = ();
 
     fn from_str(s: &str) -> Result<GossipEvent, Self::Err> {
-        debug!("'{}'", s);
         let deserialized: GossipEvent = serde_json::from_str(s).expect("Could not deserialize RemoteMessage!");
         Ok(deserialized)
     }
@@ -64,6 +62,8 @@ pub enum GossipIgniting {
     MemberDown(String)
 }
 
+#[derive(RemoteActor)]
+#[remote_messages(GossipEvent)]
 pub struct Gossip {
     own_addr: String,
     members: HashMap<String, Addr<NetworkInterface>>
@@ -124,15 +124,6 @@ impl Handler<GossipEvent> for Gossip {
         } else {
             debug!("Member left cluster");
         }
-    }
-}
-
-impl Handler<RemoteMessage> for Gossip {
-    type Result = ();
-
-    fn handle(&mut self, msg: RemoteMessage, ctx: &mut Context<Self>) -> Self::Result {
-        let gossip_event = GossipEvent::from_str(&msg.message).expect("Could not deserialize GossipEvent");
-        ctx.address().do_send(gossip_event);
     }
 }
 
