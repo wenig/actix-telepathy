@@ -168,10 +168,7 @@ impl NetworkInterface {
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
-            AddrRepresentation::Uuid(id) => {
-                //let request = self.address_resolver.send(AddressRequest::ResolveStr(id));
-
-            }
+            AddrRepresentation::Key(_) => self.address_resolver.do_send(msg)
         };
     }
 }

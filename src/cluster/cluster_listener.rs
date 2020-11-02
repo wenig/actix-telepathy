@@ -3,6 +3,7 @@ use log::*;
 use crate::remote::RemoteAddr;
 use actix::dev::channel::AddressReceiver;
 
+/// Message sent to ClusterListeners if members join or leave the cluster
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum ClusterLog {
@@ -19,4 +20,5 @@ impl Clone for ClusterLog {
     }
 }
 
+/// Trait for actors to receive ClusterLog messages
 pub trait ClusterListener: Actor + Handler<ClusterLog> {}

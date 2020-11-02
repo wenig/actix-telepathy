@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use std::str::FromStr;
 use crate::RemoteAddr;
 
-
+/// Wrapper for messages to be sent to remote actor
 #[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct RemoteMessage {
@@ -34,6 +34,8 @@ impl FromStr for RemoteMessage {
     }
 }
 
+
+/// Helper Trait to prepare messages to be sent over the network
 pub trait Sendable: ToString + FromStr {
     const IDENTIFIER: &'static str;
 

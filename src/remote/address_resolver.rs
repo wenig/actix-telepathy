@@ -1,10 +1,12 @@
 use log::*;
 use actix::prelude::*;
 use std::collections::HashMap;
-use uuid::Uuid;
 use crate::remote::RemoteMessage;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
+use std::fmt::Debug;
+use serde::export::Formatter;
 
 
 const NETWORKINTERFACE: &str = "networkinterface";
@@ -14,7 +16,7 @@ const GOSSIP: &str = "gossip";
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,
-    Uuid(String)
+    Key(String)
 }
 
 impl ToString for AddrRepresentation {
@@ -22,7 +24,7 @@ impl ToString for AddrRepresentation {
         match self {
             AddrRepresentation::NetworkInterface => String::from(NETWORKINTERFACE),
             AddrRepresentation::Gossip => String::from(GOSSIP),
-            AddrRepresentation::Uuid(id) => id.clone(),
+            AddrRepresentation::Key(id) => id.clone(),
         }
     }
 }
@@ -34,7 +36,7 @@ impl FromStr for AddrRepresentation {
         Ok(match s {
             NETWORKINTERFACE => AddrRepresentation::NetworkInterface,
             GOSSIP => AddrRepresentation::Gossip,
-            _ => AddrRepresentation::Uuid(String::from(s))
+            _ => AddrRepresentation::Key(String::from(s))
         })
     }
 }
@@ -49,7 +51,7 @@ impl Clone for AddrRepresentation {
 #[derive(Message)]
 #[rtype(result = "Result<AddressResponse, ()>")]
 pub enum AddressRequest {
-    Register(Recipient<RemoteMessage>),
+    Register(Recipient<RemoteMessage>, String),
     ResolveStr(String),
     ResolveRec(Recipient<RemoteMessage>)
 }
@@ -65,29 +67,42 @@ pub struct AddressResolver {
     rec2str: HashMap<Recipient<RemoteMessage>, String>
 }
 
+pub struct NotAvailableError {}
+
+impl Debug for NotAvailableError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("NotAvailableError")
+            .finish()
+    }
+}
+
 impl AddressResolver {
     pub fn new() -> Self {
         AddressResolver {str2rec: HashMap::new(), rec2str: HashMap::new()}
     }
 
-    pub fn resolve_str(&mut self, id: String) -> Option<&Recipient<RemoteMessage>> {
+    pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteMessage>, NotAvailableError> {
         match self.str2rec.get(&id) {
-            Some(rec) => Some(rec),
+            Some(rec) => Ok(rec),
             None => {
                 error!("ID {} is not registered", id);
-                None
+                Err(NotAvailableError {})
             },
         }
     }
 
-    pub fn resolve_rec(&mut self, rec: &Recipient<RemoteMessage>) -> Option<&String> {
+    pub fn resolve_rec(&mut self, rec: &Recipient<RemoteMessage>) -> Result<&String, NotAvailableError> {
         match self.rec2str.get(rec) {
-            Some(str) => Some(str),
+            Some(str) => Ok(str),
             None => {
                 error!("Recipient is not registered");
-                None
+                Err(NotAvailableError {})
             },
         }
+    }
+
+    pub fn resolve_rec_from_addr_representation(&mut self, addr_representation: AddrRepresentation) -> Result<&Recipient<RemoteMessage>, NotAvailableError> {
+        self.resolve_str(addr_representation.to_string())
     }
 }
 
@@ -95,21 +110,29 @@ impl Actor for AddressResolver {
     type Context = Context<Self>;
 }
 
+impl Handler<RemoteMessage> for AddressResolver {
+    type Result = ();
+
+    fn handle(&mut self, msg: RemoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone()).expect("Could not resolve Recipient for RemoteMessage");
+        recipient.do_send(msg);
+    }
+}
+
 impl Handler<AddressRequest> for AddressResolver {
     type Result = Result<AddressResponse, ()>;
 
     fn handle(&mut self, msg: AddressRequest, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            AddressRequest::Register(rec) => {
+            AddressRequest::Register(rec, identifier) => {
                 let is_new = match self.rec2str.get(&rec) {
                     Some(_) => false,
                     None => true,
                 };
 
                 if is_new {
-                    let id = Uuid::new_v4().to_string();
-                    self.str2rec.insert(id.clone(), rec.clone());
-                    self.rec2str.insert(rec, id);
+                    self.str2rec.insert(identifier.clone(), rec.clone());
+                    self.rec2str.insert(rec, identifier);
                     debug!("Actor registered");
                     Ok(AddressResponse::Register)
                 } else {
@@ -120,15 +143,15 @@ impl Handler<AddressRequest> for AddressResolver {
             AddressRequest::ResolveStr(id) => {
                 let rec = self.resolve_str(id);
                 match rec {
-                    Some(r) => Ok(AddressResponse::ResolveStr((*r).clone())),
-                    None => Err(())
+                    Ok(r) => Ok(AddressResponse::ResolveStr((*r).clone())),
+                    Err(_) => Err(())
                 }
             },
             AddressRequest::ResolveRec(rec) => {
                 let id = self.resolve_rec(&rec);
                 match id {
-                    Some(i) => Ok(AddressResponse::ResolveRec(i.clone())),
-                    None => Err(())
+                    Ok(i) => Ok(AddressResponse::ResolveRec(i.clone())),
+                    Err(_) => Err(())
                 }
             }
         }

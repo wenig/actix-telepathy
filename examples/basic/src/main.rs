@@ -42,6 +42,8 @@ struct Parameters {
 struct OwnListener {}
 
 impl OwnListener {
+    const IDENTIFIER: &'static str = "own_listener";
+
     pub fn new() -> Self {
         OwnListener {}
     }
@@ -60,7 +62,11 @@ impl Handler<ClusterLog> for OwnListener {
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(addr, mut remote_addr) => {
-                remote_addr.do_send(Box::new(Welcome {}));
+                RemoteAddr::new_from_key(
+                    addr,
+                    remote_addr.network_interface.unwrap(),
+                    OwnListener::IDENTIFIER
+                ).do_send(Box::new(Welcome {}));
             },
             ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
         }
@@ -87,8 +93,11 @@ fn main() {
 
     actix::System::run(|| {
         let cluster_listener = Supervisor::start(|_| OwnListener::new());
-        let cluster = Cluster::new(local_ip, seed_nodes, vec![cluster_listener.clone().recipient()]);
-        cluster.register_actor(cluster_listener.recipient());
+        let cluster = Cluster::new(
+            local_ip,
+            seed_nodes,
+            vec![cluster_listener.clone().recipient()],
+            vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
     });
     //let _ = sys.run();
 }

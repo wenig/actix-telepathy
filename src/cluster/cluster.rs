@@ -15,6 +15,7 @@ use std::any::Any;
 use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteMessage};
 use serde::de::IgnoredAny;
+use std::pin::Pin;
 
 
 #[derive(Message)]
@@ -28,6 +29,7 @@ pub enum NodeEvents{
     MemberDown(String)
 }
 
+/// Central Actor for cluster handling
 pub struct Cluster {
     ip_address: String,
     addrs: Vec<String>,
@@ -105,7 +107,7 @@ impl Handler<AddressRequest> for Cluster {
 }
 
 impl Cluster {
-    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>) -> Addr<Cluster> {
+    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteMessage>, &str)>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -125,6 +127,9 @@ impl Cluster {
             let own_ip_addres = ip_address.clone();
             let gossip = Supervisor::start(move |_| Gossip::new(own_ip_addres));
             let address_resolver = Supervisor::start(|_| AddressResolver::new());
+            for (rec, identifier) in rec_to_be_registered.iter() {
+                address_resolver.do_send(AddressRequest::Register(rec.clone(), identifier.to_string()));
+            }
             Cluster {ip_address, addrs, listeners: cluster_listeners, gossip, address_resolver, own_addr: None, nodes: HashMap::new()}
         })
     }
@@ -135,17 +140,18 @@ impl Cluster {
         Ok(listener)
     }
 
-    fn register_actor(&self, rec: Recipient<RemoteMessage>) {
-        self.own_addr.as_ref().unwrap().send(AddressRequest::Register(rec));
+    fn register_actor(&self, rec: Recipient<RemoteMessage>, actor_identifier: &str) {
+        self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
     }
 }
 
+/// Helper for registering actors to the cluster
 pub trait AddrApi {
-    fn register_actor(&self, rec: Recipient<RemoteMessage>);
+    fn register_actor(&self, rec: Recipient<RemoteMessage>, actor_identifier: &str);
 }
 
 impl AddrApi for Addr<Cluster> {
-    fn register_actor(&self, addr: Recipient<RemoteMessage>) -> () {
-        self.send(AddressRequest::Register(addr));
+    fn register_actor(&self, addr: Recipient<RemoteMessage>, actor_identifier: &str) -> () {
+        self.send(AddressRequest::Register(addr, actor_identifier.to_string()));
     }
 }
