@@ -6,6 +6,8 @@ mod utils;
 mod codec;
 mod cluster;
 mod remote;
+mod serialization;
 
 pub use cluster::{Cluster, ClusterListener, ClusterLog, AddrApi};
 pub use remote::{Sendable, RemoteAddr, RemoteMessage};
+pub use serialization::{DefaultSerialization, CustomSerialization};

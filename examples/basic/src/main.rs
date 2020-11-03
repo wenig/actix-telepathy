@@ -1,3 +1,5 @@
+mod custom_serializer;
+
 #[macro_use] extern crate log;
 
 use actix_rt;
@@ -7,29 +9,12 @@ use structopt::StructOpt;
 use log::Level;
 use std::str::FromStr;
 use std::any::TypeId;
+use serde::{Serialize, Deserialize};
 
-#[derive(Message)]
+#[derive(Message, Serializable, Serialize, Deserialize)]
+//#[serialize_with(DefaultSerializer)]
 #[rtype(Result = "()")]
 struct Welcome {}
-
-impl Sendable for Welcome {
-    const IDENTIFIER: &'static str = "welcome";
-}
-
-impl ToString for Welcome {
-    fn to_string(&self) -> String {
-        "{}".to_string()
-    }
-}
-
-impl FromStr for Welcome {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Welcome {})
-    }
-}
-
 
 #[derive(StructOpt, Debug)]
 struct Parameters {

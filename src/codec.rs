@@ -71,7 +71,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
             _ => {}
         }
-
+        // todo: add global config for serialization
         let msg = serde_json::to_string(&item).unwrap();
         let msg_ref: &[u8] = msg.as_ref();
 

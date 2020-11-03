@@ -10,6 +10,7 @@ edition = "2018"
 actix = "0.10"
 actix-rt = "1.1"
 actix-telepathy = { path="../..", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
 
 log = "0.4"
 env_logger = "0.7"

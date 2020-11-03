@@ -13,6 +13,7 @@ path = "src/lib.rs"
 members = [
   "./",
   "examples/basic",
+  "examples/distributed_ml",
   "actix-telepathy-derive"
 ]
 
