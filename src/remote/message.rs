@@ -1,60 +1,40 @@
 use log::*;
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
-use serde_json::{Value, json};
 use std::str::FromStr;
-use crate::RemoteAddr;
+use crate::{RemoteAddr, DefaultSerialization, CustomSerialization};
+
 
 /// Wrapper for messages to be sent to remote actor
 #[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
-pub struct RemoteMessage {
+pub struct RemoteWrapper {
     pub destination: RemoteAddr,
-    pub message: String
+    pub message_buffer: Vec<u8>,
+    pub identifier: String
 }
 
-impl RemoteMessage {
-    pub fn new<T: Sendable>(destination: RemoteAddr, message: Box<T>) -> RemoteMessage {
-        RemoteMessage {destination, message: message.to_string_with_id()}
-    }
-}
-
-impl ToString for RemoteMessage {
-    fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("Could not serialize RemoteMessage!")
-    }
-}
-
-impl FromStr for RemoteMessage {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<RemoteMessage, Self::Err> {
-        let deserialized: RemoteMessage = serde_json::from_str(s).expect("Could not deserialize RemoteMessage!");
-        Ok(deserialized)
+impl RemoteWrapper {
+    pub fn new<T: Remotable + Serialize>(destination: RemoteAddr, message: Box<T>) -> RemoteWrapper {
+        let serializer = message.get_serializer();
+        RemoteWrapper {
+            destination,
+            message_buffer: serializer.serialize(message.as_ref()).expect("Cannot serialize message"),
+            identifier: message.get_identifier().to_string() }
     }
 }
 
 
 /// Helper Trait to prepare messages to be sent over the network
-pub trait Sendable: ToString + FromStr {
+pub trait Remotable {
+    type Serializer: CustomSerialization;
     const IDENTIFIER: &'static str;
 
-    fn is_message(serialized_msg: &String) -> bool {
-        let v: Value = serde_json::from_str(serialized_msg).expect("String is no valid JSON");
-        v["identifier"] == Self::IDENTIFIER
+    fn get_identifier(&self) -> &str {
+        Self::IDENTIFIER
     }
 
-    fn from_packed(serialized_msg: &String) -> Result<Self, Self::Err> {
-        let mut v: Value = serde_json::from_str(serialized_msg).expect("String is no valid JSON");
-        let raw = &v["raw"];
-        Self::from_str(&raw.to_string())
-    }
+    fn get_serializer(&self) -> Box<Self::Serializer>;
 
-    fn to_string_with_id(&self) -> String {
-        let self_value: Value = serde_json::from_str(&self.to_string()).unwrap();
-        json!({
-            "identifier": Self::IDENTIFIER,
-            "raw": self_value
-        }).to_string()
-    }
+    fn generate_serializer() -> Box<Self::Serializer>;
 }

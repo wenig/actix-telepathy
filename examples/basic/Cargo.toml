@@ -11,6 +11,7 @@ actix = "0.10"
 actix-rt = "1.1"
 actix-telepathy = { path="../..", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
+flexbuffers = "0.1"
 
 log = "0.4"
 env_logger = "0.7"

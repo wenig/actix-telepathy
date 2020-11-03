@@ -1,4 +1,4 @@
-mod custom_serializer;
+mod serializer;
 
 #[macro_use] extern crate log;
 
@@ -10,11 +10,12 @@ use log::Level;
 use std::str::FromStr;
 use std::any::TypeId;
 use serde::{Serialize, Deserialize};
+use serializer::MySerializer;
 
-#[derive(Message, Serializable, Serialize, Deserialize)]
-//#[serialize_with(DefaultSerializer)]
+#[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(Result = "()")]
 struct Welcome {}
+
 
 #[derive(StructOpt, Debug)]
 struct Parameters {
@@ -62,12 +63,14 @@ impl Handler<Welcome> for OwnListener {
     type Result = ();
 
     fn handle(&mut self, msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Welcome said")
+        debug!("Welcome said {}", msg.get_identifier())
     }
 }
 
 
 fn main() {
+    std::env::set_current_dir("./examples/basic");
+
     env_logger::init();
 
     let args = Parameters::from_args();

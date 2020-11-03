@@ -3,8 +3,7 @@ use actix::prelude::*;
 use std::net::SocketAddr;
 use crate::network::NetworkInterface;
 use crate::codec::ClusterMessage;
-use crate::remote::{RemoteMessage, AddrRepresentation};
-use crate::Sendable;
+use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
 use std::str::FromStr;
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use std::borrow::Borrow;
@@ -37,9 +36,9 @@ impl RemoteAddr {
         self.network_interface = Some(network_interface);
     }
 
-    pub fn do_send<T: Sendable>(&mut self, msg: Box<T>) -> () {
+    pub fn do_send<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> () {
         self.network_interface.as_ref().expect("Network interface must be set!").do_send(ClusterMessage::Message(
-            RemoteMessage::new(self.clone(), msg)
+            RemoteWrapper::new(self.clone(), msg)
         ));
     }
 

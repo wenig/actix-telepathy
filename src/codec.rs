@@ -6,7 +6,7 @@ use futures::io::Error;
 use bytes::{BytesMut, BufMut};
 use byteorder::{NetworkEndian, ByteOrder};
 use serde::{Serialize, Deserialize};
-use crate::remote::RemoteMessage;
+use crate::remote::RemoteWrapper;
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 
@@ -15,7 +15,7 @@ const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 pub enum ClusterMessage {
     Request(String),
     Response,
-    Message(RemoteMessage)
+    Message(RemoteWrapper)
 }
 
 pub struct ConnectCodec {

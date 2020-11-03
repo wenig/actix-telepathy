@@ -1,7 +1,7 @@
 use log::*;
 use actix::prelude::*;
 use std::collections::HashMap;
-use crate::remote::RemoteMessage;
+use crate::remote::RemoteWrapper;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -51,20 +51,20 @@ impl Clone for AddrRepresentation {
 #[derive(Message)]
 #[rtype(result = "Result<AddressResponse, ()>")]
 pub enum AddressRequest {
-    Register(Recipient<RemoteMessage>, String),
+    Register(Recipient<RemoteWrapper>, String),
     ResolveStr(String),
-    ResolveRec(Recipient<RemoteMessage>)
+    ResolveRec(Recipient<RemoteWrapper>)
 }
 
 pub enum AddressResponse {
     Register,
-    ResolveStr(Recipient<RemoteMessage>),
+    ResolveStr(Recipient<RemoteWrapper>),
     ResolveRec(String)
 }
 
 pub struct AddressResolver {
-    str2rec: HashMap<String, Recipient<RemoteMessage>>,
-    rec2str: HashMap<Recipient<RemoteMessage>, String>
+    str2rec: HashMap<String, Recipient<RemoteWrapper>>,
+    rec2str: HashMap<Recipient<RemoteWrapper>, String>
 }
 
 pub struct NotAvailableError {}
@@ -81,7 +81,7 @@ impl AddressResolver {
         AddressResolver {str2rec: HashMap::new(), rec2str: HashMap::new()}
     }
 
-    pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteMessage>, NotAvailableError> {
+    pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         match self.str2rec.get(&id) {
             Some(rec) => Ok(rec),
             None => {
@@ -91,7 +91,7 @@ impl AddressResolver {
         }
     }
 
-    pub fn resolve_rec(&mut self, rec: &Recipient<RemoteMessage>) -> Result<&String, NotAvailableError> {
+    pub fn resolve_rec(&mut self, rec: &Recipient<RemoteWrapper>) -> Result<&String, NotAvailableError> {
         match self.rec2str.get(rec) {
             Some(str) => Ok(str),
             None => {
@@ -101,7 +101,7 @@ impl AddressResolver {
         }
     }
 
-    pub fn resolve_rec_from_addr_representation(&mut self, addr_representation: AddrRepresentation) -> Result<&Recipient<RemoteMessage>, NotAvailableError> {
+    pub fn resolve_rec_from_addr_representation(&mut self, addr_representation: AddrRepresentation) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         self.resolve_str(addr_representation.to_string())
     }
 }
@@ -110,10 +110,10 @@ impl Actor for AddressResolver {
     type Context = Context<Self>;
 }
 
-impl Handler<RemoteMessage> for AddressResolver {
+impl Handler<RemoteWrapper> for AddressResolver {
     type Result = ();
 
-    fn handle(&mut self, msg: RemoteMessage, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone()).expect("Could not resolve Recipient for RemoteMessage");
         recipient.do_send(msg);
     }

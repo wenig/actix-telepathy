@@ -12,7 +12,7 @@ use futures::TryFutureExt;
 
 use crate::cluster::{Cluster, ClusterLog, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
-use crate::remote::{RemoteAddr, RemoteMessage, AddrRepresentation, AddressResolver, AddressRequest};
+use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver, AddressRequest};
 use actix_telepathy_derive::RemoteActor;
 use futures::TryStreamExt;
 use tokio::prelude::io::AsyncBufReadExt;
@@ -164,7 +164,7 @@ impl NetworkInterface {
         &self.framed[0].write(msg);
     }
 
-    fn received_message(&mut self, mut msg: RemoteMessage) {
+    fn received_message(&mut self, mut msg: RemoteWrapper) {
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),

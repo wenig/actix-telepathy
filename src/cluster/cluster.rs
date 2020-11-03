@@ -13,7 +13,7 @@ use futures::executor::block_on;
 use std::net::SocketAddr;
 use std::any::Any;
 use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
-use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteMessage};
+use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use serde::de::IgnoredAny;
 use std::pin::Pin;
 
@@ -107,7 +107,7 @@ impl Handler<AddressRequest> for Cluster {
 }
 
 impl Cluster {
-    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteMessage>, &str)>) -> Addr<Cluster> {
+    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -140,18 +140,18 @@ impl Cluster {
         Ok(listener)
     }
 
-    fn register_actor(&self, rec: Recipient<RemoteMessage>, actor_identifier: &str) {
+    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str) {
         self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
     }
 }
 
 /// Helper for registering actors to the cluster
 pub trait AddrApi {
-    fn register_actor(&self, rec: Recipient<RemoteMessage>, actor_identifier: &str);
+    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str);
 }
 
 impl AddrApi for Addr<Cluster> {
-    fn register_actor(&self, addr: Recipient<RemoteMessage>, actor_identifier: &str) -> () {
+    fn register_actor(&self, addr: Recipient<RemoteWrapper>, actor_identifier: &str) -> () {
         self.send(AddressRequest::Register(addr, actor_identifier.to_string()));
     }
 }

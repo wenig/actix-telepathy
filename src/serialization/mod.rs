@@ -1,26 +1,31 @@
-use serde_json::Result;
 use serde::{Deserialize, Serialize};
 use log::*;
 
 pub trait CustomSerialization {
-    fn serialize<T>(value: &T) -> Result<String> where T: ?Sized + Serialize;
-    fn deserialize<'a, T>(s: &'a str) -> Result<T> where T: ?Sized + Deserialize<'a>;
+    fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, ()> where T: ?Sized + Serialize;
+    fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, ()> where T: ?Sized + Deserialize<'a>;
 }
 
 pub struct DefaultSerialization {}
 
 impl CustomSerialization for DefaultSerialization {
-    fn serialize<T>(value: &T) -> Result<String>
+    fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, ()>
     where
         T: ?Sized + Serialize,
     {
-        serde_json::to_string(value)
+        match serde_json::to_vec(value) {
+            Ok(vec) => Ok(vec),
+            Err(_) => Err(())
+        }
     }
 
-    fn deserialize<'a, T>(s: &'a str) -> Result<T>
+    fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, ()>
     where
         T: ?Sized + Deserialize<'a>,
     {
-        serde_json::from_str(s)
+        match serde_json::from_slice(s) {
+            Ok(val) => Ok(val),
+            Err(_) => Err(())
+        }
     }
 }

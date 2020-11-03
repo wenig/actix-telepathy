@@ -8,11 +8,12 @@ use rand::seq::SliceRandom;
 use crate::network::NetworkInterface;
 use crate::cluster::cluster::NodeEvents;
 use crate::codec::ClusterMessage;
-use crate::remote::{RemoteMessage, Sendable, AddrRepresentation};
+use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
 use crate::RemoteAddr;
-use actix_telepathy_derive::{RemoteActor};
+use crate::{DefaultSerialization, CustomSerialization};
+use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 
-#[derive(Message, Serialize, Deserialize)]
+#[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(result = "()")]
 pub struct GossipEvent {
     addr: String,
@@ -27,25 +28,6 @@ impl GossipEvent {
 
     pub fn member_down(addr: String, seen_addrs: Vec<String>) -> GossipEvent {
         GossipEvent {addr, seen_addrs, add: false}
-    }
-}
-
-impl Sendable for GossipEvent {
-    const IDENTIFIER: &'static str = "gossip_event";
-}
-
-impl ToString for GossipEvent {
-    fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("Could not serialize GossipEvent")
-    }
-}
-
-impl FromStr for GossipEvent {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<GossipEvent, Self::Err> {
-        let deserialized: GossipEvent = serde_json::from_str(s).expect("Could not deserialize RemoteMessage!");
-        Ok(deserialized)
     }
 }
 
@@ -99,7 +81,7 @@ impl Gossip {
     fn gossip_event(&mut self, event: GossipEvent) {
         for (addr, network_interface) in self.members.iter() {
             network_interface.do_send(ClusterMessage::Message(
-                RemoteMessage::new(
+                RemoteWrapper::new(
                     RemoteAddr::new_gossip(addr.clone(), None),
                     Box::new(event.clone()))
             ));

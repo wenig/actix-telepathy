@@ -2,7 +2,7 @@
 use proc_macro::TokenStream;
 
 mod remote_actor;
-mod serializable;
+mod remote_message;
 
 /// Helper to prepare actors for remote messages
 /// # Example
@@ -44,7 +44,7 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     remote_actor::remote_actor_macro(input)
 }
 
-#[proc_macro_derive(Serializable, attributes(serialize_with))]
-pub fn serializable_macro(input: TokenStream) -> TokenStream {
-    serializable::serializable_macro(input)
+#[proc_macro_derive(RemoteMessage)]
+pub fn remote_message_macro(input: TokenStream) -> TokenStream {
+    remote_message::remote_message_macro(input)
 }

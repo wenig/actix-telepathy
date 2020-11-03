@@ -18,21 +18,21 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 
     for attr in messages.iter() {
         let name = attr.as_ref().unwrap();
+        let condition = quote! {
+            if #name::IDENTIFIER == msg.identifier {
+                let deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+                ctx.address().do_send(deserialized_msg);
+            }
+        };
         if first {
             chained_if = quote! {
-                if #name::is_message(&(msg.message)) {
-                    let deserialized_msg: #name = #name::from_packed(&(msg.message)).expect("Cannot deserialized #name message");
-                    ctx.address().do_send(deserialized_msg);
-                }
+                #condition
             };
             first = false;
         } else {
             chained_if = quote! {
                 #chained_if
-                else if #name::is_message(&(msg.message)) {
-                    let deserialized_msg: #name = #name::from_packed(&(msg.message)).expect("Cannot deserialized #name message");
-                    ctx.address().do_send(deserialized_msg);
-                }
+                else #condition
             };
         }
     }
@@ -40,17 +40,17 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
         chained_if = quote! {
             #chained_if
             else {
-                warn!("Message dropped because identifier of {} is unknown", &(msg.message));
+                warn!("Message dropped because identifier {} is unknown", &(msg.identifier));
             }
         }
     }
 
     // Build the output, possibly using quasi-quotation
     let expanded = quote! {
-        impl Handler<RemoteMessage> for #name {
+        impl Handler<RemoteWrapper> for #name {
             type Result = ();
 
-            fn handle(&mut self, mut msg: RemoteMessage, ctx: &mut Context<Self>) -> Self::Result {
+            fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
                 #chained_if
             }
         }

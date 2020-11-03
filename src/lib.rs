@@ -9,5 +9,5 @@ mod remote;
 mod serialization;
 
 pub use cluster::{Cluster, ClusterListener, ClusterLog, AddrApi};
-pub use remote::{Sendable, RemoteAddr, RemoteMessage};
+pub use remote::{Remotable, RemoteAddr, RemoteWrapper};
 pub use serialization::{DefaultSerialization, CustomSerialization};
