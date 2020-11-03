@@ -63,14 +63,12 @@ impl Handler<Welcome> for OwnListener {
     type Result = ();
 
     fn handle(&mut self, msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Welcome said {}", msg.get_identifier())
+        debug!("Welcome said {} ", msg.get_identifier())
     }
 }
 
 
 fn main() {
-    std::env::set_current_dir("./examples/basic");
-
     env_logger::init();
 
     let args = Parameters::from_args();

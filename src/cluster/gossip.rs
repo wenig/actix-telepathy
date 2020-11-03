@@ -13,12 +13,25 @@ use crate::RemoteAddr;
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 
-#[derive(Message, Serialize, Deserialize, RemoteMessage)]
+#[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
 pub struct GossipEvent {
     addr: String,
     seen_addrs: Vec<String>,
     add: bool
+}
+
+impl Remotable for GossipEvent {
+    type Serializer = DefaultSerialization;
+    const IDENTIFIER: &'static str = "";
+
+    fn get_serializer(&self) -> Box<Self::Serializer> {
+        Box::new(DefaultSerialization {})
+    }
+
+    fn generate_serializer() -> Box<Self::Serializer> {
+        Box::new(DefaultSerialization {})
+    }
 }
 
 impl GossipEvent {
