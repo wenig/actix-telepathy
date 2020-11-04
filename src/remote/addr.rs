@@ -41,52 +41,10 @@ impl RemoteAddr {
             RemoteWrapper::new(self.clone(), msg)
         ));
     }
-
-    fn to_string_remote_addr(&self) -> StringRemoteAddr {
-        StringRemoteAddr {socket_addr: self.socket_addr.clone(), id: self.id.to_string()}
-    }
-}
-
-impl ToString for RemoteAddr {
-    fn to_string(&self) -> String {
-        self.to_string_remote_addr().to_string()
-    }
-}
-
-impl FromStr for RemoteAddr {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let string_remote_addr = StringRemoteAddr::from_str(s).unwrap();
-        Ok(RemoteAddr::new(string_remote_addr.socket_addr,
-                           None,
-                           AddrRepresentation::from_str(string_remote_addr.id.as_str()).unwrap()))
-    }
 }
 
 impl Clone for RemoteAddr {
     fn clone(&self) -> Self {
         RemoteAddr::new( self.socket_addr.clone(), self.network_interface.clone(), self.id.clone())
-    }
-}
-
-
-#[derive(Serialize, Deserialize)]
-struct StringRemoteAddr {
-    socket_addr: String,
-    id: String
-}
-
-impl ToString for StringRemoteAddr {
-    fn to_string(&self) -> String {
-        serde_json::to_string(self).expect("Could not serialize RemoteAddr")
-    }
-}
-
-impl FromStr for StringRemoteAddr {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        serde_json::from_str(s).expect("Could not deserialize RemoteAddr")
     }
 }

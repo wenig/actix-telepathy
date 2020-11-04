@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use flexbuffers;
 use log::*;
 
 pub trait CustomSerialization {
@@ -13,7 +14,7 @@ impl CustomSerialization for DefaultSerialization {
     where
         T: ?Sized + Serialize,
     {
-        match serde_json::to_vec(value) {
+        match flexbuffers::to_vec(value) {
             Ok(vec) => Ok(vec),
             Err(_) => Err(())
         }
@@ -23,7 +24,7 @@ impl CustomSerialization for DefaultSerialization {
     where
         T: ?Sized + Deserialize<'a>,
     {
-        match serde_json::from_slice(s) {
+        match flexbuffers::from_slice(s) {
             Ok(val) => Ok(val),
             Err(_) => Err(())
         }

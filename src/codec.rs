@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use std::io;
-use serde_json;
+use flexbuffers;
 use tokio_util::codec::{Encoder, Decoder};
 use futures::io::Error;
 use bytes::{BytesMut, BufMut};
@@ -55,7 +55,7 @@ impl Decoder for ConnectCodec {
         if src.len() >= size + 2 {
             src.split_to(2);
             let buf = src.split_to(size);
-            Ok(Some(serde_json::from_slice::<ClusterMessage>(&buf)?))
+            Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()))
         } else {
             Ok(None)
         }
@@ -71,8 +71,8 @@ impl Encoder<ClusterMessage> for ConnectCodec {
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
             _ => {}
         }
-        // todo: add global config for serialization
-        let msg = serde_json::to_string(&item).unwrap();
+
+        let msg = flexbuffers::to_vec(&item).unwrap();
         let msg_ref: &[u8] = msg.as_ref();
 
         dst.reserve(msg_ref.len() + 2);
