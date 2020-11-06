@@ -7,7 +7,7 @@ mod remote_message;
 /// Helper to prepare actors for remote messages
 /// # Example
 /// ```
-/// #[derive(Message)]
+/// #[derive(Message, RemoteMessage)]
 /// struct MyMessage {}
 /// impl Sendable for MyMessage {}
 /// // ...
@@ -44,6 +44,40 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     remote_actor::remote_actor_macro(input)
 }
 
+
+/// Helper to make messages sendable over network
+/// # Example
+/// ```
+/// #[derive(Message, RemoteMessage)]
+/// struct MyMessage {}
+/// impl Sendable for MyMessage {}
+/// // ...
+///
+/// #[derive(RemoteActor)]
+/// #[remote_messages(MyMessage)]
+/// struct MyActor {}
+/// // ...
+/// ```
+///
+/// # Background
+///
+/// In the previous example, the MyMessage struct gets extended the following way:
+///
+/// ```
+/// impl Remotable for MyMessage {
+///     type Serializer = DefaultSerialization;
+///     const IDENTIFIER: &'static str = "MyMessage";
+///
+///     fn get_serializer(&self) -> Box<Self::Serializer> {
+///         Box::new(DefaultSerialization {})
+///     }
+///
+///     fn generate_serializer() -> Box<Self::Serializer> {
+///         Box::new(DefaultSerialization {})
+///     }
+/// }
+/// ```
+///
 #[proc_macro_derive(RemoteMessage)]
 pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     remote_message::remote_message_macro(input)

@@ -16,6 +16,8 @@ use crate::cluster::gossip::{Gossip, GossipEvent, GossipIgniting};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use serde::de::IgnoredAny;
 use std::pin::Pin;
+use std::sync::mpsc::TrySendError::Full;
+use actix::fut::FutureResult;
 
 
 #[derive(Message)]
@@ -93,7 +95,6 @@ impl Handler<NodeEvents> for Cluster {
                 }
             }
         }
-
     }
 }
 
@@ -101,6 +102,7 @@ impl Handler<AddressRequest> for Cluster {
     type Result = Result<AddressResponse, ()>;
 
     fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
+        debug!("test3");
         self.address_resolver.send(msg);
         Ok(AddressResponse::Register)
     }
@@ -112,6 +114,7 @@ impl Cluster {
 
         debug!("Listening on {}", ip_address);
         Cluster::create(move |ctx| {
+            debug!("test cluster create");
             ctx.add_message_stream(Box::leak(listener).incoming().map(|st| {
                 let st = st.unwrap();
                 let addr = st.peer_addr().unwrap();
@@ -152,6 +155,7 @@ pub trait AddrApi {
 
 impl AddrApi for Addr<Cluster> {
     fn register_actor(&self, addr: Recipient<RemoteWrapper>, actor_identifier: &str) -> () {
+        debug!("test");
         self.send(AddressRequest::Register(addr, actor_identifier.to_string()));
     }
 }

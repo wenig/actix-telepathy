@@ -67,7 +67,7 @@ impl Actor for NetworkInterface {
 
     fn stopped(&mut self, ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+        self.parent.send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
@@ -168,7 +168,7 @@ impl NetworkInterface {
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
-            AddrRepresentation::Key(_) => self.address_resolver.do_send(msg)
+            AddrRepresentation::Key(_) => { self.address_resolver.do_send(msg); }
         };
     }
 }

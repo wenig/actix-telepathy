@@ -4,13 +4,16 @@ mod serializer;
 
 use actix_rt;
 use actix_telepathy::*;
-use actix::{System, Handler, Actor, Context, Supervisor, Supervised, Message, AsyncContext};
+use actix::{System, Handler, Actor, Context, Supervisor, Supervised, Message, AsyncContext, Recipient};
 use structopt::StructOpt;
 use log::Level;
 use std::str::FromStr;
 use std::any::TypeId;
 use serde::{Serialize, Deserialize};
 use serializer::MySerializer;
+use std::thread::sleep;
+use std::time::Duration;
+use tokio;
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(Result = "()")]
@@ -67,23 +70,21 @@ impl Handler<Welcome> for OwnListener {
     }
 }
 
-
-fn main() {
+#[actix_rt::main]
+async fn main() {
     env_logger::init();
 
     let args = Parameters::from_args();
     let local_ip = args.local_ip.to_lowercase().trim().to_owned();
     let seed_nodes = args.seed_nodes.map(|n| n.to_lowercase().trim().to_owned());
 
-    //let sys = actix::System::new("remote-example");
-
-    actix::System::run(|| {
-        let cluster_listener = Supervisor::start(|_| OwnListener::new());
-        let cluster = Cluster::new(
-            local_ip,
-            seed_nodes,
-            vec![cluster_listener.clone().recipient()],
-            vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
-    });
-    //let _ = sys.run();
+    let cluster_listener = OwnListener::new().start();
+    let _cluster = Cluster::new(
+        local_ip,
+        seed_nodes,
+        vec![cluster_listener.clone().recipient()],
+        vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
+    tokio::signal::ctrl_c().await.unwrap();
+    println!("Ctrl-C received, shutting down");
+    System::current().stop();
 }
