@@ -3,8 +3,14 @@ name = "actix-telepathy"
 version = "0.1.0"
 authors = ["wenig <info@pwenig.de>"]
 edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/wenig/actix-telepathy/"
+readme = "README.md"
+description = "Cluster extension for the actix actor framework"
+keywords = ["actor", "distributed", "decentralized", "network", "actix"]
+categories = ["network-programming"]
+exclude = ["examples/basics/telepathy.yaml"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
 name = "actix_telepathy"
 path = "src/lib.rs"

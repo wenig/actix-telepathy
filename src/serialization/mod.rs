@@ -7,6 +7,10 @@ use log::*;
 ///
 /// # Example Used in DefaultSerialization
 /// ```
+/// use serde::{Deserialize, Serialize};
+/// use flexbuffers;
+/// use actix_telepathy::CustomSerialization;
+///
 /// pub struct DefaultSerialization {}
 ///
 /// impl CustomSerialization for DefaultSerialization {

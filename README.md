@@ -47,3 +47,5 @@ fn main() {
     });
 }
 ```
+
+**Please consider citing this work when you are using it!**
