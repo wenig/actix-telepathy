@@ -1,7 +1,5 @@
 use actix::prelude::*;
-use log::*;
 use crate::remote::RemoteAddr;
-use actix::dev::channel::AddressReceiver;
 
 /// Message sent to ClusterListeners if members join or leave the cluster
 #[derive(Message)]

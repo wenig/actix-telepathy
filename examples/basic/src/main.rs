@@ -4,15 +4,11 @@ mod serializer;
 
 use actix_rt;
 use actix_telepathy::*;
-use actix::{System, Handler, Actor, Context, Supervisor, Supervised, Message, AsyncContext, Recipient};
+use actix::{System, Handler, Actor, Context, Supervised, Message, AsyncContext};
 use structopt::StructOpt;
-use log::Level;
-use std::str::FromStr;
-use std::any::TypeId;
 use serde::{Serialize, Deserialize};
+#[allow(unused_imports)]
 use serializer::MySerializer;
-use std::thread::sleep;
-use std::time::Duration;
 use tokio;
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -48,16 +44,16 @@ impl Actor for OwnListener {
 impl Handler<ClusterLog> for OwnListener {
     type Result = ();
 
-    fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            ClusterLog::NewMember(addr, mut remote_addr) => {
+            ClusterLog::NewMember(addr, remote_addr) => {
                 RemoteAddr::new_from_key(
                     addr,
                     remote_addr.network_interface.unwrap(),
                     OwnListener::IDENTIFIER
                 ).do_send(Box::new(Welcome {}));
             },
-            ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
+            ClusterLog::MemberLeft(_addr) => debug!("ClusterLog: MemberLeft")
         }
     }
 }

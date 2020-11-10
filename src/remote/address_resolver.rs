@@ -4,7 +4,6 @@ use std::collections::HashMap;
 use crate::remote::RemoteWrapper;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::fmt::Debug;
 use serde::export::Formatter;
 
@@ -12,7 +11,7 @@ use serde::export::Formatter;
 const NETWORKINTERFACE: &str = "networkinterface";
 const GOSSIP: &str = "gossip";
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Hash)]
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,
@@ -115,14 +114,14 @@ impl Handler<RemoteWrapper> for AddressResolver {
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone()).expect("Could not resolve Recipient for RemoteMessage");
-        recipient.do_send(msg);
+        let _r = recipient.do_send(msg);
     }
 }
 
 impl Handler<AddressRequest> for AddressResolver {
     type Result = Result<AddressResponse, ()>;
 
-    fn handle(&mut self, msg: AddressRequest, ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             AddressRequest::Register(rec, identifier) => {
                 let is_new = match self.rec2str.get(&rec) {

@@ -1,8 +1,6 @@
-use log::*;
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
-use std::str::FromStr;
-use crate::{RemoteAddr, DefaultSerialization, CustomSerialization};
+use crate::{RemoteAddr, CustomSerialization};
 
 
 /// Wrapper for messages to be sent to remote actor

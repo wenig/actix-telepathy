@@ -38,7 +38,7 @@ impl Decoder for ConnectCodec {
                 return Ok(None)
             }
             if &src[..11] == PREFIX {
-                src.split_to(11);
+                let _s = src.split_to(11);
                 self.prefix = true;
             } else {
                 return Err(io::Error::new(io::ErrorKind::Other, "Prefix mismatch"))
@@ -53,7 +53,7 @@ impl Decoder for ConnectCodec {
         };
 
         if src.len() >= size + 2 {
-            src.split_to(2);
+            let _s = src.split_to(2);
             let buf = src.split_to(size);
             Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()))
         } else {

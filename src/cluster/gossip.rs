@@ -1,17 +1,17 @@
 use log::*;
 use actix::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
-use std::str::FromStr;
-use rand::thread_rng;
-use rand::seq::SliceRandom;
 use crate::network::NetworkInterface;
-use crate::cluster::cluster::NodeEvents;
 use crate::codec::ClusterMessage;
-use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
-use crate::RemoteAddr;
+use crate::remote::{RemoteWrapper, Remotable};
+use crate::{RemoteAddr, Cluster, NodeResolving};
 use crate::{DefaultSerialization, CustomSerialization};
-use actix_telepathy_derive::{RemoteActor, RemoteMessage};
+use actix_telepathy_derive::{RemoteActor};
+use rand::thread_rng;
+use rand::prelude::{SliceRandom, IteratorRandom};
+use std::iter::FromIterator;
+use crate::cluster::cluster::GossipResponse;
 
 #[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -61,43 +61,66 @@ pub enum GossipIgniting {
 #[remote_messages(GossipEvent)]
 pub struct Gossip {
     own_addr: String,
-    members: HashMap<String, Addr<NetworkInterface>>
+    members: HashMap<String, Addr<NetworkInterface>>,
+    cluster: Addr<Cluster>
 }
 
 impl Gossip {
-    pub fn new(own_addr: String) -> Gossip {
-        Gossip {own_addr, members: HashMap::new()}
+    pub fn new(own_addr: String, cluster: Addr<Cluster>) -> Gossip {
+        Gossip {own_addr, members: HashMap::new(), cluster}
     }
 
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
         debug!("Member {} added!", new_addr.clone());
         self.members.insert(new_addr.clone(), node);
-        self.gossip_event(GossipEvent::member_up(new_addr.clone(), vec![self.own_addr.clone(), new_addr]));
+        self.member_up(new_addr, vec![self.own_addr.clone()]);
     }
 
     fn remove_member(&mut self, addr: String) {
         debug!("Member {} removed", addr.clone());
         self.members.remove(&addr);
-        self.gossip_event(GossipEvent::member_down(addr, vec![self.own_addr.clone()]));
+        self.member_down(addr, vec![self.own_addr.clone()]);
     }
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
-        // todo: tell cluster to add NetworkInterface (randomly choose nodes from seen_addrs)
-        /*let mut rng = &mut thread_rng();
-        let chosen_addrs: Vec<String> = seen_addrs.choose_multiple(rng, 3);*/
+        match self.members.get(new_addr.as_str()) {
+            Some(_) => {}, //debug!("already knows {} -> {}", new_addr.as_str(), self.members.len()),
+            None => self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
+        }
+        self.gossip_forward(new_addr, seen_addrs, true);
     }
 
-    fn member_down(&mut self, new_addr: String, seen_addrs: Vec<String>) {
-        // todo: tell cluster to remove NetworkInterface (randomly choose nodes from seen_addrs)
+    fn member_down(&mut self, addr: String, seen_addrs: Vec<String>) {
+        self.gossip_forward(addr, seen_addrs, false);
     }
 
-    fn gossip_event(&mut self, event: GossipEvent) {
-        for (addr, network_interface) in self.members.iter() {
-            network_interface.do_send(ClusterMessage::Message(
-                RemoteWrapper::new(
-                    RemoteAddr::new_gossip(addr.clone(), None),
-                    Box::new(event.clone()))
-            ));
+    fn gossip_forward(&mut self, member_addr: String, seen_addrs: Vec<String>, up: bool) {
+        if seen_addrs.len() >= self.members.len() {
+            return;
+        }
+
+        let mut rng = &mut thread_rng();
+        let mut chosen_addrs: Vec<String> = self.members.keys().choose_multiple(rng, 3).iter().map(|&x| x.clone()).collect();
+        chosen_addrs.extend(seen_addrs);
+        chosen_addrs.sort();
+        chosen_addrs.dedup();
+
+        let gossip_event = if up {
+            GossipEvent::member_up(member_addr.clone(), chosen_addrs.clone())
+        } else {
+            GossipEvent::member_down(member_addr.clone(), chosen_addrs.clone())
+        };
+
+        for addr in chosen_addrs.iter() {
+            match self.members.get(addr) {
+                Some(node) => node.do_send(ClusterMessage::Message(
+                    RemoteWrapper::new(
+                        RemoteAddr::new_gossip(addr.clone(), None),
+                        Box::new(gossip_event.clone())
+                    )
+                )),
+                None => debug!("doesn't know {}", addr)
+            }
         }
     }
 }
@@ -115,9 +138,9 @@ impl Handler<GossipEvent> for Gossip {
 
     fn handle(&mut self, msg: GossipEvent, _ctx: &mut Context<Self>) -> Self::Result {
         if msg.add {
-            debug!("Member joined cluster");
+            self.member_up(msg.addr, msg.seen_addrs)
         } else {
-            debug!("Member left cluster");
+            self.member_down(msg.addr, msg.seen_addrs)
         }
     }
 }
@@ -129,6 +152,25 @@ impl Handler<GossipIgniting> for Gossip {
         match msg {
             GossipIgniting::MemberUp(new_addr, node) => self.add_member(new_addr, node),
             GossipIgniting::MemberDown(addr) => self.remove_member(addr),
+        }
+    }
+}
+
+impl Handler<NodeResolving> for Gossip {
+    type Result = ();
+
+    fn handle(&mut self, msg: NodeResolving, _ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            NodeResolving::Request(socket_addr, sender) => {
+                let node_addr = self.members.get(socket_addr.as_str());
+                match node_addr {
+                    Some(addr) => {
+                        sender.do_send(NodeResolving::Response(addr.clone()));
+                    },
+                    None => error!("No NetworkInterface with id {} exists", socket_addr.as_str())
+                };
+            },
+            _ => ()
         }
     }
 }

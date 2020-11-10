@@ -1,18 +1,16 @@
-use log::*;
 use actix::prelude::*;
-use std::net::SocketAddr;
 use crate::network::NetworkInterface;
 use crate::codec::ClusterMessage;
 use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
 use std::str::FromStr;
-use serde::{Serialize, Deserialize, Serializer, Deserializer};
-use std::borrow::Borrow;
+use serde::{Serialize, Deserialize};
+use std::hash::{Hash};
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize, Serialize, Hash)]
 pub struct RemoteAddr {
-    socket_addr: String,
+    pub socket_addr: String,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub network_interface: Option<Addr<NetworkInterface>>,
@@ -24,8 +22,12 @@ impl RemoteAddr {
         RemoteAddr{socket_addr, network_interface, id}
     }
 
+    pub fn new_from_id(socket_addr: String, id: &str) -> Self {
+        RemoteAddr{socket_addr, network_interface: None, id: AddrRepresentation::from_str(id).unwrap()}
+    }
+
     pub fn new_from_key(socket_addr: String, network_interface: Addr<NetworkInterface>, id: &str) -> Self {
-        RemoteAddr{socket_addr,network_interface: Some(network_interface), id: AddrRepresentation::from_str(id).unwrap()}
+        RemoteAddr{socket_addr, network_interface: Some(network_interface), id: AddrRepresentation::from_str(id).unwrap()}
     }
 
     pub fn new_gossip(socket_addr: String, network_interface: Option<Addr<NetworkInterface>>) -> Self {
@@ -48,3 +50,11 @@ impl Clone for RemoteAddr {
         RemoteAddr::new( self.socket_addr.clone(), self.network_interface.clone(), self.id.clone())
     }
 }
+
+impl PartialEq for RemoteAddr {
+    fn eq(&self, other: &Self) -> bool {
+        self.socket_addr.eq(other.socket_addr.as_str())
+    }
+}
+
+impl Eq for RemoteAddr {}

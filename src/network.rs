@@ -1,31 +1,18 @@
 use actix::prelude::*;
 use log::*;
-use futures::executor::block_on;
-use std::collections::VecDeque;
 use std::net::SocketAddr;
 use std::str::FromStr;
-use actix::prelude::fut::IntoActorFuture;
 use tokio::net::TcpStream;
-use tokio_util::codec::{FramedRead, LinesCodec, LinesCodecError, FramedWrite};
+use tokio_util::codec::{FramedRead};
 use std::io::{Error};
-use futures::TryFutureExt;
 
-use crate::cluster::{Cluster, ClusterLog, NodeEvents, Gossip};
+use crate::cluster::{Cluster, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
-use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver, AddressRequest};
-use actix_telepathy_derive::RemoteActor;
-use futures::TryStreamExt;
-use tokio::prelude::io::AsyncBufReadExt;
+use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
 use actix::io::{WriteHandler};
-use tokio::io::WriteHalf;
-use std::iter::Copied;
 use tokio::net::tcp::OwnedWriteHalf;
-use actix::fut::err;
-use futures::future::Remote;
-use std::ops::Add;
 use std::thread::sleep;
 use actix::clock::Duration;
-use futures::task::Poll;
 
 
 pub struct NetworkInterface {
@@ -65,9 +52,9 @@ impl Actor for NetworkInterface {
         Running::Stop
     }
 
-    fn stopped(&mut self, ctx: &mut Context<Self>) {
+    fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        self.parent.send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
@@ -84,8 +71,8 @@ impl NetworkInterface {
     }
 
     fn frame_stream(&mut self, ctx: &mut Context<Self>){
-        let mut stream = self.stream.pop().unwrap();
-        let (mut r, w) = stream.into_split();
+        let stream = self.stream.pop().unwrap();
+        let (r, w) = stream.into_split();
 
         let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
         framed.write(ClusterMessage::Response);
@@ -109,9 +96,9 @@ impl NetworkInterface {
                     } else {
                         debug!("Connected to network node: {}", act.addr.clone().to_string());
 
-                        let mut stream = stream.unwrap();
+                        let stream = stream.unwrap();
 
-                        let (mut r, w) = stream.into_split();
+                        let (r, w) = stream.into_split();
 
                         // configure write side of the connection
                         let mut framed =
@@ -164,7 +151,7 @@ impl NetworkInterface {
         &self.framed[0].write(msg);
     }
 
-    fn received_message(&mut self, mut msg: RemoteWrapper) {
+    fn received_message(&mut self, msg: RemoteWrapper) {
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),

@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use flexbuffers;
-use log::*;
 
 
 /// Provides template for creating custom serializer
