@@ -56,7 +56,6 @@ impl OwnListener {
     fn initiate_training(&mut self) -> () {
         if self.local_addr == self.server_addr {
             self.grouping_server = Some(GroupingServer::new(
-                self.cluster.clone().unwrap(),
                 2,
                 0
             ).start());

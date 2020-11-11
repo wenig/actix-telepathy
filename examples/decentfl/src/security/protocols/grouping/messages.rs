@@ -5,9 +5,15 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype("Result = ()")]
-pub enum GroupingMessage {
-    Request(RemoteAddr),
-    Response(Vec<RemoteAddr>)
+#[with_source(source)]
+pub struct GroupingRequest {
+    pub source: RemoteAddr
+}
+
+#[derive(Message, Serialize, Deserialize, RemoteMessage)]
+#[rtype("Result = ()")]
+pub struct GroupingResponse {
+    pub group: Vec<RemoteAddr>
 }
 
 

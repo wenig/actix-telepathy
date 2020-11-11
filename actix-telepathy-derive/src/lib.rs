@@ -48,9 +48,9 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 /// Helper to make messages sendable over network
 /// # Example
 /// ```
-/// #[derive(Message, RemoteMessage)]
+/// #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 /// struct MyMessage {}
-/// impl Sendable for MyMessage {}
+///
 /// // ...
 ///
 /// #[derive(RemoteActor)]
@@ -75,10 +75,28 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 ///     fn generate_serializer() -> Box<Self::Serializer> {
 ///         Box::new(DefaultSerialization {})
 ///     }
+///
+///     fn set_source(&mut self, addr: Addr<NetworkInterface>) {
+///
+///     }
 /// }
 /// ```
 ///
-#[proc_macro_derive(RemoteMessage)]
+/// # Options
+///
+/// If you add the derive attribute `with_source`, you have the possibility to set the source remote address on a predefined struct attribute.
+/// That attribute needs to have the following type: `RemoteAddr`
+///
+/// ## Example
+/// ```
+/// #[derive(Message, Serialize, Deserialize, RemoteMessage)]
+/// #[with_source(source)]
+/// struct MyMessage {
+///     source: RemoteAddr
+/// }
+/// ```
+///
+#[proc_macro_derive(RemoteMessage, attributes(with_source))]
 pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     remote_message::remote_message_macro(input)
 }

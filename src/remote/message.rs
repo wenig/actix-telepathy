@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::{RemoteAddr, CustomSerialization};
+use crate::network::NetworkInterface;
 
 
 /// Wrapper for messages to be sent to remote actor
@@ -9,7 +10,10 @@ use crate::{RemoteAddr, CustomSerialization};
 pub struct RemoteWrapper {
     pub destination: RemoteAddr,
     pub message_buffer: Vec<u8>,
-    pub identifier: String
+    pub identifier: String,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
+    pub source: Option<Addr<NetworkInterface>>
 }
 
 impl RemoteWrapper {
@@ -18,7 +22,9 @@ impl RemoteWrapper {
         RemoteWrapper {
             destination,
             message_buffer: serializer.serialize(message.as_ref()).expect("Cannot serialize message"),
-            identifier: message.get_identifier().to_string() }
+            identifier: message.get_identifier().to_string(),
+            source: None
+        }
     }
 }
 
@@ -35,4 +41,6 @@ pub trait Remotable {
     fn get_serializer(&self) -> Box<Self::Serializer>;
 
     fn generate_serializer() -> Box<Self::Serializer>;
+
+    fn set_source(&mut self, source: Addr<NetworkInterface>);
 }

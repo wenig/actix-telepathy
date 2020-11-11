@@ -1,13 +1,13 @@
 use log::*;
 use actix::prelude::*;
 use actix_telepathy::*;
-use crate::security::protocols::grouping::messages::GroupingMessage;
+use crate::security::protocols::grouping::messages::{GroupingRequest, GroupingResponse};
 use crate::security::protocols::grouping::FindGroup;
 use std::net::SocketAddr;
 
 
 #[derive(RemoteActor)]
-#[remote_messages(GroupingMessage)]
+#[remote_messages(GroupingResponse)]
 pub struct GroupingClient {
     parent: Recipient<FindGroup>,
     socket_addr: String,
@@ -27,9 +27,9 @@ impl GroupingClient {
 
     fn initiate_grouping(&mut self) {
         self.asked = true;
-        self.server.do_send(Box::new(GroupingMessage::Request(
-            RemoteAddr::new_from_id(self.socket_addr.clone(), "GroupingClient")
-        )));
+        self.server.do_send(Box::new(GroupingRequest {
+            source: RemoteAddr::new_from_id( self.socket_addr.clone(), "GroupingClient")
+        }));
     }
 }
 
@@ -43,14 +43,11 @@ impl Actor for GroupingClient {
 }
 
 
-impl Handler<GroupingMessage> for GroupingClient {
+impl Handler<GroupingResponse> for GroupingClient {
     type Result = ();
 
-    fn handle(&mut self, msg: GroupingMessage, _ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            GroupingMessage::Response(partners) => self.receive_partners(partners),
-            _ => ()
-        }
+    fn handle(&mut self, msg: GroupingResponse, _ctx: &mut Self::Context) -> Self::Result {
+        self.receive_partners(msg.group)
     }
 }
 

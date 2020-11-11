@@ -151,7 +151,8 @@ impl NetworkInterface {
         &self.framed[0].write(msg);
     }
 
-    fn received_message(&mut self, msg: RemoteWrapper) {
+    fn received_message(&mut self, mut msg: RemoteWrapper) {
+        msg.source = Some(self.own_addr.clone().unwrap());
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),

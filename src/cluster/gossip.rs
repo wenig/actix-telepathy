@@ -32,6 +32,8 @@ impl Remotable for GossipEvent {
     fn generate_serializer() -> Box<Self::Serializer> {
         Box::new(DefaultSerialization {})
     }
+
+    fn set_source(&mut self, _addr: Addr<NetworkInterface>) {}
 }
 
 impl GossipEvent {
@@ -116,7 +118,7 @@ impl Gossip {
                 Some(node) => node.do_send(ClusterMessage::Message(
                     RemoteWrapper::new(
                         RemoteAddr::new_gossip(addr.clone(), None),
-                        Box::new(gossip_event.clone())
+                        Box::new(gossip_event.clone()),
                     )
                 )),
                 None => debug!("doesn't know {}", addr)

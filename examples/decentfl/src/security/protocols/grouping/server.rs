@@ -1,35 +1,29 @@
 use log::*;
 use actix::prelude::*;
 use actix_telepathy::*;
-use crate::security::protocols::grouping::messages::GroupingMessage;
+use crate::security::protocols::grouping::messages::{GroupingResponse, GroupingRequest};
 use std::collections::{VecDeque, HashSet};
 use std::iter::FromIterator;
 use std::borrow::Borrow;
 
 
 #[derive(RemoteActor)]
-#[remote_messages(GroupingMessage)]
+#[remote_messages(GroupingRequest)]
 pub struct GroupingServer {
-    unresolved: VecDeque<RemoteAddr>,
-    cluster: Addr<Cluster>,
     groups: Vec<Vec<RemoteAddr>>,
     group_size: usize,
     history_length: usize,
     full_group_idx: usize,
-    own_addr: Option<Recipient<NodeResolving>>
 }
 
 
 impl GroupingServer {
-    pub fn new(cluster: Addr<Cluster>, group_size: usize, history_length: usize) -> Self {
+    pub fn new(group_size: usize, history_length: usize) -> Self {
         Self {
-            unresolved: VecDeque::new(),
-            cluster,
             groups: vec![],
             group_size,
             history_length,
-            full_group_idx: 0,
-            own_addr: None
+            full_group_idx: 0
         }
     }
 
@@ -73,7 +67,7 @@ impl GroupingServer {
                 group.push(client);
                 for addr in group.iter() {
                     self.full_group_idx = self.full_group_idx + 1;
-                    addr.clone().do_send(Box::new(GroupingMessage::Response(group.clone())));
+                    addr.clone().do_send(Box::new(GroupingResponse {group: group.clone()}));
                 }
             }
             None => {
@@ -82,47 +76,18 @@ impl GroupingServer {
             }
         };
     }
-
-    fn resolve_socket(&mut self, client: RemoteAddr) {
-        self.unresolved.push_front(client.clone());
-        self.cluster.request_node_addr(client.socket_addr, self.own_addr.clone().unwrap());
-    }
 }
 
 
 impl Actor for GroupingServer {
     type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Self::Context) {
-        debug!("started");
-        self.own_addr = Some(ctx.address().recipient());
-    }
 }
 
 
-impl Handler<GroupingMessage> for GroupingServer {
+impl Handler<GroupingRequest> for GroupingServer {
     type Result = ();
 
-    fn handle(&mut self, msg: GroupingMessage, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            GroupingMessage::Request(remote_addr) => self.resolve_socket(remote_addr),
-            _ => ()
-        }
-    }
-}
-
-
-impl Handler<NodeResolving> for GroupingServer {
-    type Result = ();
-
-    fn handle(&mut self, msg: NodeResolving, _ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            NodeResolving::Response(node) => {
-                let mut remote_addr = self.unresolved.pop_back().unwrap();
-                remote_addr.set_network_interface(node);
-                self.find_slot(remote_addr);
-            },
-            _ => ()
-        }
+    fn handle(&mut self, msg: GroupingRequest, _ctx: &mut Self::Context) -> Self::Result {
+        self.find_slot(msg.source)
     }
 }

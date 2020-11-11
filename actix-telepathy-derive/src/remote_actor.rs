@@ -19,7 +19,10 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
         let name = attr.as_ref().unwrap();
         let condition = quote! {
             if #name::IDENTIFIER == msg.identifier {
-                let deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+                if msg.source.clone().is_some() {
+                    deserialized_msg.set_source(msg.source.unwrap());
+                }
                 ctx.address().do_send(deserialized_msg);
             }
         };
@@ -78,7 +81,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             }
         })
         .ok_or_else(|| {
-            syn::Error::new(Span::call_site(), format!("Expect a attribute `{}`", REMOTE_MESSAGES))
+            syn::Error::new(Span::call_site(), format!("Expect an attribute `{}`", REMOTE_MESSAGES))
         })?;
 
     if let syn::Meta::List(ref list) = attr {
