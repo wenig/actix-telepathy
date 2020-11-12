@@ -1,11 +1,12 @@
 use log::*;
 use actix::prelude::*;
 use tch::vision::dataset::Dataset;
-use crate::ml::model::Net;
+use crate::ml::model::{Net, FlattenModel};
 use crate::ml::score_storage::ScoreStorage;
 use tch::nn::{Sgd, Optimizer, OptimizerConfig, VarStore, ModuleT};
 use tch::Device;
 use crate::ml::protocols::{ModelAggregation, ModelMessage};
+use actix_telepathy::RemoteAddr;
 
 
 #[derive(Message)]
@@ -29,11 +30,13 @@ pub struct Training {
     update_every: usize,
     own_addr: Option<Addr<Training>>,
     device: Device,
-    aggregation_protocol: Option<Addr<ModelAggregation>>
+    aggregation_protocol: Option<Addr<ModelAggregation>>,
+    socket_addr: String,
+    server_addr: RemoteAddr
 }
 
 impl Training {
-    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize) -> Self {
+    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize, socket_addr: String, server_addr: RemoteAddr) -> Self {
         let score_storage = ScoreStorage::new();
         let optimizer = Sgd::default().build(&var_store, lr)?;
         Self {
@@ -48,7 +51,9 @@ impl Training {
             update_every,
             own_addr: None,
             device: var_store.device(),
-            aggregation_protocol: None
+            aggregation_protocol: None,
+            socket_addr,
+            server_addr
         }
     }
 
@@ -73,15 +78,13 @@ impl Training {
         debug!("Finish Epoch");
 
         if (self.current_epoch % self.test_every) == 0 {
-            let addr = self.own_addr.clone().expect("Own address should be set! Be sure to start the actor");
-            addr.do_send(Test {});
+            self.own_addr.test();
         }
 
         if (self.current_epoch % self.update_every) == 0 {
-            self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.clone()))
+            self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.to_flat_tensor().copy()))
         } else {
-            let addr = self.own_addr.clone().expect("Own address should be set! Be sure to start the actor");
-            addr.do_send(Epoch {})
+            self.own_addr.next_epoch();
         }
         self.current_epoch = self.current_epoch + 1;
     }
@@ -104,7 +107,10 @@ impl Actor for Training {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.own_addr = Some(ctx.address());
-        self.aggregation_protocol = Some(ModelAggregation::new(ctx.address().recipient()).start());
+        self.aggregation_protocol = Some(ModelAggregation::new(
+            ctx.address().recipient(),
+            self.socket_addr.clone(),
+            self.server_addr.clone()).start());
     }
 }
 
@@ -128,7 +134,24 @@ impl Handler<ModelMessage> for Training {
     type Result = ();
 
     fn handle(&mut self, msg: ModelMessage, _ctx: &mut Self::Context) -> Self::Result {
-        self.model = msg.0;
-        self.own_addr.clone().unwrap().do_send(Epoch {});
+        self.model.apply_flat_tensor(msg.0);
+        self.own_addr.next_epoch();
+    }
+}
+
+trait ApiHelper {
+    fn next_epoch(&self);
+    fn test(&self);
+}
+
+impl ApiHelper for Option<Addr<Training>> {
+    fn next_epoch(&self) {
+        let addr = self.clone().expect("Own address should be set! Be sure to start the actor");
+        addr.do_send(Epoch {});
+    }
+
+    fn test(&self) {
+        let addr = self.clone().expect("Own address should be set! Be sure to start the actor");
+        addr.do_send(Test {});
     }
 }

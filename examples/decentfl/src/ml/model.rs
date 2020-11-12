@@ -1,15 +1,17 @@
 use tch::{nn, Tensor};
 use tch::nn::{ConvConfig, ModuleT};
+use std::iter::FromIterator;
+use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 pub struct Net {
-    conv1: nn::Conv2D,
-    conv2: nn::Conv2D,
-    conv3: nn::Conv2D,
-    conv4: nn::Conv2D,
-    conv5: nn::Conv2D,
-    fc1: nn::Linear,
-    fc2: nn::Linear,
+    pub conv1: nn::Conv2D,
+    pub conv2: nn::Conv2D,
+    pub conv3: nn::Conv2D,
+    pub conv4: nn::Conv2D,
+    pub conv5: nn::Conv2D,
+    pub fc1: nn::Linear,
+    pub fc2: nn::Linear,
 }
 
 
@@ -27,6 +29,66 @@ impl Net {
             fc2: nn::linear(vs, 50, out_channels, Default::default())
         }
     }
+
+    pub fn get_parameters(&self) -> Vec<Tensor> {
+        let parameters = self.get_parameters_ref();
+        Vec::from_iter(parameters.iter().map(|&x| x.copy()))
+    }
+
+    pub fn get_parameters_ref(&self) -> Vec<&Tensor> {
+        let mut parameters: Vec<&Tensor> = Vec::new();
+        parameters.push(&self.conv1.ws);
+        parameters.push(self.conv1.bs.as_ref().unwrap());
+        parameters.push(&self.conv2.ws);
+        parameters.push(self.conv2.bs.as_ref().unwrap());
+        parameters.push(&self.conv3.ws);
+        parameters.push(self.conv3.bs.as_ref().unwrap());
+        parameters.push(&self.conv4.ws);
+        parameters.push(self.conv4.bs.as_ref().unwrap());
+        parameters.push(&self.conv5.ws);
+        parameters.push(self.conv5.bs.as_ref().unwrap());
+        parameters.push(&self.fc1.ws);
+        parameters.push(&self.fc1.bs);
+        parameters.push(&self.fc2.ws);
+        parameters.push(&self.fc2.bs);
+        parameters
+    }
+
+    pub fn get_parameters_mut(&mut self) -> Vec<&mut Tensor> {
+        let mut parameters: Vec<&mut Tensor> = Vec::new();
+        parameters.push(self.conv1.ws.borrow_mut());
+        parameters.push(self.conv1.bs.as_mut().unwrap().borrow_mut());
+        parameters.push(self.conv2.ws.borrow_mut());
+        parameters.push(self.conv2.bs.as_mut().unwrap().borrow_mut());
+        parameters.push(self.conv3.ws.borrow_mut());
+        parameters.push(self.conv3.bs.as_mut().unwrap().borrow_mut());
+        parameters.push(self.conv4.ws.borrow_mut());
+        parameters.push(self.conv4.bs.as_mut().unwrap().borrow_mut());
+        parameters.push(self.conv5.ws.borrow_mut());
+        parameters.push(self.conv5.bs.as_mut().unwrap().borrow_mut());
+        parameters.push(self.fc1.ws.borrow_mut());
+        parameters.push(self.fc1.bs.borrow_mut());
+        parameters.push(self.fc2.ws.borrow_mut());
+        parameters.push(self.fc2.bs.borrow_mut());
+        parameters
+    }
+
+    pub fn set_parameters(&mut self, parameters: Vec<&Tensor>) {
+        self.conv1.ws = parameters.get(0).expect("Not enough parameters for model").copy();
+        self.conv1.bs = Some(parameters.get(1).expect("Not enough parameters for model").copy());
+        self.conv2.ws = parameters.get(2).expect("Not enough parameters for model").copy();
+        self.conv2.bs = Some(parameters.get(3).expect("Not enough parameters for model").copy());
+        self.conv3.ws = parameters.get(4).expect("Not enough parameters for model").copy();
+        self.conv3.bs = Some(parameters.get(5).expect("Not enough parameters for model").copy());
+        self.conv4.ws = parameters.get(6).expect("Not enough parameters for model").copy();
+        self.conv4.bs = Some(parameters.get(7).expect("Not enough parameters for model").copy());
+        self.conv5.ws = parameters.get(8).expect("Not enough parameters for model").copy();
+        self.conv5.bs = Some(parameters.get(9).expect("Not enough parameters for model").copy());
+        self.fc1.ws = parameters.get(10).expect("Not enough parameters for model").copy();
+        self.fc1.bs = parameters.get(11).expect("Not enough parameters for model").copy();
+        self.fc2.ws = parameters.get(12).expect("Not enough parameters for model").copy();
+        self.fc2.bs = parameters.get(13).expect("Not enough parameters for model").copy();
+    }
 }
 
 
@@ -42,5 +104,30 @@ impl ModuleT for Net {
             .view([batch_size, -1])
             .apply(&self.fc1).relu().dropout(0.5, train)
             .apply(&self.fc2)
+    }
+}
+
+
+pub trait FlattenModel {
+    fn to_flat_tensor(&self) -> Tensor;
+    fn apply_flat_tensor(&mut self, tensor: Tensor);
+}
+
+impl FlattenModel for Net {
+    fn to_flat_tensor(&self) -> Tensor {
+        let params = self.get_parameters();
+        Tensor::cat(Vec::from_iter(params.iter().map(|x| x.copy().view(-1))).as_slice(), 0)
+    }
+
+    fn apply_flat_tensor(&mut self, tensor: Tensor) {
+        let mut offset = 0;
+
+        for p in self.get_parameters_mut() {
+            let shape = p.copy().size();
+            let l: i64 = shape.clone().iter().product();
+            let slice = tensor.slice(0, offset, offset+l, 1).view(shape.as_slice());
+            *p = slice;
+            offset = offset + l;
+        }
     }
 }
