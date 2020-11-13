@@ -13,6 +13,7 @@ use actix::io::{WriteHandler};
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
+use std::fmt;
 
 
 pub struct NetworkInterface {
@@ -184,3 +185,9 @@ impl Handler<ClusterMessage> for NetworkInterface {
 
 impl WriteHandler<Error> for NetworkInterface {}
 impl Supervised for NetworkInterface {}
+
+impl fmt::Debug for NetworkInterface {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "NetworkInterface({})", self.addr.clone().to_string())
+    }
+}

@@ -1,10 +1,6 @@
-use log::*;
 use actix::prelude::*;
 use actix_telepathy::*;
 use tch::{Tensor, Kind, Device, IndexOp};
-use rand::Rng;
-use tokio::stream::StreamExt;
-use rand::prelude::ThreadRng;
 use crate::security::sub_cluster::{SubCluster, CollectiveApi};
 use std::ops::{Add, Sub, Mul, Div};
 
@@ -16,6 +12,7 @@ pub struct Secret {
     kind: Kind
 }
 
+#[allow(dead_code)]
 impl Secret {
     pub fn new(name: String, share: Tensor, ctx: Addr<SubCluster>) -> Self {
         Self {name, share, ctx, kind: Kind::Float}
@@ -125,7 +122,7 @@ impl Secret {
         self.name = format!("({} - T)", self.name);
     }
 
-    pub fn mul(&mut self, other: &Self) {
+    pub fn mul(&mut self, _other: &Self) {
         // todo Beaver Store
     }
 
@@ -198,5 +195,7 @@ pub fn random_additive(value: &Tensor, splits: i64) -> Tensor {
         x = _random_tensor(value, splits);
         zero_index = _zero_index(&x);
     }
-    x
+    let mut shares = x.copy() / x.sum1(&[0], false, Kind::Int64);
+    shares = value.copy().mul(shares);
+    shares
 }

@@ -29,7 +29,9 @@ pub enum NodeEvents{
 #[rtype(result = "()")]
 pub enum NodeResolving{
     Request(String, Recipient<NodeResolving>),
-    Response(Addr<NetworkInterface>)
+    VecRequest(Vec<String>, Recipient<NodeResolving>),
+    Response(Addr<NetworkInterface>),
+    VecResponse(Vec<Option<Addr<NetworkInterface>>>)
 }
 
 #[derive(Message)]
@@ -132,7 +134,7 @@ impl Handler<GossipResponse> for Cluster {
 }
 
 impl Cluster {
-    pub fn new<S: Into<String>>(ip_address: String, seed_nodes: Option<S>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
+    pub fn new(ip_address: String, seed_nodes: Vec<String>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.clone()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -143,17 +145,11 @@ impl Cluster {
                 TcpConnect(st, addr)
             }));
 
-            let mut addrs: Vec<String> = Vec::new();
-            seed_nodes.map(|node_addr|{
-                let node_addr = node_addr.into();
-                addrs.push(node_addr.clone());
-            });
-
             let address_resolver = Supervisor::start(|_| AddressResolver::new());
             for (rec, identifier) in rec_to_be_registered.iter() {
                 address_resolver.do_send(AddressRequest::Register(rec.clone(), identifier.to_string()));
             }
-            Cluster {ip_address, addrs, listeners: cluster_listeners, gossip: None, address_resolver, own_addr: None, nodes: HashMap::new()}
+            Cluster {ip_address, addrs: seed_nodes, listeners: cluster_listeners, gossip: None, address_resolver, own_addr: None, nodes: HashMap::new()}
         })
     }
 
@@ -183,6 +179,7 @@ impl Cluster {
 pub trait AddrApi {
     fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str);
     fn request_node_addr(&self, socket_addr: String, rec: Recipient<NodeResolving>);
+    fn request_node_addrs(&self, socket_addrs: Vec<String>, rec: Recipient<NodeResolving>);
 }
 
 
@@ -193,5 +190,9 @@ impl AddrApi for Addr<Cluster> {
 
     fn request_node_addr(&self, socket_addr: String, rec: Recipient<NodeResolving>) -> () {
         self.do_send(NodeResolving::Request(socket_addr, rec))
+    }
+
+    fn request_node_addrs(&self, socket_addrs: Vec<String>, rec: Recipient<NodeResolving>) -> () {
+        self.do_send(NodeResolving::VecRequest(socket_addrs, rec))
     }
 }

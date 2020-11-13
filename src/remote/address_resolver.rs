@@ -11,7 +11,7 @@ use serde::export::Formatter;
 const NETWORKINTERFACE: &str = "networkinterface";
 const GOSSIP: &str = "gossip";
 
-#[derive(Serialize, Deserialize, Hash)]
+#[derive(Serialize, Deserialize, Hash, Debug)]
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,

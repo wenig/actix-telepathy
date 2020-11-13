@@ -6,7 +6,7 @@ use crate::ml::score_storage::ScoreStorage;
 use tch::nn::{Sgd, Optimizer, OptimizerConfig, VarStore, ModuleT};
 use tch::Device;
 use crate::ml::protocols::{ModelAggregation, ModelMessage};
-use actix_telepathy::RemoteAddr;
+use actix_telepathy::{RemoteAddr, Cluster};
 
 
 #[derive(Message)]
@@ -17,12 +17,31 @@ pub struct Epoch;
 #[rtype("Result = ()")]
 pub struct Test;
 
+#[derive(Message)]
+#[rtype("Result = ()")]
+pub struct Addresses {
+    socket_addr: String,
+    server_addr: RemoteAddr,
+    cluster: Addr<Cluster>
+}
+
+impl Addresses {
+    pub fn new(socket_addr: String, server_addr: RemoteAddr, cluster: Addr<Cluster>) -> Self {
+        Self {
+            socket_addr,
+            server_addr,
+            cluster
+        }
+    }
+}
+
 
 pub struct Training {
     model: Net,
     dataset: Dataset,
     batch_size: usize,
     optimizer: Optimizer<Sgd>,
+    #[allow(dead_code)]
     score_storage: ScoreStorage,
     current_epoch: usize,
     max_epochs: Option<usize>,
@@ -31,14 +50,12 @@ pub struct Training {
     own_addr: Option<Addr<Training>>,
     device: Device,
     aggregation_protocol: Option<Addr<ModelAggregation>>,
-    socket_addr: String,
-    server_addr: RemoteAddr
 }
 
 impl Training {
-    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize, socket_addr: String, server_addr: RemoteAddr) -> Self {
+    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize) -> Self {
         let score_storage = ScoreStorage::new();
-        let optimizer = Sgd::default().build(&var_store, lr)?;
+        let optimizer = Sgd::default().build(&var_store, lr).unwrap();
         Self {
             model,
             dataset,
@@ -52,8 +69,6 @@ impl Training {
             own_addr: None,
             device: var_store.device(),
             aggregation_protocol: None,
-            socket_addr,
-            server_addr
         }
     }
 
@@ -70,10 +85,10 @@ impl Training {
 
         debug!("Start Epoch");
 
-        for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
+        /*for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
             let loss = self.model.forward_t(&images, true).cross_entropy_for_logits(&labels);
             self.optimizer.backward_step(&loss);
-        }
+        }*/
 
         debug!("Finish Epoch");
 
@@ -107,10 +122,19 @@ impl Actor for Training {
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.own_addr = Some(ctx.address());
+    }
+}
+
+impl Handler<Addresses> for Training {
+    type Result = ();
+
+    fn handle(&mut self, msg: Addresses, _ctx: &mut Self::Context) -> Self::Result {
         self.aggregation_protocol = Some(ModelAggregation::new(
-            ctx.address().recipient(),
-            self.socket_addr.clone(),
-            self.server_addr.clone()).start());
+            self.own_addr.clone().unwrap().recipient(),
+            msg.cluster,
+            msg.socket_addr,
+            msg.server_addr
+        ).start());
     }
 }
 
@@ -134,8 +158,14 @@ impl Handler<ModelMessage> for Training {
     type Result = ();
 
     fn handle(&mut self, msg: ModelMessage, _ctx: &mut Self::Context) -> Self::Result {
-        self.model.apply_flat_tensor(msg.0);
-        self.own_addr.next_epoch();
+        match msg {
+            ModelMessage::Response(t) => {
+                self.model.apply_flat_tensor(t);
+                self.own_addr.next_epoch();
+            },
+            _ => ()
+        }
+
     }
 }
 

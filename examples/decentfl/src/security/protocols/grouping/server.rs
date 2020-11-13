@@ -2,9 +2,8 @@ use log::*;
 use actix::prelude::*;
 use actix_telepathy::*;
 use crate::security::protocols::grouping::messages::{GroupingResponse, GroupingRequest};
-use std::collections::{VecDeque, HashSet};
+use std::collections::{HashSet};
 use std::iter::FromIterator;
-use std::borrow::Borrow;
 
 
 #[derive(RemoteActor)]
@@ -65,9 +64,12 @@ impl GroupingServer {
             Some(idx) => {
                 let group = self.groups.get_mut(idx).unwrap();
                 group.push(client);
-                for addr in group.iter() {
+
+                if group.len() == self.group_size {
                     self.full_group_idx = self.full_group_idx + 1;
-                    addr.clone().do_send(Box::new(GroupingResponse {group: group.clone()}));
+                    for addr in group.iter() {
+                        addr.clone().do_send(Box::new(GroupingResponse { group: group.clone() }));
+                    }
                 }
             }
             None => {

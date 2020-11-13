@@ -1,6 +1,6 @@
 use log::*;
 use actix::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
 use crate::codec::ClusterMessage;
@@ -9,8 +9,7 @@ use crate::{RemoteAddr, Cluster, NodeResolving};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor};
 use rand::thread_rng;
-use rand::prelude::{SliceRandom, IteratorRandom};
-use std::iter::FromIterator;
+use rand::prelude::{IteratorRandom};
 use crate::cluster::cluster::GossipResponse;
 
 #[derive(Message, Serialize, Deserialize)]
@@ -87,7 +86,11 @@ impl Gossip {
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
         match self.members.get(new_addr.as_str()) {
             Some(_) => {}, //debug!("already knows {} -> {}", new_addr.as_str(), self.members.len()),
-            None => self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
+            None => {
+                if new_addr.clone() != self.own_addr {
+                    self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
+                }
+            }
         }
         self.gossip_forward(new_addr, seen_addrs, true);
     }
@@ -101,7 +104,7 @@ impl Gossip {
             return;
         }
 
-        let mut rng = &mut thread_rng();
+        let rng = &mut thread_rng();
         let mut chosen_addrs: Vec<String> = self.members.keys().choose_multiple(rng, 3).iter().map(|&x| x.clone()).collect();
         chosen_addrs.extend(seen_addrs);
         chosen_addrs.sort();
@@ -167,11 +170,21 @@ impl Handler<NodeResolving> for Gossip {
                 let node_addr = self.members.get(socket_addr.as_str());
                 match node_addr {
                     Some(addr) => {
-                        sender.do_send(NodeResolving::Response(addr.clone()));
+                        let _r = sender.do_send(NodeResolving::Response(addr.clone()));
                     },
                     None => error!("No NetworkInterface with id {} exists", socket_addr.as_str())
                 };
             },
+            NodeResolving::VecRequest(socket_addrs, sender) => {
+                let node_addrs: Vec<Option<Addr<NetworkInterface>>> = socket_addrs.into_iter().map(|x| {
+                    if x.clone() == self.own_addr {
+                        None
+                    } else {
+                        Some(self.members.get(&x).expect(&format!("Socket {} should be known!", &x)).clone())
+                    }
+                }).collect();
+                let _r = sender.do_send(NodeResolving::VecResponse(node_addrs));
+            }
             _ => ()
         }
     }

@@ -14,6 +14,7 @@ struct SubClusterMessage {
 
 #[derive(Message)]
 #[rtype("Result = ()")]
+#[allow(dead_code)]
 enum InternalMessage {
     Scatter(Tensor),
     ScatterResponse(Tensor),
@@ -22,11 +23,12 @@ enum InternalMessage {
 
 #[derive(RemoteActor)]
 #[remote_messages()]
+#[allow(dead_code)]
 pub struct SubCluster {
     size: usize,
     partners: Vec<RemoteAddr>
 }
-
+#[allow(dead_code)]
 impl SubCluster {
     pub fn new(size: usize) -> Self {
         SubCluster {size, partners: vec![]}
@@ -44,7 +46,7 @@ impl Actor for SubCluster {
 impl Handler<SubClusterMessage> for SubCluster {
     type Result = ();
 
-    fn handle(&mut self, msg: SubClusterMessage, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: SubClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
         debug!("received sub-cluster-message");
     }
 }
@@ -52,7 +54,7 @@ impl Handler<SubClusterMessage> for SubCluster {
 impl Handler<InternalMessage> for SubCluster {
     type Result = ();
 
-    fn handle(&mut self, msg: InternalMessage, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, _msg: InternalMessage, _ctx: &mut Self::Context) -> Self::Result {
         debug!("scatter...")
     }
 }
@@ -65,19 +67,19 @@ pub trait CollectiveApi {
 }
 
 impl CollectiveApi for Addr<SubCluster> {
-    fn receive(&self, recvbuf: &Tensor, src: RemoteAddr) {
+    fn receive(&self, _recvbuf: &Tensor, _src: RemoteAddr) {
 
     }
 
-    fn allreduce(&self, sendbuf: &Tensor, recvbuf: &Tensor) {
+    fn allreduce(&self, _sendbuf: &Tensor, _recvbuf: &Tensor) {
 
     }
 
-    fn scatter(&self, sendbuf: &Tensor, recvbuf: &Tensor) {
+    fn scatter(&self, _sendbuf: &Tensor, _recvbuf: &Tensor) {
 
     }
 
-    fn allscatter(&self, sendbuf: &Tensor, recvbuf: &Tensor) {
+    fn allscatter(&self, _sendbuf: &Tensor, _recvbuf: &Tensor) {
 
     }
 }

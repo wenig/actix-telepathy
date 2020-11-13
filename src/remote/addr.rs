@@ -8,7 +8,7 @@ use std::hash::{Hash};
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
-#[derive(Deserialize, Serialize, Hash)]
+#[derive(Deserialize, Serialize, Hash, Debug)]
 pub struct RemoteAddr {
     pub socket_addr: String,
     #[serde(skip_serializing)]
@@ -36,6 +36,10 @@ impl RemoteAddr {
 
     pub fn set_network_interface(&mut self, network_interface: Addr<NetworkInterface>) {
         self.network_interface = Some(network_interface);
+    }
+
+    pub fn change_id(&mut self, id: String) {
+        self.id = AddrRepresentation::Key(id);
     }
 
     pub fn do_send<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> () {

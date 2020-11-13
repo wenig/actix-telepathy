@@ -3,7 +3,6 @@ use actix::prelude::*;
 use actix_telepathy::*;
 use crate::security::protocols::grouping::messages::{GroupingRequest, GroupingResponse};
 use crate::security::protocols::grouping::FindGroup;
-use std::net::SocketAddr;
 
 
 #[derive(RemoteActor)]
@@ -22,7 +21,7 @@ impl GroupingClient {
     }
 
     fn receive_partners(&self, partners: Vec<RemoteAddr>) {
-        self.parent.do_send(FindGroup::Response(partners));
+        let _r = self.parent.do_send(FindGroup::Response(partners));
     }
 
     fn initiate_grouping(&mut self) {

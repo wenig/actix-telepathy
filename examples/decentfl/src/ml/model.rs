@@ -72,23 +72,6 @@ impl Net {
         parameters.push(self.fc2.bs.borrow_mut());
         parameters
     }
-
-    pub fn set_parameters(&mut self, parameters: Vec<&Tensor>) {
-        self.conv1.ws = parameters.get(0).expect("Not enough parameters for model").copy();
-        self.conv1.bs = Some(parameters.get(1).expect("Not enough parameters for model").copy());
-        self.conv2.ws = parameters.get(2).expect("Not enough parameters for model").copy();
-        self.conv2.bs = Some(parameters.get(3).expect("Not enough parameters for model").copy());
-        self.conv3.ws = parameters.get(4).expect("Not enough parameters for model").copy();
-        self.conv3.bs = Some(parameters.get(5).expect("Not enough parameters for model").copy());
-        self.conv4.ws = parameters.get(6).expect("Not enough parameters for model").copy();
-        self.conv4.bs = Some(parameters.get(7).expect("Not enough parameters for model").copy());
-        self.conv5.ws = parameters.get(8).expect("Not enough parameters for model").copy();
-        self.conv5.bs = Some(parameters.get(9).expect("Not enough parameters for model").copy());
-        self.fc1.ws = parameters.get(10).expect("Not enough parameters for model").copy();
-        self.fc1.bs = parameters.get(11).expect("Not enough parameters for model").copy();
-        self.fc2.ws = parameters.get(12).expect("Not enough parameters for model").copy();
-        self.fc2.bs = parameters.get(13).expect("Not enough parameters for model").copy();
-    }
 }
 
 
