@@ -51,7 +51,8 @@ pub struct ModelAggregation {
     current_group: Option<Vec<RemoteAddr>>,
     accepted: Vec<RemoteAddr>,
     own_model: Option<Tensor>,
-    shares: Vec<Tensor>
+    shares: Vec<Tensor>,
+    aggregate: Vec<Tensor>
 }
 
 // todo register at cluster
@@ -67,7 +68,8 @@ impl ModelAggregation {
             current_group: None,
             accepted: vec![],
             own_model: None,
-            shares: vec![]
+            shares: vec![],
+            aggregate: vec![]
         }
     }
 
@@ -88,7 +90,6 @@ impl ModelAggregation {
     }
 
     fn accept_partner(&mut self, partner: RemoteAddr) {
-        debug!("accept partner");
         if self.current_group.as_ref().unwrap().iter().any(|i| i.clone() == partner) {
             self.accepted.push(partner);
         }
@@ -98,11 +99,12 @@ impl ModelAggregation {
     }
 
     fn share_encrypted_model(&mut self) {
+        let len = self.current_group.as_ref().expect("Current group should be set at that point").len() as i64;
+
         let encrypted_models = random_additive(
             self.own_model.as_ref().expect("Model should be set at that point"),
-            self.current_group.as_ref().expect("Current group should be set at that point").len() as i64
+            len
         );
-        let len = encrypted_models.size().get(0).expect("Should have more than 0 dimensions").clone();
         for _ in 0..(len as usize) {
             self.shares.push(self.own_model.as_ref().unwrap().empty_like());
         }
@@ -129,19 +131,27 @@ impl ModelAggregation {
         if self.shares.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
             // todo add krum
             let revealed: Tensor = self.shares.iter().sum();
-            for partner in self.current_group.as_ref().unwrap() {
-                partner.clone().do_send(Box::new(AggregationMessage{ model: revealed.copy() }))
+            let len = self.current_group.as_ref().expect("Current group should be set at that point").len();
+
+            for i in 0..len {
+                let mut partner = self.current_group.as_ref().unwrap().get(i).unwrap().clone();
+
+                if partner.socket_addr == self.socket_addr {
+                    self.aggregate.push(revealed.copy());
+                } else {
+                    partner.do_send(Box::new(AggregationMessage{ model: revealed.copy() }));
+                }
             }
             self.shares = vec![];
         }
     }
 
     fn receive_reveals(&mut self, share: Tensor) {
-        self.shares.push(share);
+        self.aggregate.push(share);
 
-        if self.shares.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
-            let revealed: Tensor = self.shares.iter().sum::<Tensor>().div(self.shares.len() as i64);
-            self.shares = vec![];
+        if self.aggregate.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
+            let revealed: Tensor = self.aggregate.iter().sum::<Tensor>().div(self.shares.len() as i64);
+            self.aggregate = vec![];
             self.own_model = None;
 
             let _r = self.parent.do_send(ModelMessage::Response(revealed));

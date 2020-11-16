@@ -7,10 +7,10 @@ use actix_rt;
 use actix::prelude::*;
 use actix_telepathy::*;
 use security::{GroupingServer};
-use crate::ml::{Training, Net, load_mnist, FlattenModel};
+use crate::ml::{Training, Net, load_mnist};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
-use tch::{Device, Tensor};
+use tch::{Device};
 use serde::{Deserialize, Serialize};
 
 

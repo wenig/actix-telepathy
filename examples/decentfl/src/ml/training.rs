@@ -85,10 +85,10 @@ impl Training {
 
         debug!("Start Epoch");
 
-        /*for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
+        for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
             let loss = self.model.forward_t(&images, true).cross_entropy_for_logits(&labels);
             self.optimizer.backward_step(&loss);
-        }*/
+        }
 
         debug!("Finish Epoch");
 
@@ -113,7 +113,7 @@ impl Training {
             self.device,
             1024
         );
-        debug!("epoch: {:4} test acc {:5.2}%", self.current_epoch, 100. * test_accuracy);
+        info!("epoch: {:4} test acc {:5.2}%", self.current_epoch, 100. * test_accuracy);
     }
 }
 
