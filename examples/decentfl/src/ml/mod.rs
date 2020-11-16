@@ -5,5 +5,5 @@ mod score_storage;
 mod protocols;
 
 pub use training::{Training, Addresses, Epoch};
-pub use model::Net;
+pub use model::{Net, FlattenModel};
 pub use dataset::load_mnist;

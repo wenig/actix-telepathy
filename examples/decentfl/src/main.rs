@@ -7,10 +7,11 @@ use actix_rt;
 use actix::prelude::*;
 use actix_telepathy::*;
 use security::{GroupingServer};
-use crate::ml::{Training, Net, load_mnist};
+use crate::ml::{Training, Net, load_mnist, FlattenModel};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
-use tch::Device;
+use tch::{Device, Tensor};
+use serde::{Deserialize, Serialize};
 
 
 #[derive(StructOpt, Debug, Clone)]
@@ -34,6 +35,10 @@ struct Parameters{
     history_length: usize,
     #[structopt(long)]
     seed_nodes: Vec<String>,
+    #[structopt(long, default_value = "0.0")]
+    dropout: f64,
+    #[structopt(long)]
+    adversarial: bool,
 }
 
 fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> {

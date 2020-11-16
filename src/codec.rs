@@ -1,3 +1,4 @@
+use log::*;
 use actix::prelude::*;
 use std::io;
 use flexbuffers;
@@ -9,6 +10,7 @@ use serde::{Serialize, Deserialize};
 use crate::remote::RemoteWrapper;
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
+const ENDIAN_LENGTH: usize = 4;
 
 #[derive(Message, Deserialize, Serialize)]
 #[rtype(result = "()")]
@@ -46,14 +48,14 @@ impl Decoder for ConnectCodec {
         }
 
         let size = {
-            if src.len() < 2 {
+            if src.len() < ENDIAN_LENGTH {
                 return Ok(None)
             }
-            NetworkEndian::read_u16(src.as_ref()) as usize
+            NetworkEndian::read_u32(src.as_ref()) as usize
         };
 
-        if src.len() >= size + 2 {
-            let _s = src.split_to(2);
+        if src.len() >= size + ENDIAN_LENGTH {
+            let _s = src.split_to(ENDIAN_LENGTH);
             let buf = src.split_to(size);
             Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()))
         } else {
@@ -75,8 +77,8 @@ impl Encoder<ClusterMessage> for ConnectCodec {
         let msg = flexbuffers::to_vec(&item).unwrap();
         let msg_ref: &[u8] = msg.as_ref();
 
-        dst.reserve(msg_ref.len() + 2);
-        dst.put_u16(msg_ref.len() as u16);
+        dst.reserve(msg_ref.len() + ENDIAN_LENGTH);
+        dst.put_u32(msg_ref.len() as u32);
         dst.put(msg_ref);
         Ok(())
     }

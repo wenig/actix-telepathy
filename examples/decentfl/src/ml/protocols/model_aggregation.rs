@@ -26,7 +26,8 @@ pub struct AggregationMessage {
 #[rtype("Result = ()")]
 pub struct EncryptionMessage {
     #[serde(with = "tch_serde::serde_tensor")]
-    model: Tensor
+    model: Tensor,
+    sender_addr: String
 }
 
 
@@ -102,22 +103,28 @@ impl ModelAggregation {
             self.current_group.as_ref().expect("Current group should be set at that point").len() as i64
         );
         let len = encrypted_models.size().get(0).expect("Should have more than 0 dimensions").clone();
-        self.shares = vec![self.own_model.as_ref().unwrap().empty_like(); len as usize];
+        for _ in 0..(len as usize) {
+            self.shares.push(self.own_model.as_ref().unwrap().empty_like());
+        }
+        let own_pos = self.current_group.as_ref().unwrap().iter().position(|x| x.clone().socket_addr == self.socket_addr)
+            .expect("Own address should appear in current group");
         for i in 0..len {
             let mut partner = self.current_group.as_ref().unwrap().get(i as usize).unwrap().clone();
 
-            if partner.socket_addr == self.own_addr {
-                self.shares.
+            if partner.socket_addr == self.socket_addr {
+                self.shares[own_pos] = encrypted_models.i(i).copy();
             } else {
-                partner.do_send(Box::new(EncryptionMessage { model: encrypted_models.i(i).copy()}));
+                partner.do_send(Box::new(EncryptionMessage { model: encrypted_models.i(i).copy(), sender_addr: self.socket_addr.clone()}));
             }
-
         }
     }
 
-    fn receive_shares(&mut self, share: Tensor) {
+    fn receive_shares(&mut self, share: Tensor, addr: String) {
         // todo push share at right position depending on current_group
-        self.shares.push(share);
+        let pos = self.current_group.as_ref().unwrap().iter()
+            .position(|x| x.clone().socket_addr == addr)
+            .expect("Own address should appear in current group");
+        self.shares[pos] = share;
 
         if self.shares.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
             // todo add krum
@@ -181,7 +188,7 @@ impl Handler<EncryptionMessage> for ModelAggregation {
     type Result = ();
 
     fn handle(&mut self, msg: EncryptionMessage, _ctx: &mut Self::Context) -> Self::Result {
-        self.receive_shares(msg.model)
+        self.receive_shares(msg.model, msg.sender_addr)
     }
 }
 
