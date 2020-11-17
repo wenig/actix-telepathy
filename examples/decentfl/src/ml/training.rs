@@ -41,7 +41,6 @@ pub struct Training {
     dataset: Dataset,
     batch_size: usize,
     optimizer: Optimizer<Sgd>,
-    #[allow(dead_code)]
     score_storage: ScoreStorage,
     current_epoch: usize,
     max_epochs: Option<usize>,
@@ -53,8 +52,7 @@ pub struct Training {
 }
 
 impl Training {
-    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize) -> Self {
-        let score_storage = ScoreStorage::new();
+    pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize, score_storage: ScoreStorage) -> Self {
         let optimizer = Sgd::default().build(&var_store, lr).unwrap();
         Self {
             model,
@@ -104,7 +102,7 @@ impl Training {
         self.current_epoch = self.current_epoch + 1;
     }
 
-    fn test(&self) {
+    fn test(&mut self) {
         debug!("Start Test");
 
         let test_accuracy = self.model.batch_accuracy_for_logits(
@@ -114,6 +112,7 @@ impl Training {
             1024
         );
         info!("epoch: {:4} test acc {:5.2}%", self.current_epoch, 100. * test_accuracy);
+        self.score_storage.add_result(self.current_epoch as i16, "accuracy", test_accuracy);
     }
 }
 

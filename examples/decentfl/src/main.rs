@@ -2,12 +2,13 @@ mod ml;
 mod security;
 mod cluster_listener;
 
+use log::*;
 use structopt::StructOpt;
 use actix_rt;
 use actix::prelude::*;
 use actix_telepathy::*;
 use security::{GroupingServer};
-use crate::ml::{Training, Net, load_mnist};
+use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
 use tch::{Device};
@@ -21,6 +22,8 @@ struct Parameters{
     server_addr: String,
     #[structopt(short, long)]
     cluster_size: usize,
+    #[structopt(long)]
+    db_path: String,
     #[structopt(long, default_value = "0.01")]
     lr: f64,
     #[structopt(short, long, default_value = "8")]
@@ -39,6 +42,12 @@ struct Parameters{
     dropout: f64,
     #[structopt(long)]
     adversarial: bool,
+    #[structopt(long)]
+    krum: bool,
+    #[structopt(long, default_value = "1992")]
+    seed: u64,
+    #[structopt(long, default_value = "0")]
+    split: usize
 }
 
 fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> {
@@ -52,9 +61,27 @@ fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> 
     }
 }
 
-fn build_training(args: Parameters) -> Addr<Training> {
+fn build_score_storage(args: Parameters) -> ScoreStorage {
+    let mut score_storage = ScoreStorage::new(&args.db_path);
+    score_storage.new_experiment(
+        args.cluster_size as i16,
+        args.lr,
+        args.batch_size as i16,
+        args.test_every as i16,
+        args.update_every as i16,
+        args.group_size as i16,
+        args.history_length as i16,
+        args.dropout,
+        args.adversarial,
+        args.krum
+    );
+    score_storage
+}
+
+fn build_training(args: Parameters, score_storage: ScoreStorage) -> Addr<Training> {
     let vs = VarStore::new(Device::Cpu);
-    let dataset = load_mnist();
+    let mut dataset = load_mnist();
+    dataset.partition(args.split, (args.cluster_size - 1) as i64, args.seed);
     let model = Net::new(&vs.root(), dataset.labels);
 
     Training::new(
@@ -64,7 +91,8 @@ fn build_training(args: Parameters) -> Addr<Training> {
         args.lr,
         args.batch_size,
         args.test_every,
-        args.update_every
+        args.update_every,
+        score_storage
     ).start()
 }
 
@@ -96,7 +124,10 @@ async fn main() {
     let grouping_server = evtl_build_grouping_server(args.clone());
 
     let training = match grouping_server {
-        None => Some(build_training(args.clone())),
+        None => {
+            let score_storage = build_score_storage(args.clone());
+            Some(build_training(args.clone(), score_storage))
+        },
         Some(_) => None
     };
 
