@@ -47,10 +47,6 @@ impl RemoteAddr {
             RemoteWrapper::new(self.clone(), msg)
         ));
     }
-
-    pub fn do_send_lmp<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> () {
-
-    }
 }
 
 impl Clone for RemoteAddr {

@@ -29,3 +29,17 @@ impl Subset for Dataset {
         self.train_labels = self.train_labels.index_select(0, own_split);
     }
 }
+
+
+#[test]
+fn subset_is_correctly_split() {
+    let control = load_mnist();
+    let mut a = load_mnist();
+    a.partition(0, 2, 1002);
+    let mut b = load_mnist();
+    b.partition(1, 2, 1002);
+    assert_eq!(a.train_images.size().get(0).unwrap(),
+               &(control.train_images.size().get(0).unwrap() / 2));
+    assert_eq!(b.train_images.size().get(0).unwrap(),
+                &(control.train_images.size().get(0).unwrap() / 2));
+}

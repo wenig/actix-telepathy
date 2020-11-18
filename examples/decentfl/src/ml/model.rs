@@ -1,7 +1,8 @@
-use tch::{nn, Tensor};
-use tch::nn::{ConvConfig, ModuleT};
+use tch::{nn, Tensor, Device};
+use tch::nn::{ConvConfig, ModuleT, VarStore};
 use std::iter::FromIterator;
 use std::borrow::BorrowMut;
+use crate::ml::load_mnist;
 
 #[derive(Debug)]
 pub struct Net {
@@ -113,4 +114,22 @@ impl FlattenModel for Net {
             offset = offset + l;
         }
     }
+}
+
+
+#[test]
+fn flat_tensor_is_right() {
+    let dataset = load_mnist();
+    let vs = VarStore::new(Device::Cpu);
+    let model = Net::new(&vs.root(), 10);
+    let mut model2 = Net::new(&vs.root(), 10);
+    let flat = model.to_flat_tensor();
+    model2.apply_flat_tensor(flat.copy());
+    let flat2 = model2.to_flat_tensor();
+    assert_eq!(flat, flat2);
+
+    let out = model.forward_t(&dataset.train_images.get(0).view([1, -1]), false);
+    let out2 = model2.forward_t(&dataset.train_images.get(0).view([1, -1]), false);
+
+    assert_eq!(out, out2);
 }

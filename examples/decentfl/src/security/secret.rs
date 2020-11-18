@@ -199,3 +199,14 @@ pub fn random_additive(value: &Tensor, splits: i64) -> Tensor {
     shares = value.copy().mul(shares);
     shares
 }
+
+#[test]
+fn correct_mpc_addition() {
+    let a = Tensor::of_slice(&[1,2,3]);
+    let b = Tensor::of_slice(&[3,2,1]);
+    let a_encrypted = random_additive(&a, 2);
+    let b_encrypted = random_additive(&b, 2);
+    let sum_encrypted = (a_encrypted.copy() + b_encrypted)
+        .sum1(&[0], false, a_encrypted.kind());
+    assert_eq!(sum_encrypted.round(), (a+b))
+}

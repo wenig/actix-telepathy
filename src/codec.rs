@@ -1,4 +1,3 @@
-use log::*;
 use actix::prelude::*;
 use std::io;
 use flexbuffers;

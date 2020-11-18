@@ -2,6 +2,7 @@ mod ml;
 mod security;
 mod cluster_listener;
 
+pub use security::random_additive;
 use log::*;
 use structopt::StructOpt;
 use actix_rt;
