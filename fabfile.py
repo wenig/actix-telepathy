@@ -76,7 +76,7 @@ def experiment(gateway):
     base_port: int = settings["settings"]["base_port"]
     kwargs = to_terminal_args(settings["kwargs"])
     for n_idx in range():
-        c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASE_PORT={base_port} bash start_decenfl.sh {kwargs}'")
+        c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_decentfl.sh {kwargs}'")
 
 
 def to_terminal_args(kwargs: dict) -> str:

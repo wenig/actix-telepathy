@@ -40,8 +40,8 @@ fabric:
     settings:
       base_port: 1992
     kwargs:
-      local_addr: "'$hostname:`expr 8000 + $DECENTFL_PROCESS`'"
-      server_addr: "odin01:8000"
+      local_addr: "'$HOSTNAME:`expr $DECENTFL_BASEPORT + $DECENTFL_PROCESS`'"
+      server_addr: "'$DECENTFL_BASEHOST:$DECENTFL_BASEPORT'"
       cluster_size: "101"
       db_path: "'decenfl.$DECENTFL_PROCESS.db'"
       lr: 0.01
@@ -50,7 +50,7 @@ fabric:
       update_every: 1
       group_size: 3
       history_length: 1
-      seed_nodes: "odin01:8000"
+      seed_nodes: "'$DECENTFL_BASEHOST:$DECENTFL_BASEPORT'"
       dropout: 0
       adversarial: false
       krum: false

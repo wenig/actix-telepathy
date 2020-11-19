@@ -1,5 +1,7 @@
-set -o allexport; source .env; set +o allexport
+#!/bin/bash
 
-for DECENTFL_PROCESS in $(seq 0 `expr $DECENTFL_PROCESSES - 1`); do
-  eval "echo $1"
+for DECENTFL_PROCESS in $(seq 0 `expr $1 - 1`); do
+  args="${@:2}"
+  echo "cargo run --package decentfl --bin decentfl" $(eval "echo $args") &
 done
+wait
