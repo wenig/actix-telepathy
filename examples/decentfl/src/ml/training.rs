@@ -82,7 +82,6 @@ impl Training {
         }
 
         debug!("Start Epoch");
-
         for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
             let loss = self.model.forward_t(&images, true).cross_entropy_for_logits(&labels);
             self.optimizer.backward_step(&loss);

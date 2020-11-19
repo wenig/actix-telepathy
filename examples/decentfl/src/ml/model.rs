@@ -1,8 +1,8 @@
-use tch::{nn, Tensor, Device};
-use tch::nn::{ConvConfig, ModuleT, VarStore};
+use tch::{nn, Tensor};
+use tch::nn::{ConvConfig, ModuleT};
 use std::iter::FromIterator;
 use std::borrow::BorrowMut;
-use crate::ml::load_mnist;
+
 
 #[derive(Debug)]
 pub struct Net {
@@ -29,6 +29,11 @@ impl Net {
             fc1: nn::linear(vs, 160, 50, Default::default()),
             fc2: nn::linear(vs, 50, out_channels, Default::default())
         }
+    }
+
+    pub fn new_with_seed(vs: &nn::Path, out_channels: i64, seed: i64) -> Self {
+        tch::manual_seed(seed);
+        Self::new(vs, out_channels)
     }
 
     pub fn get_parameters(&self) -> Vec<Tensor> {
@@ -100,7 +105,7 @@ pub trait FlattenModel {
 impl FlattenModel for Net {
     fn to_flat_tensor(&self) -> Tensor {
         let params = self.get_parameters();
-        Tensor::cat(Vec::from_iter(params.iter().map(|x| x.copy().view(-1))).as_slice(), 0)
+        Tensor::cat(Vec::from_iter(params.iter().map(|x| x.copy().detach().view(-1))).as_slice(), 0)
     }
 
     fn apply_flat_tensor(&mut self, tensor: Tensor) {
@@ -110,7 +115,7 @@ impl FlattenModel for Net {
             let shape = p.copy().size();
             let l: i64 = shape.clone().iter().product();
             let slice = tensor.slice(0, offset, offset+l, 1).view(shape.as_slice());
-            *p = slice;
+            *p = slice.set_requires_grad(true);
             offset = offset + l;
         }
     }
@@ -119,6 +124,10 @@ impl FlattenModel for Net {
 
 #[test]
 fn flat_tensor_is_right() {
+    use tch::{Device};
+    use tch::nn::VarStore;
+    use crate::ml::load_mnist;
+
     let dataset = load_mnist();
     let vs = VarStore::new(Device::Cpu);
     let model = Net::new(&vs.root(), 10);

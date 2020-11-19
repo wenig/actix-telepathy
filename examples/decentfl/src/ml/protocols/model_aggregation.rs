@@ -150,7 +150,7 @@ impl ModelAggregation {
         self.aggregate.push(share);
 
         if self.aggregate.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
-            let revealed: Tensor = self.aggregate.iter().sum::<Tensor>().div(self.shares.len() as i64);
+            let revealed: Tensor = self.aggregate.iter().sum::<Tensor>().div(self.aggregate.len() as i64);
             self.aggregate = vec![];
             self.own_model = None;
 
