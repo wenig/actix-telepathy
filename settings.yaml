@@ -1,0 +1,58 @@
+fabric:
+  hosts:
+    - hostname: "odin01"
+      user: "phillip.wenig"
+      np: 9
+    - hostname: "odin02"
+      user: "phillip.wenig"
+      np: 9
+    - hostname: "odin03"
+      user: "phillip.wenig"
+      np: 9
+    - hostname: "odin04"
+      user: "phillip.wenig"
+      np: 9
+    - hostname: "odin05"
+      user: "phillip.wenig"
+      np: 9
+    - hostname: "odin06"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "odin07"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "odin08"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "thor01"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "thor02"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "thor03"
+      user: "phillip.wenig"
+      np: 8
+    - hostname: "thor04"
+      user: "phillip.wenig"
+      np: 8
+  experiment:
+    settings:
+      base_port: 1992
+    kwargs:
+      local_addr: "'$hostname:`expr 8000 + $DECENTFL_PROCESS`'"
+      server_addr: "odin01:8000"
+      cluster_size: "101"
+      db_path: "'decenfl.$DECENTFL_PROCESS.db'"
+      lr: 0.01
+      batch_size: 8
+      test_every: 1
+      update_every: 1
+      group_size: 3
+      history_length: 1
+      seed_nodes: "odin01:8000"
+      dropout: 0
+      adversarial: false
+      krum: false
+      seed: 1992
+      split: "'$DECENTFL_PROCESS'"

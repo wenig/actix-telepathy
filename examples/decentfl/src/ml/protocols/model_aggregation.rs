@@ -94,6 +94,7 @@ impl ModelAggregation {
             self.accepted.push(partner);
         }
         if self.accepted.len() == (self.current_group.as_ref().unwrap().len() - 1) {
+            // todo add mascot
             self.share_encrypted_model()
         }
     }

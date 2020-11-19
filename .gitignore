@@ -1,8 +1,5 @@
 /target
 Cargo.lock
-fabfile.py
-Pipfile
 Pipfile.lock
 /__pycache__
-settings.yaml
 .env
