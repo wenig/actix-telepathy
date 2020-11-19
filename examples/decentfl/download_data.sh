@@ -5,7 +5,7 @@ hashes=("f68b3c2dcbeaaa9fbdd348bbdeb94873" "d53e105ee54ea40749a09fcbcd1e9432" "9
 
 mkdir -p $TORCH_DATASETS/TEST
 
-for i in {1..4}; do
+for i in {0..3}; do
   url=${links[i]}
   hash=${hashes[i]}
   wget $url -P $TORCH_DATASETS/TEST
