@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use serde::{Serialize, Deserialize};
 
 

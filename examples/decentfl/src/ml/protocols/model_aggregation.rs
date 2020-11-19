@@ -1,6 +1,6 @@
 use log::*;
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use serde::{Serialize, Deserialize};
 use tch::{Tensor, IndexOp};
 use crate::security::{GroupingClient, FindGroup, random_additive};

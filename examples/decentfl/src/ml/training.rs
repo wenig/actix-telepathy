@@ -112,7 +112,7 @@ impl Training {
             1024
         );
         info!("epoch: {:4} test acc {:5.2}%", self.current_epoch, 100. * test_accuracy);
-        self.score_storage.add_result(self.current_epoch as i16, "accuracy", test_accuracy);
+        let _r = self.score_storage.add_result(self.current_epoch as i16, "accuracy", test_accuracy);
     }
 }
 

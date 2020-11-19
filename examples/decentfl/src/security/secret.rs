@@ -1,5 +1,5 @@
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use tch::{Tensor, Kind, Device, IndexOp};
 use crate::security::sub_cluster::{SubCluster, CollectiveApi};
 use std::ops::{Add, Sub, Mul, Div};

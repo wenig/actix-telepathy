@@ -1,10 +1,9 @@
 use log::*;
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use crate::security::protocols::grouping::messages::{GroupingResponse, GroupingRequest};
 use std::collections::{HashSet};
 use std::iter::FromIterator;
-use actix::actors::mocker::Mocker;
 
 
 #[derive(RemoteActor)]

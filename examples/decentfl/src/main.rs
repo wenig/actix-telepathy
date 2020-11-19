@@ -3,17 +3,15 @@ mod security;
 mod cluster_listener;
 
 pub use security::random_additive;
-use log::*;
 use structopt::StructOpt;
 use actix_rt;
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use security::{GroupingServer};
 use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
 use tch::{Device};
-use serde::{Deserialize, Serialize};
 
 
 #[derive(StructOpt, Debug, Clone)]
@@ -64,7 +62,7 @@ fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> 
 
 fn build_score_storage(args: Parameters) -> ScoreStorage {
     let mut score_storage = ScoreStorage::new(&args.db_path);
-    score_storage.new_experiment(
+    let _r = score_storage.new_experiment(
         args.cluster_size as i16,
         args.lr,
         args.batch_size as i16,

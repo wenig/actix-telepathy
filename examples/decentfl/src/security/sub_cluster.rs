@@ -1,6 +1,6 @@
 use log::*;
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use serde::{Deserialize, Serialize};
 use tch::Tensor;
 

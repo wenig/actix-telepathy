@@ -1,6 +1,6 @@
 use log::*;
 use actix::prelude::*;
-use actix_telepathy::*;
+use actix_telepathy::prelude::*;
 use crate::ml::{Training, Addresses, Epoch};
 
 

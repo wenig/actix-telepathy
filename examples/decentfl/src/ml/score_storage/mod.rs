@@ -64,7 +64,6 @@ impl ScoreStorage {
                                    new_experiment.dropout,
                                    new_experiment.adversarial,
                                    new_experiment.krum])?;
-        let mut stmt = self.db_connection.prepare("SELECT last_insert_rowid() from experiments;")?;
         let id = self.db_connection.last_insert_rowid();
         self.experiment_id = Some(id);
         Ok(())

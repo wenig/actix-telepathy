@@ -1,4 +1,3 @@
-use log::*;
 use tch::vision::dataset::Dataset;
 use tch::{vision, Tensor, Kind, Device};
 use rand::{seq::SliceRandom, SeedableRng};

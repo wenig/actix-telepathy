@@ -7,7 +7,18 @@ mod cluster;
 mod remote;
 mod serialization;
 
-pub use cluster::{Cluster, ClusterListener, ClusterLog, AddrApi, NodeResolving};
-pub use remote::{Remotable, RemoteAddr, RemoteWrapper};
-pub use serialization::{DefaultSerialization, CustomSerialization};
-pub use network::NetworkInterface;
+pub use crate::cluster::*;
+pub use crate::remote::*;
+pub use crate::serialization::*;
+pub use crate::network::*;
+
+
+pub mod prelude {
+    #[cfg(feature = "derive")]
+    pub use actix_telepathy_derive::*;
+
+    pub use crate::cluster::{Cluster, ClusterListener, ClusterLog, AddrApi, NodeResolving};
+    pub use crate::remote::{Remotable, RemoteAddr, RemoteWrapper};
+    pub use crate::serialization::{DefaultSerialization, CustomSerialization};
+    pub use crate::network::NetworkInterface;
+}
