@@ -47,6 +47,12 @@ impl RemoteAddr {
             RemoteWrapper::new(self.clone(), msg)
         ));
     }
+
+    pub fn send<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> Request<NetworkInterface, ClusterMessage> {
+        self.network_interface.as_ref().expect("Network interface must be set!").send(ClusterMessage::Message(
+            RemoteWrapper::new(self.clone(), msg)
+        ))
+    }
 }
 
 impl Clone for RemoteAddr {

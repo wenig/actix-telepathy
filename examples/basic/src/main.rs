@@ -3,13 +3,15 @@ mod serializer;
 #[macro_use] extern crate log;
 
 use actix_rt;
-use actix_telepathy::*;
-use actix::{System, Handler, Actor, Context, Supervised, Message, AsyncContext};
+use actix_telepathy::prelude::*;
+use actix::prelude::*;
 use structopt::StructOpt;
 use serde::{Serialize, Deserialize};
 #[allow(unused_imports)]
 use serializer::MySerializer;
 use tokio;
+use std::thread::sleep;
+use actix::clock::Duration;
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(Result = "()")]
@@ -19,7 +21,7 @@ struct Welcome {}
 #[derive(StructOpt, Debug)]
 struct Parameters {
     local_ip: String,
-    seed_nodes: Option<String>,
+    seed_nodes: Vec<String>,
 }
 
 #[derive(RemoteActor)]
@@ -71,13 +73,11 @@ async fn main() {
     env_logger::init();
 
     let args = Parameters::from_args();
-    let local_ip = args.local_ip.to_lowercase().trim().to_owned();
-    let seed_nodes = args.seed_nodes.map(|n| n.to_lowercase().trim().to_owned());
 
     let cluster_listener = OwnListener::new().start();
     let _cluster = Cluster::new(
-        local_ip,
-        seed_nodes,
+        args.local_ip,
+        args.seed_nodes,
         vec![cluster_listener.clone().recipient()],
         vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
     tokio::signal::ctrl_c().await.unwrap();

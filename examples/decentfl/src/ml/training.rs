@@ -20,17 +20,13 @@ pub struct Test;
 #[derive(Message)]
 #[rtype("Result = ()")]
 pub struct Addresses {
-    socket_addr: String,
-    server_addr: RemoteAddr,
-    cluster: Addr<Cluster>
+    model_aggregation: Addr<ModelAggregation>
 }
 
 impl Addresses {
-    pub fn new(socket_addr: String, server_addr: RemoteAddr, cluster: Addr<Cluster>) -> Self {
+    pub fn new(model_aggregation: Addr<ModelAggregation>) -> Self {
         Self {
-            socket_addr,
-            server_addr,
-            cluster
+            model_aggregation
         }
     }
 }
@@ -82,6 +78,8 @@ impl Training {
         }
 
         debug!("Start Epoch");
+
+        self.optimizer.zero_grad();
         for (images, labels) in self.dataset.train_iter(self.batch_size as i64).shuffle().to_device(self.device) {
             let loss = self.model.forward_t(&images, true).cross_entropy_for_logits(&labels);
             self.optimizer.backward_step(&loss);
@@ -116,7 +114,7 @@ impl Training {
 }
 
 impl Actor for Training {
-    type Context = Context<Self>;
+    type Context = SyncContext<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
         self.own_addr = Some(ctx.address());
@@ -127,12 +125,7 @@ impl Handler<Addresses> for Training {
     type Result = ();
 
     fn handle(&mut self, msg: Addresses, _ctx: &mut Self::Context) -> Self::Result {
-        self.aggregation_protocol = Some(ModelAggregation::new(
-            self.own_addr.clone().unwrap().recipient(),
-            msg.cluster,
-            msg.socket_addr,
-            msg.server_addr
-        ).start());
+        self.aggregation_protocol = Some(msg.model_aggregation);
     }
 }
 
@@ -162,8 +155,7 @@ impl Handler<ModelMessage> for Training {
                 self.own_addr.next_epoch();
             },
             _ => ()
-        }
-
+        };
     }
 }
 

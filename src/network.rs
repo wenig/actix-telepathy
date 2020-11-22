@@ -176,6 +176,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
 }
 
 impl Handler<ClusterMessage> for NetworkInterface {
+    // todo: give back future in case of send instead of do_send
     type Result = ();
 
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {

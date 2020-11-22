@@ -33,7 +33,7 @@ struct Parameters{
     update_every: usize,
     #[structopt(long, default_value = "2")]
     group_size: usize,
-    #[structopt(long, default_value = "1")]
+    #[structopt(long, default_value = "0")]
     history_length: usize,
     #[structopt(long)]
     seed_nodes: Vec<String>,
@@ -77,22 +77,25 @@ fn build_score_storage(args: Parameters) -> ScoreStorage {
     score_storage
 }
 
-fn build_training(args: Parameters, score_storage: ScoreStorage) -> Addr<Training> {
-    let vs = VarStore::new(Device::Cpu);
-    let mut dataset = load_mnist();
-    dataset.partition(args.split, (args.cluster_size - 1) as i64, args.seed);
-    let model = Net::new_with_seed(&vs.root(), dataset.labels, args.seed as i64);
+fn build_training(args: Parameters) -> Addr<Training> {
+    SyncArbiter::start(1, move || {
+        let score_storage = build_score_storage(args.clone());
+        let vs = VarStore::new(Device::Cpu);
+        let mut dataset = load_mnist();
+        dataset.partition(args.split, (args.cluster_size - 1) as i64, args.seed);
+        let model = Net::new_with_seed(&vs.root(), dataset.labels, args.seed as i64);
 
-    Training::new(
-        model,
-        vs,
-        dataset,
-        args.lr,
-        args.batch_size,
-        args.test_every,
-        args.update_every,
-        score_storage
-    ).start()
+        Training::new(
+            model,
+            vs,
+            dataset,
+            args.lr,
+            args.batch_size,
+            args.test_every,
+            args.update_every,
+            score_storage
+        )
+    })
 }
 
 fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) -> Addr<OwnListener> {
@@ -124,8 +127,7 @@ async fn main() {
 
     let training = match grouping_server {
         None => {
-            let score_storage = build_score_storage(args.clone());
-            Some(build_training(args.clone(), score_storage))
+            Some(build_training(args.clone()))
         },
         Some(_) => None
     };

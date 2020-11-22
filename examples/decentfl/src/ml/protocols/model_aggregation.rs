@@ -79,7 +79,6 @@ impl ModelAggregation {
     }
 
     fn build_sub_cluster(&mut self) {
-        debug!("build sub cluster");
         for partner in self.current_group.as_ref().unwrap().iter() {
             if partner.socket_addr != self.socket_addr {
                 partner.clone().do_send(Box::new(GroupingMessage {
@@ -95,6 +94,7 @@ impl ModelAggregation {
         }
         if self.accepted.len() == (self.current_group.as_ref().unwrap().len() - 1) {
             // todo add mascot
+            self.accepted = vec![];
             self.share_encrypted_model()
         }
     }
