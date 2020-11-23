@@ -8,7 +8,7 @@ use crate::network::NetworkInterface;
 use std::str::FromStr;
 use futures::StreamExt;
 use futures::executor::block_on;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use crate::cluster::gossip::{Gossip, GossipIgniting};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use crate::ClusterLog;
@@ -60,7 +60,7 @@ impl Actor for Cluster {
         self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip, addr4gossip)));
 
         for node_addr in self.addrs.iter() {
-            let addr = SocketAddr::from_str(&node_addr).unwrap();
+            let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
             let own_ip = self.ip_address.clone();
             let parent = self.own_addr.clone().unwrap();
             let gossip = self.gossip.clone().unwrap();
