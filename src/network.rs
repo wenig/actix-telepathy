@@ -17,7 +17,7 @@ use std::fmt;
 
 
 pub struct NetworkInterface {
-    own_ip: String,
+    own_ip: SocketAddr,
     pub addr: SocketAddr,
     stream: Vec<TcpStream>,
     framed: Vec<actix::io::FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
@@ -61,11 +61,11 @@ impl Actor for NetworkInterface {
 
 
 impl NetworkInterface {
-    pub fn new(own_ip: String, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
+    pub fn new(own_ip: SocketAddr, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0 }
     }
 
-    pub fn from_stream(own_ip: String, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
+    pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
         let mut ni = Self::new(own_ip, addr, parent, gossip, address_resolver);
         ni.stream.push(stream);
         ni
@@ -104,7 +104,8 @@ impl NetworkInterface {
                         // configure write side of the connection
                         let mut framed =
                             actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-                        framed.write(ClusterMessage::Request(act.own_ip.clone()));
+                        let reply_port = act.own_ip.port();
+                        framed.write(ClusterMessage::Request(reply_port));
                         act.framed.push(framed);
 
                         // read side of the connection
@@ -116,15 +117,15 @@ impl NetworkInterface {
             .wait(ctx);
     }
 
-    fn finish_connecting(&mut self, peer_addr: Option<String>) {
+    fn finish_connecting(&mut self, peer_port: Option<u16>) {
         self.connected = true;
 
         match self.own_addr.clone() {
             Some(addr) => {
                 let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr), AddrRepresentation::NetworkInterface);
-                let peer_addr = match peer_addr {
-                    Some(p_a) => {
-                        self.addr = SocketAddr::from_str(&p_a).unwrap();
+                let peer_addr = match peer_port {
+                    Some(p) => {
+                        self.addr.set_port(p as u16);
                         self.addr.to_string()
                     },
                     None => self.addr.to_string()
@@ -138,9 +139,9 @@ impl NetworkInterface {
         };
     }
 
-    fn requested(&mut self, addr: String) {
-        debug!("Request from {}", addr);
-        self.finish_connecting(Some(addr));
+    fn requested(&mut self, port: u16) {
+        debug!("Request from {}:{}", self.addr.ip().to_string(), port);
+        self.finish_connecting(Some(port));
     }
 
     fn responsed(&mut self) {
@@ -166,7 +167,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
     fn handle(&mut self, item: Result<ClusterMessage, Error>, _ctx: &mut Context<Self>) {
         match item {
             Ok(msg) => match msg {
-                ClusterMessage::Request(addr) => self.requested(addr),
+                ClusterMessage::Request(port) => self.requested(port),
                 ClusterMessage::Response => self.responsed(),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
             },

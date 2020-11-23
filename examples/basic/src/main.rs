@@ -10,6 +10,7 @@ use serde::{Serialize, Deserialize};
 #[allow(unused_imports)]
 use serializer::MySerializer;
 use tokio;
+use std::net::ToSocketAddrs;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -78,7 +79,7 @@ async fn main() {
 
     let cluster_listener = OwnListener::new().start();
     let _cluster = Cluster::new(
-        args.local_ip,
+        args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,
         vec![cluster_listener.clone().recipient()],
         vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);

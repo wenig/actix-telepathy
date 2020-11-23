@@ -40,7 +40,7 @@ pub struct GossipResponse(pub(crate) String);
 
 /// Central Actor for cluster handling
 pub struct Cluster {
-    ip_address: String,
+    ip_address: SocketAddr,
     addrs: Vec<String>,
     listeners: Vec<Recipient<ClusterLog>>,
     gossip: Option<Addr<Gossip>>,
@@ -57,7 +57,7 @@ impl Actor for Cluster {
         self.own_addr = Some(ctx.address());
         let ip_addr4gossip = self.ip_address.clone();
         let addr4gossip = ctx.address().clone();
-        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip, addr4gossip)));
+        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip.to_string(), addr4gossip)));
 
         for node_addr in self.addrs.iter() {
             let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
@@ -134,8 +134,8 @@ impl Handler<GossipResponse> for Cluster {
 }
 
 impl Cluster {
-    pub fn new(ip_address: String, seed_nodes: Vec<String>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
-        let listener = Cluster::bind(ip_address.clone()).unwrap();
+    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<String>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
+        let listener = Cluster::bind(ip_address.to_string()).unwrap();
 
         debug!("Listening on {}", ip_address);
         Cluster::create(move |ctx| {
