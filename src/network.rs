@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use log::*;
 use std::net::SocketAddr;
-use std::str::FromStr;
 use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead};
 use std::io::{Error};
