@@ -71,6 +71,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
         match item {
             ClusterMessage::Request(_) => dst.extend_from_slice(PREFIX),
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
+            ClusterMessage::Decline => dst.extend_from_slice(PREFIX),
             _ => {}
         }
 
