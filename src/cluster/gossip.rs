@@ -87,7 +87,7 @@ impl Gossip {
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
         if self.members.get(new_addr.as_str()).is_none() {
-            if !self.requested_members.contains(&new_addr) && self.own_addr != new_addr {
+            if (!self.requested_members.contains(&new_addr)) && self.own_addr != new_addr {
                 self.requested_members.insert(new_addr.clone());
                 self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
             }
