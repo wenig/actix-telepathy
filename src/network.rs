@@ -54,7 +54,7 @@ impl Actor for NetworkInterface {
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+        //self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
