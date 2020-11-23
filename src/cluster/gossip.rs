@@ -124,7 +124,7 @@ impl Gossip {
                         Box::new(gossip_event.clone()),
                     )
                 )),
-                None => debug!("doesn't know {}", addr)
+                None => {}//debug!("doesn't know {}", addr)
             }
         }
     }
