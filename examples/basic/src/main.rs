@@ -26,13 +26,15 @@ struct Parameters {
 
 #[derive(RemoteActor)]
 #[remote_messages(Welcome)]
-struct OwnListener {}
+struct OwnListener {
+    count: usize
+}
 
 impl OwnListener {
     const IDENTIFIER: &'static str = "own_listener";
 
     pub fn new() -> Self {
-        OwnListener {}
+        OwnListener {count: 0}
     }
 }
 
@@ -63,8 +65,9 @@ impl Handler<ClusterLog> for OwnListener {
 impl Handler<Welcome> for OwnListener {
     type Result = ();
 
-    fn handle(&mut self, msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("Welcome said {} ", msg.get_identifier())
+    fn handle(&mut self, _msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
+        self.count = self.count + 1;
+        debug!("Welcome said {}x", self.count)
     }
 }
 
