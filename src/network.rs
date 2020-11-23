@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead};
 use std::io::{Error};
 
-use crate::cluster::{Cluster, NodeEvents, Gossip};
+use crate::cluster::{Cluster, NodeEvents, Gossip, ConnectionApproval, ConnectionApprovalResponse};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
 use actix::io::{WriteHandler};
@@ -75,7 +75,6 @@ impl NetworkInterface {
         let (r, w) = stream.into_split();
 
         let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-        framed.write(ClusterMessage::Response);
         self.framed.push(framed);
 
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
@@ -116,36 +115,49 @@ impl NetworkInterface {
             .wait(ctx);
     }
 
-    fn finish_connecting(&mut self, peer_port: Option<u16>) {
+    fn finish_connecting(&mut self) {
         self.connected = true;
 
         match self.own_addr.clone() {
             Some(addr) => {
-                let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr), AddrRepresentation::NetworkInterface);
-                let peer_addr = match peer_port {
-                    Some(p) => {
-                        self.addr.set_port(p as u16);
-                        self.addr.to_string()
-                    },
-                    None => self.addr.to_string()
-                };
-                match &self.own_addr {
-                    Some(oa) => self.parent.do_send(NodeEvents::MemberUp(peer_addr, oa.clone(), remote_address)),
-                    None => ()
-                }
+                let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
+                let peer_addr =  self.addr.to_string();
+                self.parent.do_send(NodeEvents::MemberUp(peer_addr, addr, remote_address));
             },
             None => error!("NetworkInterface might not have been started already!")
         };
     }
 
-    fn requested(&mut self, port: u16) {
+    fn connection_approved(&mut self) {
+        &self.framed[0].write(ClusterMessage::Response);
+    }
+
+    fn requested(&mut self, port: u16, ctx: &mut Context<Self>) {
         debug!("Request from {}:{}", self.addr.ip().to_string(), port);
-        self.finish_connecting(Some(port));
+
+        let send_addr = self.addr.to_string();
+        self.addr.set_port(port);
+        let addr = self.addr.to_string();
+
+        self.parent.send(ConnectionApproval { addr, send_addr })
+            .into_actor(self)
+            .map(|res, act, ctx| match res {
+                Ok(message_response) => match message_response {
+                    ConnectionApprovalResponse::Approved => {
+                        &act.framed[0].write(ClusterMessage::Response);
+                        act.finish_connecting();
+                    },
+                    ConnectionApprovalResponse::Declined => {
+                        &act.framed[0].write(ClusterMessage::Decline);
+                        ctx.stop();
+                    }
+                },
+                Err(_) => {}
+            }).wait(ctx);
     }
 
     fn responsed(&mut self) {
-        debug!("Response");
-        self.finish_connecting(None);
+        self.finish_connecting();
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
@@ -163,12 +175,13 @@ impl NetworkInterface {
 }
 
 impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
-    fn handle(&mut self, item: Result<ClusterMessage, Error>, _ctx: &mut Context<Self>) {
+    fn handle(&mut self, item: Result<ClusterMessage, Error>, ctx: &mut Context<Self>) {
         match item {
             Ok(msg) => match msg {
-                ClusterMessage::Request(port) => self.requested(port),
+                ClusterMessage::Request(port) => self.requested(port, ctx),
                 ClusterMessage::Response => self.responsed(),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
+                ClusterMessage::Decline => ctx.stop()
             },
             Err(err) => error!("{}", err)
         }

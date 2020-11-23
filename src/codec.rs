@@ -16,7 +16,8 @@ const ENDIAN_LENGTH: usize = 4;
 pub enum ClusterMessage {
     Request(u16),
     Response,
-    Message(RemoteWrapper)
+    Message(RemoteWrapper),
+    Decline
 }
 
 pub struct ConnectCodec {

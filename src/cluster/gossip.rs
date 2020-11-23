@@ -93,7 +93,6 @@ impl Gossip {
                 self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
             }
         }
-        assert_eq!(self.requested_members.intersection(&HashSet::from_iter(self.members.keys().into_iter().map(|x| x.clone()))).count(), 0);
         self.gossip_forward(new_addr, seen_addrs, true);
     }
 

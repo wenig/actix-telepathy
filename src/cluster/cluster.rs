@@ -14,6 +14,21 @@ use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse
 use crate::ClusterLog;
 
 
+#[derive(MessageResponse)]
+pub enum ConnectionApprovalResponse {
+    Approved,
+    Declined
+}
+
+
+#[derive(Message)]
+#[rtype(result = "ConnectionApprovalResponse")]
+pub struct ConnectionApproval {
+    pub addr: String,
+    pub send_addr: String
+}
+
+
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct TcpConnect(pub TcpStream, pub SocketAddr);
@@ -59,14 +74,9 @@ impl Actor for Cluster {
         let addr4gossip = ctx.address().clone();
         self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip.to_string(), addr4gossip)));
 
-        for node_addr in self.addrs.iter() {
-            let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
-            let own_ip = self.ip_address.clone();
-            let parent = self.own_addr.clone().unwrap();
-            let gossip = self.gossip.clone().unwrap();
-            let address_resolver = self.address_resolver.clone();
-            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver).start();
-            self.nodes.insert(node_addr.clone(), node);
+        let addrs_len = self.addrs.len();
+        for node_addr in 0..addrs_len {
+            self.add_node(self.addrs.get(node_addr).unwrap().clone());
         }
     }
 }
@@ -78,12 +88,7 @@ impl Handler<TcpConnect> for Cluster {
         debug!("Incoming TcpConnect");
         let stream = msg.0;
         let addr = msg.1;
-        let own_ip = self.ip_address.clone();
-        let parent = self.own_addr.clone().unwrap();
-        let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.clone();
-        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip, address_resolver).start();
-        self.nodes.insert(addr.to_string(), node);
+        self.add_node_from_stream(addr, stream);
     }
 }
 
@@ -133,6 +138,21 @@ impl Handler<GossipResponse> for Cluster {
     }
 }
 
+impl Handler<ConnectionApproval> for Cluster {
+    type Result = ConnectionApprovalResponse;
+
+    fn handle(&mut self, msg: ConnectionApproval, _ctx: &mut Self::Context) -> ConnectionApprovalResponse {
+        if self.nodes.contains_key(&msg.addr) {
+            ConnectionApprovalResponse::Declined
+        } else {
+            let node = self.nodes.get(&msg.send_addr).expect("Should be filled").clone();
+            self.nodes.remove(&msg.send_addr);
+            self.nodes.insert(msg.addr, node);
+            ConnectionApprovalResponse::Approved
+        }
+    }
+}
+
 impl Cluster {
     pub fn new(ip_address: SocketAddr, seed_nodes: Vec<String>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.to_string()).unwrap();
@@ -159,14 +179,25 @@ impl Cluster {
         Ok(listener)
     }
 
-    fn add_node(&mut self, node_addr: String) {
-        let addr = SocketAddr::from_str(&node_addr).unwrap();
+    fn add_node_from_stream(&mut self, addr: SocketAddr, stream: TcpStream) {
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
         let address_resolver = self.address_resolver.clone();
-        let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver).start();
-        self.nodes.insert(node_addr.clone(), node);
+        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip, address_resolver).start();
+        self.nodes.insert(addr.to_string(), node);
+    }
+
+    fn add_node(&mut self, node_addr: String) {
+        let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
+        let own_ip = self.ip_address.clone();
+        let parent = self.own_addr.clone().unwrap();
+        let gossip = self.gossip.clone().unwrap();
+        let address_resolver = self.address_resolver.clone();
+        if !self.nodes.contains_key(&node_addr) {
+            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver).start();
+            self.nodes.insert(node_addr.clone(), node);
+        }
     }
 
     #[allow(dead_code)]
