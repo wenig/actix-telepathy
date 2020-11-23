@@ -33,7 +33,7 @@ impl Actor for NetworkInterface {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        debug!("NetworkInterface started!");
+        debug!("NetworkInterface started! {}", self.addr);
         self.own_addr = Some(ctx.address());
         self.counter = 0;
         if self.stream.is_empty() {
