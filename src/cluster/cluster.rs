@@ -12,6 +12,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use crate::cluster::gossip::{Gossip, GossipIgniting};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use crate::ClusterLog;
+use tokio::prelude::io::AsyncReadExt;
 
 
 #[derive(MessageResponse)]
@@ -86,8 +87,8 @@ impl Handler<TcpConnect> for Cluster {
 
     fn handle(&mut self, msg: TcpConnect, _ctx: &mut Self::Context) -> Self::Result {
         debug!("Incoming TcpConnect");
-        let stream = msg.0;
-        let addr = msg.1;
+        let mut stream = msg.0;
+        let mut addr = msg.1;
         self.add_node_from_stream(addr, stream);
     }
 }

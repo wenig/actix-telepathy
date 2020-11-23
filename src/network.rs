@@ -14,6 +14,8 @@ use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse};
+use tokio::prelude::io::AsyncWriteExt;
+use futures::executor::block_on;
 
 
 pub struct NetworkInterface {
@@ -44,18 +46,18 @@ impl Actor for NetworkInterface {
         }
     }
 
-    fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
+    /*fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
         if self.counter < 5 {
             self.stream = vec![];
             self.connect_to_stream(ctx);
             return Running::Continue
         }
         Running::Stop
-    }
+    }*/
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+        //self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
@@ -157,7 +159,8 @@ impl NetworkInterface {
                         act.finish_connecting()
                     },
                     ConnectionApprovalResponse::Declined => {
-                        debug!("Declined")
+                        act.transmit_message(ClusterMessage::Decline);
+                        ctx.stop()
                     }
                 },
                 Err(_) => {}
@@ -172,6 +175,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
                 ClusterMessage::Request(reply_port) => self.set_reply_port(reply_port, ctx),
                 ClusterMessage::Response => self.finish_connecting(),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
+                ClusterMessage::Decline => ctx.stop()
             },
             Err(err) => error!("{}", err)
         }
