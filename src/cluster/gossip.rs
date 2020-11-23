@@ -74,7 +74,7 @@ impl Gossip {
 
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
         debug!("Member {} added!", new_addr.clone());
-        match self.requested_members.iter().position(|x| x.clone() == new_addr.clone()) {
+        match self.requested_members.iter().position(|x| x.clone() == new_addr) {
             Some(pos) => { self.requested_members.remove(pos); },
             _ => {}
         }
@@ -89,13 +89,10 @@ impl Gossip {
     }
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
-        match self.members.get(new_addr.as_str()) {
-            Some(_) => {},
-            None => {
-                if new_addr.clone() != self.own_addr {
-                    self.requested_members.push(new_addr.clone());
-                    self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
-                }
+        if self.members.get(new_addr.as_str()).is_none() {
+            if !self.requested_members.iter().any(|x| x.clone() == new_addr) && self.own_addr != new_addr {
+                self.requested_members.push(new_addr.clone());
+                self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
             }
         }
         self.gossip_forward(new_addr, seen_addrs, true);
