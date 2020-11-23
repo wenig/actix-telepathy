@@ -10,8 +10,7 @@ use serde::{Serialize, Deserialize};
 #[allow(unused_imports)]
 use serializer::MySerializer;
 use tokio;
-use std::thread::sleep;
-use actix::clock::Duration;
+
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(Result = "()")]
