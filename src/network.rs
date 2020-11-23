@@ -44,11 +44,11 @@ impl Actor for NetworkInterface {
     }
 
     fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
-        if self.counter < 5 {
+        /*if self.counter < 5 {
             self.stream = vec![];
             self.connect_to_stream(ctx);
             return Running::Continue
-        }
+        }*/
         Running::Stop
     }
 
@@ -88,9 +88,9 @@ impl NetworkInterface {
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
                     if stream.is_err() {
-                        debug!("Connection refused! Trying to reconnect!");
+                        /*debug!("Connection refused! Trying to reconnect!");
                         act.counter += 1;
-                        sleep(Duration::from_secs(1));
+                        sleep(Duration::from_secs(1));*/
                         ctx.stop();
                     } else {
                         debug!("Connected to network node: {}", act.addr.clone().to_string());
