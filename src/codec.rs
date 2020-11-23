@@ -16,8 +16,7 @@ const ENDIAN_LENGTH: usize = 4;
 pub enum ClusterMessage {
     Request(u16),
     Response,
-    Message(RemoteWrapper),
-    Decline
+    Message(RemoteWrapper)
 }
 
 pub struct ConnectCodec {
@@ -71,7 +70,6 @@ impl Encoder<ClusterMessage> for ConnectCodec {
         match item {
             ClusterMessage::Request(_) => dst.extend_from_slice(PREFIX),
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
-            ClusterMessage::Decline => dst.extend_from_slice(PREFIX),
             _ => {}
         }
 

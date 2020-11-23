@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead};
 use std::io::{Error};
 
-use crate::cluster::{Cluster, NodeEvents, Gossip, ConnectionApproval, ConnectionApprovalResponse};
+use crate::cluster::{Cluster, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
 use actix::io::{WriteHandler};
@@ -13,6 +13,7 @@ use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
+use crate::{ConnectionApproval, ConnectionApprovalResponse};
 
 
 pub struct NetworkInterface {
@@ -44,17 +45,17 @@ impl Actor for NetworkInterface {
     }
 
     fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
-        /*if self.counter < 5 {
+        if self.counter < 5 {
             self.stream = vec![];
             self.connect_to_stream(ctx);
             return Running::Continue
-        }*/
+        }
         Running::Stop
     }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        //self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
+        self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
@@ -75,6 +76,7 @@ impl NetworkInterface {
         let (r, w) = stream.into_split();
 
         let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
+        framed.write(ClusterMessage::Response);
         self.framed.push(framed);
 
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
@@ -88,9 +90,9 @@ impl NetworkInterface {
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
                     if stream.is_err() {
-                        /*debug!("Connection refused! Trying to reconnect!");
+                        debug!("Connection refused! Trying to reconnect!");
                         act.counter += 1;
-                        sleep(Duration::from_secs(1));*/
+                        sleep(Duration::from_secs(1));
                         ctx.stop();
                     } else {
                         debug!("Connected to network node: {}", act.addr.clone().to_string());
@@ -120,44 +122,13 @@ impl NetworkInterface {
 
         match self.own_addr.clone() {
             Some(addr) => {
+                debug!("finish connecting to {}", self.addr.to_string());
                 let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
                 let peer_addr =  self.addr.to_string();
                 self.parent.do_send(NodeEvents::MemberUp(peer_addr, addr, remote_address));
             },
             None => error!("NetworkInterface might not have been started already!")
         };
-    }
-
-    fn connection_approved(&mut self) {
-        &self.framed[0].write(ClusterMessage::Response);
-    }
-
-    fn requested(&mut self, port: u16, ctx: &mut Context<Self>) {
-        debug!("Request from {}:{}", self.addr.ip().to_string(), port);
-
-        let send_addr = self.addr.to_string();
-        self.addr.set_port(port);
-        let addr = self.addr.to_string();
-
-        self.parent.send(ConnectionApproval { addr, send_addr })
-            .into_actor(self)
-            .map(|res, act, ctx| match res {
-                Ok(message_response) => match message_response {
-                    ConnectionApprovalResponse::Approved => {
-                        &act.framed[0].write(ClusterMessage::Response);
-                        act.finish_connecting();
-                    },
-                    ConnectionApprovalResponse::Declined => {
-                        &act.framed[0].write(ClusterMessage::Decline);
-                        ctx.stop();
-                    }
-                },
-                Err(_) => {}
-            }).wait(ctx);
-    }
-
-    fn responsed(&mut self) {
-        self.finish_connecting();
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
@@ -172,16 +143,35 @@ impl NetworkInterface {
             AddrRepresentation::Key(_) => { self.address_resolver.do_send(msg); }
         };
     }
+
+    fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>) {
+        let send_addr = self.addr.to_string();
+        self.addr.set_port(port);
+        let addr = self.addr.to_string();
+
+        self.parent.send(ConnectionApproval { addr, send_addr })
+            .into_actor(self)
+            .map(|res, act, ctx| match res {
+                Ok(message_response) => match message_response {
+                    ConnectionApprovalResponse::Approved => {
+                        act.finish_connecting()
+                    },
+                    ConnectionApprovalResponse::Declined => {
+                        debug!("Declined")
+                    }
+                },
+                Err(_) => {}
+            }).wait(ctx);
+    }
 }
 
 impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
     fn handle(&mut self, item: Result<ClusterMessage, Error>, ctx: &mut Context<Self>) {
         match item {
             Ok(msg) => match msg {
-                ClusterMessage::Request(port) => self.requested(port, ctx),
-                ClusterMessage::Response => self.responsed(),
+                ClusterMessage::Request(reply_port) => self.set_reply_port(reply_port, ctx),
+                ClusterMessage::Response => self.finish_connecting(),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
-                ClusterMessage::Decline => ctx.stop()
             },
             Err(err) => error!("{}", err)
         }
