@@ -11,6 +11,7 @@ use actix_telepathy_derive::{RemoteActor};
 use rand::thread_rng;
 use rand::prelude::{IteratorRandom};
 use crate::cluster::cluster::GossipResponse;
+use std::iter::FromIterator;
 
 #[derive(Message, Serialize, Deserialize)]
 #[rtype(result = "()")]
@@ -92,6 +93,7 @@ impl Gossip {
                 self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
             }
         }
+        assert_eq!(self.requested_members.difference(&HashSet::from_iter(self.members.keys().into_iter().map(|x| x.clone()))).count(), 0);
         self.gossip_forward(new_addr, seen_addrs, true);
     }
 
