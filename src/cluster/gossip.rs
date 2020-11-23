@@ -1,6 +1,6 @@
 use log::*;
 use actix::prelude::*;
-use std::collections::{HashMap};
+use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
 use crate::codec::ClusterMessage;
@@ -62,23 +62,20 @@ pub enum GossipIgniting {
 #[remote_messages(GossipEvent)]
 pub struct Gossip {
     own_addr: String,
-    requested_members: Vec<String>,
+    requested_members: HashSet<String>,
     members: HashMap<String, Addr<NetworkInterface>>,
     cluster: Addr<Cluster>
 }
 
 impl Gossip {
     pub fn new(own_addr: String, cluster: Addr<Cluster>) -> Gossip {
-        Gossip {own_addr, requested_members: vec![], members: HashMap::new(), cluster}
+        Gossip {own_addr, requested_members: HashSet::new(), members: HashMap::new(), cluster}
     }
 
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
-        debug!("Member {} added!", new_addr.clone());
-        match self.requested_members.iter().position(|x| x.clone() == new_addr) {
-            Some(pos) => { self.requested_members.remove(pos); },
-            _ => {}
-        }
+        self.requested_members.remove(&new_addr);
         self.members.insert(new_addr.clone(), node);
+        debug!("Member {} added! {:?}", new_addr.clone(), self.members.keys());
         self.member_up(new_addr, vec![self.own_addr.clone()]);
     }
 
@@ -90,8 +87,8 @@ impl Gossip {
 
     fn member_up(&mut self, new_addr: String, seen_addrs: Vec<String>) {
         if self.members.get(new_addr.as_str()).is_none() {
-            if !self.requested_members.iter().any(|x| x.clone() == new_addr) && self.own_addr != new_addr {
-                self.requested_members.push(new_addr.clone());
+            if !self.requested_members.contains(&new_addr) && self.own_addr != new_addr {
+                self.requested_members.insert(new_addr.clone());
                 self.cluster.do_send(GossipResponse { 0: new_addr.clone() })
             }
         }
