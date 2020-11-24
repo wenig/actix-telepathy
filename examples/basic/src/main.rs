@@ -11,6 +11,7 @@ use serde::{Serialize, Deserialize};
 use serializer::MySerializer;
 use tokio;
 use std::net::ToSocketAddrs;
+use std::fs;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -27,14 +28,15 @@ struct Parameters {
 #[derive(RemoteActor)]
 #[remote_messages(Welcome)]
 struct OwnListener {
-    count: usize
+    count: usize,
+    filename: String
 }
 
 impl OwnListener {
     const IDENTIFIER: &'static str = "own_listener";
 
-    pub fn new() -> Self {
-        OwnListener {count: 0}
+    pub fn new(filename: String) -> Self {
+        OwnListener {count: 0, filename}
     }
 }
 
@@ -67,7 +69,10 @@ impl Handler<Welcome> for OwnListener {
 
     fn handle(&mut self, _msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
         self.count = self.count + 1;
-        debug!("Welcome said {}x", self.count)
+        debug!("Welcome said {}x", self.count);
+        if self.count == 100 {
+            fs::write(format!("./{}", self.filename.as_str()), "100").expect("Unable to write file");
+        }
     }
 }
 
@@ -77,7 +82,7 @@ async fn main() {
 
     let args = Parameters::from_args();
 
-    let cluster_listener = OwnListener::new().start();
+    let cluster_listener = OwnListener::new(args.local_ip.clone()).start();
     let _cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,
