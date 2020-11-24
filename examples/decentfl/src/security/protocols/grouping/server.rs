@@ -54,7 +54,6 @@ impl GroupingServer {
         let end_idx = self.groups.len();
         let groups = &self.groups;
         let history = self.get_history(&client);
-        debug!("history {:?}", history);
 
         for group_idx in start_idx..end_idx {
             let group = groups.get(group_idx).unwrap();
@@ -67,7 +66,6 @@ impl GroupingServer {
 
         match assigned_group {
             Some(idx) => {
-                debug!("found slot in group for {}", client.socket_addr.as_str());
                 let group = self.groups.get_mut(idx).unwrap();
                 group.push(client);
 
@@ -79,7 +77,6 @@ impl GroupingServer {
                 }
             }
             None => {
-                debug!("new group for {}", client.socket_addr.as_str());
                 let new_group = vec![client];
                 self.groups.push(new_group);
             }

@@ -12,6 +12,7 @@ use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
 use tch::{Device};
+use std::net::ToSocketAddrs;
 
 
 #[derive(StructOpt, Debug, Clone)]
@@ -109,7 +110,7 @@ fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) ->
 
 fn build_cluster(args: Parameters, cluster_listener: Addr<OwnListener>, group_server: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
     Cluster::new(
-        args.local_addr,
+        args.local_addr.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,
         vec![cluster_listener.recipient()],
         group_server

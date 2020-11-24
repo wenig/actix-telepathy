@@ -2,6 +2,7 @@ use tch::{nn, Tensor};
 use tch::nn::{ConvConfig, ModuleT};
 use std::iter::FromIterator;
 use std::borrow::BorrowMut;
+use crate::ml::Subset;
 
 
 #[derive(Debug)]
@@ -109,15 +110,18 @@ impl FlattenModel for Net {
     }
 
     fn apply_flat_tensor(&mut self, tensor: Tensor) {
-        let mut offset = 0;
-
-        for p in self.get_parameters_mut() {
-            let shape = p.copy().size();
-            let l: i64 = shape.clone().iter().product();
-            let slice = tensor.slice(0, offset, offset+l, 1).view(shape.as_slice());
-            *p = slice.set_requires_grad(true);
-            offset = offset + l;
-        }
+        tch::no_grad(
+            || {
+                 let mut offset = 0;
+                 for p in self.get_parameters_mut() {
+                     let shape = p.copy().size();
+                     let l: i64 = shape.clone().iter().product();
+                     let slice = tensor.slice(0, offset, offset + l, 1).view(shape.as_slice());
+                     p.set_1(&slice);
+                     offset = offset + l;
+                 }
+            }
+        )
     }
 }
 
@@ -141,4 +145,60 @@ fn flat_tensor_is_right() {
     let out2 = model2.forward_t(&dataset.train_images.get(0).view([1, -1]), false);
 
     assert_eq!(out, out2);
+}
+
+
+#[test]
+fn model_trains() {
+    use tch::{Device};
+    use tch::nn::{VarStore, Sgd, OptimizerConfig};
+    use crate::ml::load_mnist;
+
+    let mut dataset = load_mnist();
+    dataset.partition(0, 10, 1111);
+    let vs = VarStore::new(Device::Cpu);
+    let mut model = Net::new(&vs.root(), 10);
+    let mut optimizer = Sgd::default().build(&vs, 0.1).unwrap();
+
+    let before_tensor = model.to_flat_tensor();
+
+    optimizer.zero_grad();
+    for (images, labels) in dataset.train_iter(8).shuffle().to_device(Device::Cpu) {
+        let loss = model.forward_t(&images, true).cross_entropy_for_logits(&labels);
+        optimizer.backward_step(&loss);
+        break
+    }
+
+    let after_tensor = model.to_flat_tensor();
+
+    assert_ne!(before_tensor, after_tensor);
+}
+
+
+#[test]
+fn model_trains_with_new_params() {
+    use tch::{Device};
+    use tch::nn::{VarStore, Sgd, OptimizerConfig};
+    use crate::ml::load_mnist;
+
+    let mut dataset = load_mnist();
+    dataset.partition(0, 10, 1111);
+    let vs = VarStore::new(Device::Cpu);
+    let mut model = Net::new(&vs.root(), 10);
+    let mut model2 = Net::new(&vs.root(), 10);
+    let mut optimizer = Sgd::default().build(&vs, 0.1).unwrap();
+
+    let before_tensor = model2.to_flat_tensor();
+    model.apply_flat_tensor(before_tensor.copy());
+
+    optimizer.zero_grad();
+    for (images, labels) in dataset.train_iter(8).shuffle().to_device(Device::Cpu) {
+        let loss = model.forward_t(&images, true).cross_entropy_for_logits(&labels);
+        optimizer.backward_step(&loss);
+        break
+    }
+
+    let after_tensor = model.to_flat_tensor();
+
+    assert_ne!(before_tensor, after_tensor);
 }
