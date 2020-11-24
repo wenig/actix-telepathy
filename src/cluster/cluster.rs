@@ -77,10 +77,7 @@ impl Actor for Cluster {
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
-            let addr = self.addrs.get(node_addr).unwrap().clone();
-            if addr != self.ip_address.to_string() {
-                self.add_node(addr, true);
-            }
+            self.add_node(self.addrs.get(node_addr).unwrap().clone(), true);
         }
     }
 }
