@@ -14,7 +14,7 @@ const ENDIAN_LENGTH: usize = 4;
 #[derive(Message, Deserialize, Serialize)]
 #[rtype(result = "()")]
 pub enum ClusterMessage {
-    Request(u16),
+    Request(u16, bool), // bool = is_seed?
     Response,
     Message(RemoteWrapper),
     Decline
@@ -69,7 +69,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
 
     fn encode(&mut self, item: ClusterMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
         match item {
-            ClusterMessage::Request(_) => dst.extend_from_slice(PREFIX),
+            ClusterMessage::Request(_, _) => dst.extend_from_slice(PREFIX),
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
             _ => {}
         }

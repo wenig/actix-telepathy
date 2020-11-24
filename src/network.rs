@@ -28,7 +28,8 @@ pub struct NetworkInterface {
     parent: Addr<Cluster>,
     gossip: Addr<Gossip>,
     address_resolver: Addr<AddressResolver>,
-    counter: i8
+    counter: i8,
+    seed: bool
 }
 
 
@@ -46,14 +47,14 @@ impl Actor for NetworkInterface {
         }
     }
 
-    /*fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
-        if self.counter < 5 {
+    fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
+        if self.counter < 2 {
             self.stream = vec![];
             self.connect_to_stream(ctx);
             return Running::Continue
         }
         Running::Stop
-    }*/
+    }
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
@@ -63,12 +64,12 @@ impl Actor for NetworkInterface {
 
 
 impl NetworkInterface {
-    pub fn new(own_ip: SocketAddr, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0 }
+    pub fn new(own_ip: SocketAddr, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>, seed: bool) -> NetworkInterface {
+        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
 
     pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
-        let mut ni = Self::new(own_ip, addr, parent, gossip, address_resolver);
+        let mut ni = Self::new(own_ip, addr, parent, gossip, address_resolver, false);
         ni.stream.push(stream);
         ni
     }
@@ -78,7 +79,6 @@ impl NetworkInterface {
         let (r, w) = stream.into_split();
 
         let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-        framed.write(ClusterMessage::Response);
         self.framed.push(framed);
 
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
@@ -107,7 +107,7 @@ impl NetworkInterface {
                         let mut framed =
                             actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
                         let reply_port = act.own_ip.port();
-                        framed.write(ClusterMessage::Request(reply_port));
+                        framed.write(ClusterMessage::Request(reply_port, act.seed));
                         act.framed.push(framed);
 
                         // read side of the connection
@@ -127,7 +127,7 @@ impl NetworkInterface {
                 debug!("finish connecting to {}", self.addr.to_string());
                 let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
                 let peer_addr =  self.addr.to_string();
-                self.parent.do_send(NodeEvents::MemberUp(peer_addr, addr, remote_address));
+                self.parent.do_send(NodeEvents::MemberUp(peer_addr, addr, remote_address, self.seed));
             },
             None => error!("NetworkInterface might not have been started already!")
         };
@@ -146,16 +146,18 @@ impl NetworkInterface {
         };
     }
 
-    fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>) {
+    fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>, seed: bool) {
         let send_addr = self.addr.to_string();
         self.addr.set_port(port);
         let addr = self.addr.to_string();
+        self.seed = seed;
 
         self.parent.send(ConnectionApproval { addr, send_addr })
             .into_actor(self)
             .map(|res, act, ctx| match res {
                 Ok(message_response) => match message_response {
                     ConnectionApprovalResponse::Approved => {
+                        act.transmit_message(ClusterMessage::Response);
                         act.finish_connecting()
                     },
                     ConnectionApprovalResponse::Declined => {
@@ -172,7 +174,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
     fn handle(&mut self, item: Result<ClusterMessage, Error>, ctx: &mut Context<Self>) {
         match item {
             Ok(msg) => match msg {
-                ClusterMessage::Request(reply_port) => self.set_reply_port(reply_port, ctx),
+                ClusterMessage::Request(reply_port, seed) => self.set_reply_port(reply_port, ctx, seed),
                 ClusterMessage::Response => self.finish_connecting(),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
                 ClusterMessage::Decline => ctx.stop()

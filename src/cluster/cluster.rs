@@ -9,7 +9,7 @@ use std::str::FromStr;
 use futures::StreamExt;
 use futures::executor::block_on;
 use std::net::{SocketAddr, ToSocketAddrs};
-use crate::cluster::gossip::{Gossip, GossipIgniting};
+use crate::cluster::gossip::{Gossip, GossipIgniting, MemberMgmt};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use crate::ClusterLog;
 use tokio::prelude::io::AsyncReadExt;
@@ -37,7 +37,7 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents{
-    MemberUp(String, Addr<NetworkInterface>, RemoteAddr),
+    MemberUp(String, Addr<NetworkInterface>, RemoteAddr, bool),
     MemberDown(String)
 }
 
@@ -77,7 +77,7 @@ impl Actor for Cluster {
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
-            self.add_node(self.addrs.get(node_addr).unwrap().clone());
+            self.add_node(self.addrs.get(node_addr).unwrap().clone(), true);
         }
     }
 }
@@ -98,8 +98,12 @@ impl Handler<NodeEvents> for Cluster {
 
     fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
         match msg {
-            NodeEvents::MemberUp(host, node, remote_addr) => {
-                self.gossip.clone().unwrap().do_send(GossipIgniting::MemberUp(host.clone(), node));
+            NodeEvents::MemberUp(host, node, remote_addr, seed) => {
+                if seed {
+                    self.gossip.clone().unwrap().do_send(GossipIgniting::MemberUp(host.clone(), node));
+                } else {
+                    self.gossip.clone().unwrap().do_send(MemberMgmt::MemberUp(host.clone(), node));
+                }
                 for listener in self.listeners.iter() {
                     let _r = listener.do_send(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
                 }
@@ -135,7 +139,7 @@ impl Handler<GossipResponse> for Cluster {
     type Result = ();
 
     fn handle(&mut self, msg: GossipResponse, _ctx: &mut Context<Self>) -> Self::Result {
-        self.add_node(msg.0);
+        self.add_node(msg.0, false);
     }
 }
 
@@ -189,14 +193,14 @@ impl Cluster {
         self.nodes.insert(addr.to_string(), node);
     }
 
-    fn add_node(&mut self, node_addr: String) {
+    fn add_node(&mut self, node_addr: String, seed: bool) {
         let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
         let address_resolver = self.address_resolver.clone();
         if !self.nodes.contains_key(&node_addr) {
-            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver).start();
+            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver, seed).start();
             self.nodes.insert(node_addr.clone(), node);
         }
     }
