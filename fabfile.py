@@ -70,13 +70,23 @@ def update(gateway):
 
 
 @task
+def basic_test(gateway):
+    c = get_group_connection(gateway)
+    settings = load_settings()["fabric"]
+    base_port: int = settings["experiment"]["settings"]["base_port"]
+    local_ip = settings["experiment"]["local_addr"]
+    server_addr = settings["experiment"]["server_addr"]
+    n_processes = 9
+    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=localhost bash start_basic.sh {n_processes} {local_ip} {server_addr}'")
+
+
+@task
 def experiment(gateway):
     c = get_group_connection(gateway)
     settings = load_settings()["fabric"]["experiment"]
     base_port: int = settings["settings"]["base_port"]
     kwargs = to_terminal_args(settings["kwargs"])
-    for n_idx in range():
-        c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_decentfl.sh {kwargs}'")
+    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_decentfl.sh {kwargs}'")
 
 
 def to_terminal_args(kwargs: dict) -> str:
