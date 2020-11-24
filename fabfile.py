@@ -24,7 +24,7 @@ def get_group_connection(gateway: Connection) -> Group:
     settings = load_settings()
     hosts = settings["fabric"]["hosts"]
     password = getpass.getpass(f"{hosts[0]['user']}@{hosts[0]['hostname']}'s password: ")
-    c = ThreadingGroup(*[host2hoststr(h) for h in hosts], gateway=gateway,
+    c = SerialGroup(*[host2hoststr(h) for h in hosts], gateway=gateway,
                     connect_kwargs={"password": password})
     return c
 
@@ -74,10 +74,10 @@ def basic_test(gateway):
     c = get_group_connection(gateway)
     settings = load_settings()["fabric"]
     base_port: int = settings["experiment"]["settings"]["base_port"]
-    local_ip = settings["experiment"]["local_addr"]
-    server_addr = settings["experiment"]["server_addr"]
+    local_ip = settings["experiment"]["kwargs"]["local_addr"]
+    server_addr = settings["experiment"]["kwargs"]["server_addr"]
     n_processes = 9
-    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=localhost bash start_basic.sh {n_processes} {local_ip} {server_addr}'")
+    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_basic.sh {n_processes} {local_ip} {server_addr}'")
 
 
 @task

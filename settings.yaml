@@ -42,7 +42,7 @@ fabric:
     kwargs:
       local_addr: "'$HOSTNAME:`expr $DECENTFL_BASEPORT + $DECENTFL_PROCESS`'"
       server_addr: "'$DECENTFL_BASEHOST:$DECENTFL_BASEPORT'"
-      cluster_size: "101"
+      cluster_size: "108"
       db_path: "'decenfl.$DECENTFL_PROCESS.db'"
       lr: 0.01
       batch_size: 8

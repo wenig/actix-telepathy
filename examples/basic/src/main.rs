@@ -75,7 +75,7 @@ impl Handler<Welcome> for OwnListener {
 async fn main() {
     env_logger::init();
 
-    let args = Parameters::from_args();
+    let mut args = Parameters::from_args();
 
     let cluster_listener = OwnListener::new().start();
     let _cluster = Cluster::new(
