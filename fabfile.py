@@ -72,12 +72,7 @@ def update(gateway):
 @task
 def basic_test(gateway):
     c = get_group_connection(gateway)
-    settings = load_settings()["fabric"]
-    base_port: int = settings["experiment"]["settings"]["base_port"]
-    local_ip = settings["experiment"]["kwargs"]["local_addr"]
-    server_addr = settings["experiment"]["kwargs"]["server_addr"]
-    n_processes = 9
-    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_basic.sh {n_processes} {local_ip} {server_addr}'")
+    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; bash start_basic.sh'")
 
 
 @task
