@@ -47,7 +47,7 @@ impl Gossip {
     fn add_member(&mut self, new_addr: String, node: Addr<NetworkInterface>) {
         self.requested_members.remove(&new_addr);
         self.members.insert(new_addr.clone(), node);
-        debug!("Member {} added! {:?}", new_addr.clone(), self.members.keys());
+        debug!("Member {} added!", new_addr.clone());
     }
 
     fn remove_member(&mut self, addr: String) {
@@ -96,7 +96,6 @@ impl Handler<GossipEvent> for Gossip {
     type Result = ();
 
     fn handle(&mut self, msg: GossipEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        debug!("gossip received: {:?}", msg);
         for addr in msg.members {
             self.cluster.do_send(GossipResponse(addr))
         }
