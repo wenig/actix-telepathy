@@ -14,8 +14,6 @@ use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse};
-use tokio::prelude::io::AsyncWriteExt;
-use futures::executor::block_on;
 
 
 pub struct NetworkInterface {
@@ -78,7 +76,7 @@ impl NetworkInterface {
         let stream = self.stream.pop().unwrap();
         let (r, w) = stream.into_split();
 
-        let mut framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
+        let framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
         self.framed.push(framed);
 
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));

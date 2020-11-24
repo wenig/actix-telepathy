@@ -3,18 +3,12 @@ use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
-use crate::codec::ClusterMessage;
 use crate::remote::{RemoteWrapper, Remotable};
 use crate::{RemoteAddr, Cluster, NodeResolving};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use rand::thread_rng;
-use rand::prelude::{IteratorRandom};
 use crate::cluster::cluster::GossipResponse;
-use std::iter::FromIterator;
 use serde::export::fmt::Debug;
-use serde::export::Formatter;
-use std::fmt;
 
 #[derive(Message, Serialize, Deserialize, Debug, RemoteMessage)]
 #[rtype(result = "()")]
@@ -66,7 +60,7 @@ impl Gossip {
         self.gossip_members(new_addr)
     }
 
-    fn member_down(&mut self, addr: String, seen_addrs: Vec<String>) {
+    fn member_down(&mut self, _addr: String, _seen_addrs: Vec<String>) {
         //self.gossip_forward(addr, seen_addrs, false);
     }
 

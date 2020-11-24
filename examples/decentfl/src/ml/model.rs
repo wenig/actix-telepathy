@@ -2,7 +2,6 @@ use tch::{nn, Tensor};
 use tch::nn::{ConvConfig, ModuleT};
 use std::iter::FromIterator;
 use std::borrow::BorrowMut;
-use crate::ml::Subset;
 
 
 #[derive(Debug)]
@@ -117,7 +116,7 @@ impl FlattenModel for Net {
                      let shape = p.copy().size();
                      let l: i64 = shape.clone().iter().product();
                      let slice = tensor.slice(0, offset, offset + l, 1).view(shape.as_slice());
-                     p.set_1(&slice);
+                     let _ = p.set_1(&slice);
                      offset = offset + l;
                  }
             }
@@ -153,6 +152,7 @@ fn model_trains() {
     use tch::{Device};
     use tch::nn::{VarStore, Sgd, OptimizerConfig};
     use crate::ml::load_mnist;
+    use crate::ml::Subset;
 
     let mut dataset = load_mnist();
     dataset.partition(0, 10, 1111);
@@ -180,6 +180,7 @@ fn model_trains_with_new_params() {
     use tch::{Device};
     use tch::nn::{VarStore, Sgd, OptimizerConfig};
     use crate::ml::load_mnist;
+    use crate::ml::Subset;
 
     let mut dataset = load_mnist();
     dataset.partition(0, 10, 1111);

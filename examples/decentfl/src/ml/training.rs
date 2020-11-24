@@ -6,7 +6,6 @@ use crate::ml::score_storage::ScoreStorage;
 use tch::nn::{Sgd, Optimizer, OptimizerConfig, VarStore, ModuleT};
 use tch::Device;
 use crate::ml::protocols::{ModelAggregation, ModelMessage};
-use actix_telepathy::{RemoteAddr, Cluster};
 
 
 #[derive(Message)]
