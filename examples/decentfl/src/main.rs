@@ -102,7 +102,7 @@ fn build_training(args: Parameters) -> Addr<Training> {
 fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) -> Addr<OwnListener> {
     OwnListener::new(
         args.local_addr.clone(),
-        args.server_addr.clone(),
+        args.server_addr.to_socket_addrs().expect("No valid URL given for server-addr").next().unwrap().to_string(),
         args.cluster_size,
         training
     ).start()
