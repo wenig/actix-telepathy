@@ -37,22 +37,15 @@ fabric:
       user: "phillip.wenig"
       np: 8
   experiment:
-    settings:
-      base_port: 1992
     kwargs:
-      local_addr: "'$HOSTNAME:`expr $DECENTFL_BASEPORT + $DECENTFL_PROCESS`'"
-      server_addr: "'$DECENTFL_BASEHOST:$DECENTFL_BASEPORT'"
-      cluster_size: "108"
-      db_path: "'decenfl.$DECENTFL_PROCESS.db'"
+      cluster_size: 101
       lr: 0.01
       batch_size: 8
       test_every: 1
       update_every: 1
       group_size: 3
       history_length: 1
-      seed_nodes: "'$DECENTFL_BASEHOST:$DECENTFL_BASEPORT'"
       dropout: 0
       adversarial: false
       krum: false
       seed: 1992
-      split: "'$DECENTFL_PROCESS'"

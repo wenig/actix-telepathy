@@ -1,7 +1,12 @@
 #!/bin/bash
 
-for DECENTFL_PROCESS in $(seq 0 `expr $1 - 1`); do
-  args="${@:2}"
-  echo "cargo run --package decentfl --bin decentfl" $(eval "echo $args") &
+for DECENTFL_PROCESS in $(seq 0 `expr $DECENTFL_PROCESSES - 1`); do
+  host=$HOSTNAME:`expr $DECENTFL_BASEPORT + $DECENTFL_PROCESS`
+  if [[ "$DECENTFL_BASEHOST:$DECENTFL_BASEPORT" != "$host" ]]; then
+    server=$DECENTFL_BASEHOST:$DECENTFL_BASEPORT
+  fi
+  split=`expr $DECENTFL_SPLIT_OFFSET + $DECENTFL_PROCESS`
+  args="${@:1}"
+  RUST_LOG=debug cargo run --package decentfl --bin decentfl $host $args --db_path "decentfl.$split.db" --split $split --seed_nodes $server &
 done
-wait
+sleep 1200; killall decentfl
