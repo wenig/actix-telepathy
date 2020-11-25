@@ -157,7 +157,7 @@ fn model_trains() {
     let mut dataset = load_mnist();
     dataset.partition(0, 10, 1111);
     let vs = VarStore::new(Device::Cpu);
-    let mut model = Net::new(&vs.root(), 10);
+    let model = Net::new(&vs.root(), 10);
     let mut optimizer = Sgd::default().build(&vs, 0.1).unwrap();
 
     let before_tensor = model.to_flat_tensor();
@@ -186,7 +186,7 @@ fn model_trains_with_new_params() {
     dataset.partition(0, 10, 1111);
     let vs = VarStore::new(Device::Cpu);
     let mut model = Net::new(&vs.root(), 10);
-    let mut model2 = Net::new(&vs.root(), 10);
+    let model2 = Net::new(&vs.root(), 10);
     let mut optimizer = Sgd::default().build(&vs, 0.1).unwrap();
 
     let before_tensor = model2.to_flat_tensor();

@@ -86,6 +86,7 @@ fn build_score_storage(args: Parameters) -> ScoreStorage {
 
 fn build_training(args: Parameters) -> Addr<Training> {
     SyncArbiter::start(1, move || {
+        tch::set_num_threads(1);
         let score_storage = build_score_storage(args.clone());
         let vs = VarStore::new(Device::Cpu);
         let mut dataset = load_mnist();
