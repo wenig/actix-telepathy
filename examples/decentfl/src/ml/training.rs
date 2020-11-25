@@ -48,6 +48,7 @@ pub struct Training {
 
 impl Training {
     pub fn new(model: Net, var_store: VarStore, dataset: Dataset, lr: f64, batch_size: usize, test_every: usize, update_every: usize, score_storage: ScoreStorage) -> Self {
+        tch::set_num_threads(1);
         let optimizer = Sgd::default().build(&var_store, lr).unwrap();
         Self {
             model,
