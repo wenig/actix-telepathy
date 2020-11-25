@@ -40,7 +40,7 @@ struct Parameters{
     update_every: usize,
     #[structopt(long, default_value = "2")]
     group_size: usize,
-    #[structopt(long, default_value = "0")]
+    #[structopt(long, default_value = "1")]
     history_length: usize,
     #[structopt(long, parse(from_str = from_addr))]
     seed_nodes: Vec<SocketAddr>,

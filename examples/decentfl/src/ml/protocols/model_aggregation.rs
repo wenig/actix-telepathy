@@ -53,7 +53,7 @@ pub struct ModelAggregation {
     accepted: Vec<RemoteAddr>,
     own_model: Option<Tensor>,
     shares: Vec<Tensor>,
-    aggregate: Vec<Tensor>
+    aggregate: Vec<Tensor>,
 }
 
 // todo register at cluster
@@ -70,7 +70,7 @@ impl ModelAggregation {
             accepted: vec![],
             own_model: None,
             shares: vec![],
-            aggregate: vec![]
+            aggregate: vec![],
         }
     }
 
@@ -107,16 +107,12 @@ impl ModelAggregation {
             self.own_model.as_ref().expect("Model should be set at that point"),
             len
         );
-        for _ in 0..(len as usize) {
-            self.shares.push(self.own_model.as_ref().unwrap().empty_like());
-        }
-        let own_pos = self.current_group.as_ref().unwrap().iter().position(|x| x.clone().socket_addr == self.socket_addr)
-            .expect("Own address should appear in current group");
+
         for i in 0..len {
             let mut partner = self.current_group.as_ref().unwrap().get(i as usize).unwrap().clone();
 
             if partner.socket_addr == self.socket_addr {
-                self.shares[own_pos] = encrypted_models.i(i).copy();
+                self.own_addr.as_ref().unwrap().do_send(EncryptionMessage { model: encrypted_models.i(i).copy(), sender_addr: self.socket_addr.clone()});
             } else {
                 partner.do_send(Box::new(EncryptionMessage { model: encrypted_models.i(i).copy(), sender_addr: self.socket_addr.clone()}));
             }
@@ -124,11 +120,11 @@ impl ModelAggregation {
     }
 
     fn receive_shares(&mut self, share: Tensor, addr: SocketAddr) {
-        // todo push share at right position depending on current_group
-        let pos = self.current_group.as_ref().unwrap().iter()
-            .position(|x| x.clone().socket_addr == addr)
-            .expect("Own address should appear in current group");
-        self.shares[pos] = share;
+        if self.current_group.as_ref().unwrap().iter().any(|x| x.clone().socket_addr == addr) {
+            self.shares.push(share);
+        } else {
+            error!("Getting wrong tensors!")
+        }
 
         if self.shares.len() == self.current_group.as_ref().expect("Current group should be set at that point").len() {
             // todo add krum
