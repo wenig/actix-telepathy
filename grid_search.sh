@@ -11,7 +11,7 @@ for update_every in "${update_everies[@]}"; do
     for seed in "${seeds[@]}"; do
       echo "update frequency: $update_every | cluster size: $group_size"
       args="${@:1}"
-      bash start_decentfl.sh $args --group_size $group_size --update_every $update_every --seed $seed
+      bash start_decentfl.sh $args --group-size $group_size --update-every $update_every --seed $seed
       sleep 5
     done
   done
