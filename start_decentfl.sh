@@ -9,6 +9,6 @@ for DECENTFL_PROCESS in $(seq 0 `expr $DECENTFL_PROCESSES - 1`); do
   fi
   split=`expr $DECENTFL_SPLIT_OFFSET + $DECENTFL_PROCESS`
   args="${@:1}"
-  RUST_LOG=debug cargo run --package decentfl --bin decentfl $host $args --db-path "decentfl.$split.db" --split $split --seed-nodes $server &
+  RUST_LOG=debug cargo run --package decentfl --bin decentfl $host $args --db-path "decentfl.$split.db" --split $split --server-addr $server --seed-nodes $server &
 done
 sleep 1200; killall decentfl
