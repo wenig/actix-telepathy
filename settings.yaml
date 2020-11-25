@@ -42,10 +42,10 @@ fabric:
       lr: 0.01
       batch_size: 8
       test_every: 1
-      update_every: 1
-      group_size: 3
+      #update_every: 1
+      #group_size: 3
       history_length: 1
       dropout: 0
       adversarial: false
       krum: false
-      seed: 1992
+      #seed: 1992

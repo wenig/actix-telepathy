@@ -79,9 +79,8 @@ def basic_test(gateway):
 def experiment(gateway):
     c = get_group_connection(gateway)
     settings = load_settings()["fabric"]["experiment"]
-    base_port: int = settings["settings"]["base_port"]
     kwargs = to_terminal_args(settings["kwargs"])
-    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; DECENTFL_BASEPORT={base_port} DECENTFL_BASEHOST=odin01 bash start_decentfl.sh {kwargs}'")
+    c.run(f"screen -dm bash -c 'cd {WORKING_DIR}; bash grid_search.sh {kwargs}'")
 
 
 def to_terminal_args(kwargs: dict) -> str:

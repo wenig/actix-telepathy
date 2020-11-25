@@ -2,6 +2,11 @@ use log::*;
 use actix::prelude::*;
 use actix_telepathy::prelude::*;
 use serde::{Serialize, Deserialize};
+use glass_pumpkin::prime;
+use glass_pumpkin::num_bigint::BigUint;
+use std::ops::Sub;
+use rand::Rng;
+use gcd::Gcd;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -18,11 +23,9 @@ enum OTMessage {
 #[remote_messages(OTMessage)]
 #[allow(dead_code)]
 pub struct ObliviousTransfer {
-    prime_size: i64,
-    field_size: i64,
-    p: i64,
-    q: i64,
-    n: i64,
+    p: BigUint,
+    q: BigUint,
+    n: BigUint,
     phi_n: i64,
     e: i64,
     d: i64,
@@ -33,6 +36,30 @@ pub struct ObliviousTransfer {
 
 
 impl ObliviousTransfer {
+    pub fn new(prime_size: u64, field_size: u64, size: u64) -> Self {
+        let mut rng = rand::thread_rng();
+        let mut p = prime::new(prime_size as usize).expect("Could not create prime");
+        let mut q = prime::new(prime_size as usize).expect("Could not create prime");
+
+        while p == q {
+            p = prime::new(prime_size as usize).expect("Could not create prime");
+            q = prime::new(prime_size as usize).expect("Could not create prime");
+        }
+        let one = BigUint::from(1);
+        let n = p.clone() * q.clone();
+        let phi_n = (p - one.clone()) * (q - one.clone());
+        let e = BigUint::from(rng.gen_range(2, phi_n.clone()));
+
+        while e.gcd(&phi_n) != one {
+            let e = rng.gen_range(2, phi_n.clone());
+        }
+
+        let d = pow;
+        
+        Self {
+            p:
+        }
+    }
 }
 
 
