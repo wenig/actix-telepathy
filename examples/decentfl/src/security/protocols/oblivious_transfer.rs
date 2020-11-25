@@ -36,7 +36,7 @@ pub struct ObliviousTransfer {
 
 #[allow(dead_code)]
 impl ObliviousTransfer {
-    pub fn new(prime_size: u64, field_size: u64, size: u64) -> Self {
+    /*pub fn new(prime_size: u64, field_size: u64, size: u64) -> Self {
         let mut rng = rand::thread_rng();
         let mut p = prime::new(prime_size as usize).expect("Could not create prime");
         let mut q = prime::new(prime_size as usize).expect("Could not create prime");
@@ -53,7 +53,7 @@ impl ObliviousTransfer {
         while e.gcd(&phi_n) != one {
             let e = rng.gen_range(2, phi_n.clone());
         };
-    }
+    }*/
 }
 
 
