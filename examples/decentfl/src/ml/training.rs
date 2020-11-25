@@ -75,7 +75,7 @@ impl Training {
             }
             None => ()
         }
-
+        info!("Epoch {}", self.current_epoch);
         debug!("Start Epoch");
 
         self.optimizer.zero_grad();
