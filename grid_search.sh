@@ -1,8 +1,8 @@
 #!/bin/bash
 
 
-update_everies=(1 2 3 4 5)
-group_sizes=(3 5 7 9)
+update_everies=(1 3 5)
+group_sizes=(3 5 9)
 seeds=(1992 1993 1994)
 
 
