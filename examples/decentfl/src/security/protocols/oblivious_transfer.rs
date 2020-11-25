@@ -34,7 +34,7 @@ pub struct ObliviousTransfer {
     k: i64
 }
 
-
+#[allow(dead_code)]
 impl ObliviousTransfer {
     pub fn new(prime_size: u64, field_size: u64, size: u64) -> Self {
         let mut rng = rand::thread_rng();
@@ -52,13 +52,7 @@ impl ObliviousTransfer {
 
         while e.gcd(&phi_n) != one {
             let e = rng.gen_range(2, phi_n.clone());
-        }
-
-        let d = pow;
-        
-        Self {
-            p:
-        }
+        };
     }
 }
 
