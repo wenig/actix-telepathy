@@ -90,7 +90,7 @@ fn build_training(args: Parameters) -> Addr<Training> {
         let score_storage = build_score_storage(args.clone());
         let vs = VarStore::new(Device::Cpu);
         let mut dataset = load_mnist();
-        dataset.partition(args.split, (args.cluster_size - 1) as i64, args.seed);
+        dataset.partition(args.split - 1, (args.cluster_size - 1) as i64, args.seed); // split - 1 because split=0 is the server that does not participate in training
         let model = Net::new_with_seed(&vs.root(), dataset.labels, args.seed as i64);
 
         Training::new(
