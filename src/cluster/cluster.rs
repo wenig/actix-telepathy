@@ -8,7 +8,7 @@ use crate::network::NetworkInterface;
 use std::str::FromStr;
 use futures::StreamExt;
 use futures::executor::block_on;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::{SocketAddr};
 use crate::cluster::gossip::{Gossip, GossipIgniting, MemberMgmt};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use crate::ClusterLog;
@@ -24,8 +24,8 @@ pub enum ConnectionApprovalResponse {
 #[derive(Message)]
 #[rtype(result = "ConnectionApprovalResponse")]
 pub struct ConnectionApproval {
-    pub addr: String,
-    pub send_addr: String
+    pub addr: SocketAddr,
+    pub send_addr: SocketAddr
 }
 
 
@@ -36,32 +36,32 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents{
-    MemberUp(String, Addr<NetworkInterface>, RemoteAddr, bool),
-    MemberDown(String)
+    MemberUp(SocketAddr, Addr<NetworkInterface>, RemoteAddr, bool),
+    MemberDown(SocketAddr)
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeResolving{
-    Request(String, Recipient<NodeResolving>),
-    VecRequest(Vec<String>, Recipient<NodeResolving>),
+    Request(SocketAddr, Recipient<NodeResolving>),
+    VecRequest(Vec<SocketAddr>, Recipient<NodeResolving>),
     Response(Addr<NetworkInterface>),
     VecResponse(Vec<Option<Addr<NetworkInterface>>>)
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub struct GossipResponse(pub(crate) String);
+pub struct GossipResponse(pub(crate) SocketAddr);
 
 /// Central Actor for cluster handling
 pub struct Cluster {
     ip_address: SocketAddr,
-    addrs: Vec<String>,
+    addrs: Vec<SocketAddr>,
     listeners: Vec<Recipient<ClusterLog>>,
     gossip: Option<Addr<Gossip>>,
     address_resolver: Addr<AddressResolver>,
     own_addr: Option<Addr<Cluster>>,
-    nodes: HashMap<String, Addr<NetworkInterface>>
+    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>
 }
 
 
@@ -72,7 +72,7 @@ impl Actor for Cluster {
         self.own_addr = Some(ctx.address());
         let ip_addr4gossip = self.ip_address.clone();
         let addr4gossip = ctx.address().clone();
-        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip.to_string(), addr4gossip)));
+        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip, addr4gossip)));
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
@@ -158,7 +158,7 @@ impl Handler<ConnectionApproval> for Cluster {
 }
 
 impl Cluster {
-    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<String>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
+    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
         let listener = Cluster::bind(ip_address.to_string()).unwrap();
 
         debug!("Listening on {}", ip_address);
@@ -188,18 +188,17 @@ impl Cluster {
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
         let address_resolver = self.address_resolver.clone();
-        let node = NetworkInterface::from_stream(own_ip, addr, stream, parent, gossip, address_resolver).start();
-        self.nodes.insert(addr.to_string(), node);
+        let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream, parent, gossip, address_resolver).start();
+        self.nodes.insert(addr, node);
     }
 
-    fn add_node(&mut self, node_addr: String, seed: bool) {
-        let addr = node_addr.to_socket_addrs().unwrap().next().unwrap();
+    fn add_node(&mut self, node_addr: SocketAddr, seed: bool) {
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
         let address_resolver = self.address_resolver.clone();
         if !self.nodes.contains_key(&node_addr) {
-            let node = NetworkInterface::new(own_ip, addr, parent, gossip, address_resolver, seed).start();
+            let node = NetworkInterface::new(own_ip, node_addr.clone(), parent, gossip, address_resolver, seed).start();
             self.nodes.insert(node_addr.clone(), node);
         }
     }
@@ -213,8 +212,8 @@ impl Cluster {
 /// Helper for registering actors to the cluster
 pub trait AddrApi {
     fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str);
-    fn request_node_addr(&self, socket_addr: String, rec: Recipient<NodeResolving>);
-    fn request_node_addrs(&self, socket_addrs: Vec<String>, rec: Recipient<NodeResolving>);
+    fn request_node_addr(&self, socket_addr: SocketAddr, rec: Recipient<NodeResolving>);
+    fn request_node_addrs(&self, socket_addrs: Vec<SocketAddr>, rec: Recipient<NodeResolving>);
 }
 
 
@@ -223,11 +222,11 @@ impl AddrApi for Addr<Cluster> {
         let _r = self.do_send(AddressRequest::Register(addr, actor_identifier.to_string()));
     }
 
-    fn request_node_addr(&self, socket_addr: String, rec: Recipient<NodeResolving>) -> () {
+    fn request_node_addr(&self, socket_addr: SocketAddr, rec: Recipient<NodeResolving>) -> () {
         self.do_send(NodeResolving::Request(socket_addr, rec))
     }
 
-    fn request_node_addrs(&self, socket_addrs: Vec<String>, rec: Recipient<NodeResolving>) -> () {
+    fn request_node_addrs(&self, socket_addrs: Vec<SocketAddr>, rec: Recipient<NodeResolving>) -> () {
         self.do_send(NodeResolving::VecRequest(socket_addrs, rec))
     }
 }

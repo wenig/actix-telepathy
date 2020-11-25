@@ -5,12 +5,13 @@ use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
 use std::str::FromStr;
 use serde::{Serialize, Deserialize};
 use std::hash::{Hash};
+use std::net::SocketAddr;
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
 #[derive(Deserialize, Serialize, Hash, Debug)]
 pub struct RemoteAddr {
-    pub socket_addr: String,
+    pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub network_interface: Option<Addr<NetworkInterface>>,
@@ -18,19 +19,19 @@ pub struct RemoteAddr {
 }
 
 impl RemoteAddr {
-    pub fn new(socket_addr: String, network_interface: Option<Addr<NetworkInterface>>, id: AddrRepresentation) -> Self {
+    pub fn new(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>, id: AddrRepresentation) -> Self {
         RemoteAddr{socket_addr, network_interface, id}
     }
 
-    pub fn new_from_id(socket_addr: String, id: &str) -> Self {
+    pub fn new_from_id(socket_addr: SocketAddr, id: &str) -> Self {
         RemoteAddr{socket_addr, network_interface: None, id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_from_key(socket_addr: String, network_interface: Addr<NetworkInterface>, id: &str) -> Self {
+    pub fn new_from_key(socket_addr: SocketAddr, network_interface: Addr<NetworkInterface>, id: &str) -> Self {
         RemoteAddr{socket_addr, network_interface: Some(network_interface), id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_gossip(socket_addr: String, network_interface: Option<Addr<NetworkInterface>>) -> Self {
+    pub fn new_gossip(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>) -> Self {
         RemoteAddr::new(socket_addr, network_interface, AddrRepresentation::Gossip)
     }
 
@@ -63,7 +64,7 @@ impl Clone for RemoteAddr {
 
 impl PartialEq for RemoteAddr {
     fn eq(&self, other: &Self) -> bool {
-        self.socket_addr.eq(other.socket_addr.as_str())
+        self.socket_addr.eq(&other.socket_addr)
     }
 }
 

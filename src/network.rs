@@ -123,9 +123,8 @@ impl NetworkInterface {
         match self.own_addr.clone() {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
-                let remote_address = RemoteAddr::new(self.addr.to_string(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
-                let peer_addr =  self.addr.to_string();
-                self.parent.do_send(NodeEvents::MemberUp(peer_addr, addr, remote_address, self.seed));
+                let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
+                self.parent.do_send(NodeEvents::MemberUp(self.addr.clone(), addr, remote_address, self.seed));
             },
             None => error!("NetworkInterface might not have been started already!")
         };
@@ -145,9 +144,9 @@ impl NetworkInterface {
     }
 
     fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>, seed: bool) {
-        let send_addr = self.addr.to_string();
+        let send_addr = self.addr.clone();
         self.addr.set_port(port);
-        let addr = self.addr.to_string();
+        let addr = self.addr.clone();
         self.seed = seed;
 
         self.parent.send(ConnectionApproval { addr, send_addr })

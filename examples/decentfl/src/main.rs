@@ -12,14 +12,20 @@ use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
 use tch::{Device};
-use std::net::ToSocketAddrs;
+use std::net::{ToSocketAddrs, SocketAddr};
+
+
+fn from_addr(s: &str) -> SocketAddr {
+    s.to_socket_addrs().expect("Could not parse seed node").next().unwrap()
+}
 
 
 #[derive(StructOpt, Debug, Clone)]
 struct Parameters{
-    local_addr: String,
-    #[structopt(short, long)]
-    server_addr: String,
+    #[structopt(parse(from_str = from_addr))]
+    local_addr: SocketAddr,
+    #[structopt(short, long, parse(from_str = from_addr))]
+    server_addr: SocketAddr,
     #[structopt(short, long)]
     cluster_size: usize,
     #[structopt(long)]
@@ -36,8 +42,8 @@ struct Parameters{
     group_size: usize,
     #[structopt(long, default_value = "0")]
     history_length: usize,
-    #[structopt(long)]
-    seed_nodes: Vec<String>,
+    #[structopt(long, parse(from_str = from_addr))]
+    seed_nodes: Vec<SocketAddr>,
     #[structopt(long, default_value = "0.0")]
     dropout: f64,
     #[structopt(long)]
@@ -51,7 +57,7 @@ struct Parameters{
 }
 
 fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> {
-    if args.local_addr.eq(args.server_addr.as_str()) {
+    if args.local_addr.eq(&args.server_addr) {
         Some(GroupingServer::new(
             args.group_size,
             args.history_length
@@ -101,8 +107,8 @@ fn build_training(args: Parameters) -> Addr<Training> {
 
 fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) -> Addr<OwnListener> {
     OwnListener::new(
-        args.local_addr.clone(),
-        args.server_addr.to_socket_addrs().expect("No valid URL given for server-addr").next().unwrap().to_string(),
+        args.local_addr,
+        args.server_addr,
         args.cluster_size,
         training
     ).start()
@@ -110,7 +116,7 @@ fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) ->
 
 fn build_cluster(args: Parameters, cluster_listener: Addr<OwnListener>, group_server: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
     Cluster::new(
-        args.local_addr.to_socket_addrs().unwrap().next().unwrap(),
+        args.local_addr,
         args.seed_nodes,
         vec![cluster_listener.recipient()],
         group_server

@@ -3,20 +3,21 @@ use actix::prelude::*;
 use actix_telepathy::prelude::*;
 use crate::security::protocols::grouping::messages::{GroupingRequest, GroupingResponse};
 use crate::security::protocols::grouping::FindGroup;
+use std::net::SocketAddr;
 
 
 #[derive(RemoteActor)]
 #[remote_messages(GroupingResponse)]
 pub struct GroupingClient {
     parent: Recipient<FindGroup>,
-    socket_addr: String,
+    socket_addr: SocketAddr,
     server: RemoteAddr,
     asked: bool
 }
 
 
 impl GroupingClient {
-    pub fn new(parent: Recipient<FindGroup>, socket_addr: String, server: RemoteAddr) -> Self {
+    pub fn new(parent: Recipient<FindGroup>, socket_addr: SocketAddr, server: RemoteAddr) -> Self {
         Self {parent, socket_addr, server, asked: false}
     }
 

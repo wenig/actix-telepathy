@@ -10,7 +10,7 @@ use serde::{Serialize, Deserialize};
 #[allow(unused_imports)]
 use serializer::MySerializer;
 use tokio;
-use std::net::ToSocketAddrs;
+use std::net::{ToSocketAddrs, SocketAddr};
 use std::fs;
 
 
@@ -18,11 +18,15 @@ use std::fs;
 #[rtype(Result = "()")]
 struct Welcome {}
 
+fn from_addr(s: &str) -> SocketAddr {
+    s.to_socket_addrs().expect("Could not parse seed node").next().unwrap()
+}
 
 #[derive(StructOpt, Debug)]
 struct Parameters {
-    local_ip: String,
-    seed_nodes: Vec<String>,
+    local_ip: SocketAddr,
+    #[structopt(parse(from_str = from_addr))]
+    seed_nodes: Vec<SocketAddr>,
 }
 
 #[derive(RemoteActor)]
@@ -80,9 +84,11 @@ impl Handler<Welcome> for OwnListener {
 async fn main() {
     env_logger::init();
 
+    debug!("{}", "localhost:8000".to_socket_addrs().unwrap().next().unwrap());
+
     let args = Parameters::from_args();
 
-    let cluster_listener = OwnListener::new(args.local_ip.clone()).start();
+    let cluster_listener = OwnListener::new(args.local_ip.to_string()).start();
     let _cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,

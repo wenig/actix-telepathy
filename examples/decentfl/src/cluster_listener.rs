@@ -2,6 +2,7 @@ use log::*;
 use actix::prelude::*;
 use actix_telepathy::prelude::*;
 use crate::ml::{Training, Addresses, Epoch, ModelAggregation};
+use std::net::SocketAddr;
 
 
 #[derive(Message)]
@@ -16,8 +17,8 @@ impl ClusterAddr {
 
 
 pub struct OwnListener {
-    local_addr: String,
-    server_addr: String,
+    local_addr: SocketAddr,
+    server_addr: SocketAddr,
     server_remote_addr: Option<RemoteAddr>,
     cluster_size: usize,
     current_size: usize,
@@ -27,7 +28,7 @@ pub struct OwnListener {
 }
 
 impl OwnListener {
-    pub fn new(local_addr: String, server_addr: String, cluster_size: usize, training: Option<Addr<Training>>) -> Self {
+    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>) -> Self {
         OwnListener {
             local_addr,
             server_addr,

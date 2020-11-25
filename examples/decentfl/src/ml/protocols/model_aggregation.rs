@@ -5,6 +5,7 @@ use serde::{Serialize, Deserialize};
 use tch::{Tensor, IndexOp};
 use crate::security::{GroupingClient, FindGroup, random_additive};
 use std::ops::Div;
+use std::net::SocketAddr;
 
 
 #[derive(Message)]
@@ -27,7 +28,7 @@ pub struct AggregationMessage {
 pub struct EncryptionMessage {
     #[serde(with = "tch_serde::serde_tensor")]
     model: Tensor,
-    sender_addr: String
+    sender_addr: SocketAddr
 }
 
 
@@ -45,7 +46,7 @@ pub struct ModelAggregation {
     own_addr: Option<Addr<ModelAggregation>>,
     parent: Recipient<ModelMessage>,
     cluster: Addr<Cluster>,
-    socket_addr: String,
+    socket_addr: SocketAddr,
     server_addr: RemoteAddr,
     grouping_client: Option<Addr<GroupingClient>>,
     current_group: Option<Vec<RemoteAddr>>,
@@ -57,7 +58,7 @@ pub struct ModelAggregation {
 
 // todo register at cluster
 impl ModelAggregation {
-    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: String, server_addr: RemoteAddr) -> Self {
+    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: SocketAddr, server_addr: RemoteAddr) -> Self {
         Self {
             own_addr: None,
             parent,
@@ -122,7 +123,7 @@ impl ModelAggregation {
         }
     }
 
-    fn receive_shares(&mut self, share: Tensor, addr: String) {
+    fn receive_shares(&mut self, share: Tensor, addr: SocketAddr) {
         // todo push share at right position depending on current_group
         let pos = self.current_group.as_ref().unwrap().iter()
             .position(|x| x.clone().socket_addr == addr)
