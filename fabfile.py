@@ -39,10 +39,10 @@ def get_single_connection(gateway: Connection, hostname: str) -> Connection:
 
 def get_single_connections(gateway: Connection) -> List[Connection]:
     settings = load_settings()
-    hosts = list(filter(lambda x: x['hostname'] == hostname, settings["fabric"]["hosts"]))
+    hosts = settings["fabric"]["hosts"]
     connections = []
+    password = getpass.getpass(f"{host2hoststr(hosts[0])}'s password: ")
     for host in hosts:
-        password = getpass.getpass(f"{host2hoststr(host)}'s password: ")
         connections.append(Connection(host2hoststr(host), gateway=gateway, connect_kwargs={"password": password}))
     return connections
 
@@ -98,14 +98,13 @@ def check_for_running(gateway):
 
 
 @task
-def download_results(gateway, gather=True):
-    c = get_single_connection(gateway, "odin01")
-    if gather:
-        c.run(f"cd {WORKING_DIR}; ./scp_all.sh")
-    files = c.run(f"ls {os.path.join(WORKING_DIR, 'decentfl*.db')}", hide="out")
-    files = files.stdout.strip().split("\n")
-    for file in files:
-        print(f"download {file}")
-        c.get(os.path.join(file))
-        local_file = file.split("/")[-1]
-        os.replace(local_file, f"results/{local_file}")
+def download_results(gateway):
+    cs = get_single_connections(gateway)
+    for c in cs:
+        files = c.run(f"ls {os.path.join(WORKING_DIR, 'decentfl.*.db')}", hide="out")
+        files = files.stdout.strip().split("\n")
+        for file in files:
+            print(f"download {file}")
+            c.get(os.path.join(file))
+            local_file = file.split("/")[-1]
+            os.replace(local_file, f"results/{local_file}")
