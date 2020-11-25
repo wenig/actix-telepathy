@@ -64,9 +64,9 @@ def install(gateway):
 @task
 def update(gateway):
     c = get_group_connection(gateway)
-    c.run(f"cd {WORKING_DIR}; git pull")
-    c.run(f"cd {WORKING_DIR}; cargo build --workspace")
-    c.run(f"cd {WORKING_DIR}; cargo test --package decentfl")
+    c.run(f"cd {WORKING_DIR}; git pull; ~/.cargo/bin/cargo build --workspace; ~/.cargo/bin/cargo test --package decentfl")
+    #c.run(f"cd {WORKING_DIR}; cargo build --workspace")
+    #c.run(f"cd {WORKING_DIR}; cargo test --package decentfl")
 
 
 @task
