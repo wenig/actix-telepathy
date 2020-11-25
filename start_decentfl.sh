@@ -8,6 +8,7 @@ for DECENTFL_PROCESS in $(seq 0 `expr $DECENTFL_PROCESSES - 1`); do
   host=$HOSTNAME:`expr $DECENTFL_BASEPORT + $DECENTFL_PROCESS`
   if [[ "$DECENTFL_BASEHOST:$DECENTFL_BASEPORT" != "$host" ]]; then
     seed="--seed-nodes $DECENTFL_BASEHOST:$DECENTFL_BASEPORT"
+  else
     splitoff=`expr $splitoff + 1`
   fi
   server=$DECENTFL_BASEHOST:$DECENTFL_BASEPORT
