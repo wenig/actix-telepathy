@@ -102,7 +102,7 @@ fn build_training(args: Parameters) -> Addr<Training> {
 fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) -> Addr<OwnListener> {
     OwnListener::new(
         args.local_addr.clone(),
-        "127.0.0.1:8000".to_string(),
+        args.server_addr.clone(),
         args.cluster_size,
         training
     ).start()
