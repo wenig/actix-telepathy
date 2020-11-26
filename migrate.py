@@ -15,7 +15,7 @@ def migrate(conn: sqlite3.Connection, name = ""):
     print(f"Database: {name}")
     print(f"Last migration: {last_successfull_migration}")
 
-    for migration in os.listdir(MIGRATIONS_DIR):
+    for migration in sorted(os.listdir(MIGRATIONS_DIR)):
         if migration.endswith(".sql"):
             migration_id = int(migration.split("_")[0])
             if migration_id > last_successfull_migration:
