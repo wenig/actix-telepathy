@@ -20,10 +20,13 @@ def migrate(conn: sqlite3.Connection, name = ""):
             migration_id = int(migration.split("_")[0])
             if migration_id > last_successfull_migration:
                 with open(os.path.join(MIGRATIONS_DIR, migration)) as f:
-                    c = conn.execute(f.read())
-                    c.execute(f"INSERT INTO migrations (migration_id, success) VALUES ({migration_id}, TRUE);")
-                    print(f"migrated to {migration_id}")
-                    c.close()
+                    try:
+                        c = conn.execute(f.read())
+                        c.execute(f"INSERT INTO migrations (migration_id, success) VALUES ({migration_id}, TRUE);")
+                        print(f"migrated to {migration_id}")
+                        c.close()
+                    except:
+                        pass
         conn.commit()
     conn.close()
 
