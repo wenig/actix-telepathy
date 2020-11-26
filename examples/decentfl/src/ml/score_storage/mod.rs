@@ -36,7 +36,8 @@ impl ScoreStorage {
                           history_length: i16,
                           dropout: f64,
                           adversarial: bool,
-                          krum: bool) -> Result<()> {
+                          krum: bool,
+                          seed: i64) -> Result<()> {
 
         let new_experiment = Experiment {
             id: 0,
@@ -49,7 +50,8 @@ impl ScoreStorage {
             history_length,
             dropout,
             adversarial,
-            krum
+            krum,
+            seed
         };
 
         self.db_connection.execute(&Experiment::insert_into(),
@@ -63,7 +65,8 @@ impl ScoreStorage {
                                    new_experiment.history_length,
                                    new_experiment.dropout,
                                    new_experiment.adversarial,
-                                   new_experiment.krum])?;
+                                   new_experiment.krum,
+                                   new_experiment.seed])?;
         let id = self.db_connection.last_insert_rowid();
         self.experiment_id = Some(id);
         Ok(())

@@ -10,7 +10,8 @@ pub struct Experiment {
     pub history_length: i16,
     pub dropout: f64,
     pub adversarial: bool,
-    pub krum: bool
+    pub krum: bool,
+    pub seed: i64
 }
 
 impl Experiment {
@@ -27,15 +28,16 @@ impl Experiment {
             history_length  INTEGER,
             dropout         FLOAT,
             adversarial     BOOLEAN,
-            krum            BOOLEAN
+            krum            BOOLEAN,
+            seed            INTEGER
         );
         ".to_string()
     }
 
     pub fn insert_into() -> String {
         "INSERT INTO experiments (cluster_size, lr, batch_size, test_every, update_every, \
-        group_size, history_length, dropout, adversarial, krum) \
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);".to_string()
+        group_size, history_length, dropout, adversarial, krum, seed) \
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11);".to_string()
     }
 }
 

@@ -8,6 +8,7 @@ verify_ssl = true
 [packages]
 fabric = "*"
 pyyaml = "*"
+ipykernel = "*"
 
 [requires]
 python_version = "3.7"
