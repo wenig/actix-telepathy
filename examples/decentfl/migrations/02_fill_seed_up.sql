@@ -1,0 +1,1 @@
+UPDATE experiments set seed = (1992 + ((id-1) % 3)) WHERE seed is NULL
