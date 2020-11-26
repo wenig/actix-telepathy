@@ -53,7 +53,9 @@ struct Parameters{
     #[structopt(long, default_value = "1992")]
     seed: u64,
     #[structopt(long, default_value = "0")]
-    split: usize
+    split: usize,
+    #[structopt(long)]
+    centralized: bool
 }
 
 fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> {
@@ -79,7 +81,8 @@ fn build_score_storage(args: Parameters) -> ScoreStorage {
         args.history_length as i16,
         args.dropout,
         args.adversarial,
-        args.krum
+        args.krum,
+        args.seed as i64
     );
     score_storage
 }
@@ -111,7 +114,8 @@ fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) ->
         args.local_addr,
         args.server_addr,
         args.cluster_size,
-        training
+        training,
+        args.centralized
     ).start()
 }
 

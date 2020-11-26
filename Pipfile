@@ -9,6 +9,9 @@ verify_ssl = true
 fabric = "*"
 pyyaml = "*"
 ipykernel = "*"
+jupyter = "*"
+pandas = "*"
+matplotlib = "*"
 
 [requires]
 python_version = "3.7"

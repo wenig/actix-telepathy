@@ -24,11 +24,12 @@ pub struct OwnListener {
     current_size: usize,
     cluster: Option<Addr<Cluster>>,
     cluster_full: bool,
-    training: Option<Addr<Training>>
+    training: Option<Addr<Training>>,
+    centralized: bool
 }
 
 impl OwnListener {
-    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>) -> Self {
+    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>, centralized: bool) -> Self {
         OwnListener {
             local_addr,
             server_addr,
@@ -37,7 +38,8 @@ impl OwnListener {
             current_size: 1,
             cluster: None,
             cluster_full: false,
-            training
+            training,
+            centralized
         }
     }
 
@@ -74,7 +76,8 @@ impl Handler<ClusterLog> for OwnListener {
                         self.training.clone().unwrap().recipient(),
                         self.cluster.clone().unwrap(),
                         self.local_addr.clone(),
-                        self.server_remote_addr.clone().unwrap()
+                        self.server_remote_addr.clone().unwrap(),
+                        self.centralized
                     ).start();
 
                     self.training.as_ref().unwrap().do_send(Addresses::new(

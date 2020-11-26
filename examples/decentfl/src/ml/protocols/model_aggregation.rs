@@ -54,11 +54,12 @@ pub struct ModelAggregation {
     own_model: Option<Tensor>,
     shares: Vec<Tensor>,
     aggregate: Vec<Tensor>,
+    centralized: bool
 }
 
 // todo register at cluster
 impl ModelAggregation {
-    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: SocketAddr, server_addr: RemoteAddr) -> Self {
+    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: SocketAddr, server_addr: RemoteAddr, centralized: bool) -> Self {
         Self {
             own_addr: None,
             parent,
@@ -71,6 +72,7 @@ impl ModelAggregation {
             own_model: None,
             shares: vec![],
             aggregate: vec![],
+            centralized
         }
     }
 

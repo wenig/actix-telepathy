@@ -48,8 +48,13 @@ def get_single_connections(gateway: Connection) -> List[Connection]:
 
 
 @task
-def hostname(gateway):
+def hostname_gateway(gateway):
     c = get_group_connection(gateway)
+    c.run("hostname", pty=True)
+
+
+@task
+def hostname(c):
     c.run("hostname", pty=True)
 
 
@@ -97,13 +102,18 @@ def check_for_running(gateway):
 
 
 @task
-def download_results(gateway):
+def download_results_gateway(gateway):
     cs = get_single_connections(gateway)
     for c in cs:
-        files = c.run(f"ls {os.path.join(WORKING_DIR, 'decentfl.*.db')}", hide="out")
-        files = files.stdout.strip().split("\n")
-        for file in files:
-            print(f"download {file}")
-            c.get(os.path.join(file))
-            local_file = file.split("/")[-1]
-            os.replace(local_file, f"results/{local_file}")
+        download_results(c)
+
+
+@task
+def download_results(c):
+    files = c.run(f"ls {os.path.join(WORKING_DIR, 'decentfl.*.db')}", hide="out")
+    files = files.stdout.strip().split("\n")
+    for file in files:
+        print(f"download {file}")
+        c.get(os.path.join(file))
+        local_file = file.split("/")[-1]
+        os.replace(local_file, f"results/{local_file}")
