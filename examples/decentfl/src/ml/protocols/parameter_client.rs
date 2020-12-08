@@ -41,7 +41,7 @@ impl ParameterClient {
 
     fn receive_global(&mut self, model: Tensor) {
         self.model = model.copy();
-        self.parent.clone().do_send(ModelMessage::Response(model));
+        let _r = self.parent.clone().do_send(ModelMessage::Response(model));
     }
 }
 

@@ -12,7 +12,7 @@ use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset, ParameterServer
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
 use tch::{Device, Tensor};
-use std::net::{ToSocketAddrs, SocketAddr, SocketAddrV4};
+use std::net::{ToSocketAddrs, SocketAddr};
 use log::*;
 
 
@@ -158,7 +158,7 @@ async fn main() {
 
     let model = if args.centralized {
         let vs = VarStore::new(Device::Cpu);
-        let mut dataset = load_mnist();
+        let dataset = load_mnist();
         let model = build_model(&vs, dataset.labels, args.seed as i64).to_flat_tensor();
         Some(model)
     } else {

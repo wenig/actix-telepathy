@@ -1,7 +1,7 @@
 use log::*;
 use actix::prelude::*;
 use actix_telepathy::prelude::*;
-use tch::{Tensor, IndexOp};
+use tch::{Tensor};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::net::SocketAddr;
@@ -66,7 +66,7 @@ impl Handler<CentralModelAggregation> for ParameterServer {
 
     fn handle(&mut self, msg: CentralModelAggregation, _ctx: &mut Context<Self>) -> Self::Result {
         if self.participated_clients.insert(msg.source) {
-            self.global_model.add_out(&self.global_model, &msg.model);
+            let _ = self.global_model.add_out(&self.global_model, &msg.model);
         }
 
         self.eventually_send_back_aggregate();

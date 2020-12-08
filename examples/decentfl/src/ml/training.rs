@@ -5,7 +5,7 @@ use crate::ml::model::{Net, FlattenModel};
 use crate::ml::score_storage::ScoreStorage;
 use tch::nn::{Sgd, Optimizer, OptimizerConfig, VarStore, ModuleT};
 use tch::Device;
-use crate::ml::protocols::{ModelAggregation, ModelMessage};
+use crate::ml::protocols::{ModelMessage};
 
 
 #[derive(Message)]
@@ -91,7 +91,7 @@ impl Training {
         }
 
         if (self.current_epoch % self.update_every) == 0 {
-            self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.to_flat_tensor().copy()));
+            let _r = self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.to_flat_tensor().copy()));
         } else {
             self.own_addr.next_epoch();
         }
