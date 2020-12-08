@@ -8,11 +8,12 @@ use actix_rt;
 use actix::prelude::*;
 use actix_telepathy::prelude::*;
 use security::{GroupingServer};
-use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset};
+use crate::ml::{Training, Net, load_mnist, ScoreStorage, Subset, ParameterServer, FlattenModel};
 use crate::cluster_listener::{OwnListener, ClusterAddr};
 use tch::nn::VarStore;
-use tch::{Device};
-use std::net::{ToSocketAddrs, SocketAddr};
+use tch::{Device, Tensor};
+use std::net::{ToSocketAddrs, SocketAddr, SocketAddrV4};
+use log::*;
 
 
 fn from_addr(s: &str) -> SocketAddr {
@@ -55,7 +56,13 @@ struct Parameters{
     #[structopt(long, default_value = "0")]
     split: usize,
     #[structopt(long)]
-    centralized: bool
+    centralized: bool,
+    #[structopt(long, default_value = "0")]
+    n_clients: usize
+}
+
+fn build_model(vs: &VarStore, out_channels: i64, seed: i64) -> Net {
+    Net::new_with_seed(&vs.root(), out_channels, seed)
 }
 
 fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> {
@@ -63,6 +70,18 @@ fn evtl_build_grouping_server(args: Parameters) -> Option<Addr<GroupingServer>> 
         Some(GroupingServer::new(
             args.group_size,
             args.history_length
+        ).start())
+    } else {
+        None
+    }
+}
+
+fn evtl_build_parameter_server(args: Parameters, model: Tensor) -> Option<Addr<ParameterServer>> {
+    if args.local_addr.eq(&args.server_addr) {
+        Some(ParameterServer::new(
+            model,
+            args.n_clients,
+            args.local_addr
         ).start())
     } else {
         None
@@ -82,7 +101,8 @@ fn build_score_storage(args: Parameters) -> ScoreStorage {
         args.dropout,
         args.adversarial,
         args.krum,
-        args.seed as i64
+        args.seed as i64,
+        args.centralized
     );
     score_storage
 }
@@ -94,7 +114,7 @@ fn build_training(args: Parameters) -> Addr<Training> {
         let vs = VarStore::new(Device::Cpu);
         let mut dataset = load_mnist();
         dataset.partition(args.split - 1, (args.cluster_size - 1) as i64, args.seed); // split - 1 because split=0 is the server that does not participate in training
-        let model = Net::new_with_seed(&vs.root(), dataset.labels, args.seed as i64);
+        let model = build_model(&vs, dataset.labels, args.seed as i64);
 
         Training::new(
             model,
@@ -109,22 +129,23 @@ fn build_training(args: Parameters) -> Addr<Training> {
     })
 }
 
-fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>) -> Addr<OwnListener> {
+fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>, model: Option<Tensor>) -> Addr<OwnListener> {
     OwnListener::new(
         args.local_addr,
         args.server_addr,
         args.cluster_size,
         training,
-        args.centralized
+        args.centralized,
+        model
     ).start()
 }
 
-fn build_cluster(args: Parameters, cluster_listener: Addr<OwnListener>, group_server: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
+fn build_cluster(args: Parameters, cluster_listener: Addr<OwnListener>, servers: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
     Cluster::new(
         args.local_addr,
         args.seed_nodes,
         vec![cluster_listener.recipient()],
-        group_server
+        servers
     )
 }
 
@@ -135,23 +156,41 @@ async fn main() {
 
     let args = Parameters::from_args();
 
-    let grouping_server = evtl_build_grouping_server(args.clone());
-
-    let training = match grouping_server {
-        None => {
-            Some(build_training(args.clone()))
-        },
-        Some(_) => None
+    let model = if args.centralized {
+        let vs = VarStore::new(Device::Cpu);
+        let mut dataset = load_mnist();
+        let model = build_model(&vs, dataset.labels, args.seed as i64).to_flat_tensor();
+        Some(model)
+    } else {
+        None
     };
 
-    let cluster_listener = build_cluster_listener(args.clone(), training);
-    let cluster = build_cluster(
-        args,
-        cluster_listener.clone(),
-        match grouping_server {
+    let server: Vec<(Recipient<RemoteWrapper>, &str)> = if args.centralized {
+        match evtl_build_parameter_server(args.clone(), model.as_ref().unwrap().copy()) {
+            Some(addr) => vec![(addr.recipient(), "ParameterServer")],
+            None => vec![]
+        }
+    } else {
+        match evtl_build_grouping_server(args.clone()) {
             Some(addr) => vec![(addr.recipient(), "GroupingServer")],
             None => vec![]
         }
+    };
+
+    let training = if server.len() == 0 {
+        Some(build_training(args.clone()))
+    } else {
+        None
+    };
+
+    debug!("Parameter Server: {:?}", server);
+    debug!("centralized: {}", args.centralized);
+
+    let cluster_listener = build_cluster_listener(args.clone(), training, model);
+    let cluster = build_cluster(
+        args,
+        cluster_listener.clone(),
+        server
     );
 
     cluster_listener.do_send(ClusterAddr::new(cluster));

@@ -1,8 +1,9 @@
 use log::*;
 use actix::prelude::*;
 use actix_telepathy::prelude::*;
-use crate::ml::{Training, Addresses, Epoch, ModelAggregation};
+use crate::ml::{Training, Addresses, Epoch, ModelAggregation, ParameterClient};
 use std::net::SocketAddr;
+use tch::Tensor;
 
 
 #[derive(Message)]
@@ -25,11 +26,12 @@ pub struct OwnListener {
     cluster: Option<Addr<Cluster>>,
     cluster_full: bool,
     training: Option<Addr<Training>>,
-    centralized: bool
+    centralized: bool,
+    init_model: Option<Tensor>
 }
 
 impl OwnListener {
-    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>, centralized: bool) -> Self {
+    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>, centralized: bool, init_model: Option<Tensor>) -> Self {
         OwnListener {
             local_addr,
             server_addr,
@@ -39,7 +41,8 @@ impl OwnListener {
             cluster: None,
             cluster_full: false,
             training,
-            centralized
+            centralized,
+            init_model
         }
     }
 
@@ -68,17 +71,30 @@ impl Handler<ClusterLog> for OwnListener {
         match msg {
             ClusterLog::NewMember(addr, remote_addr) => {
                 if self.training.is_some() & (addr == self.server_addr) {
-                    let server_addr = RemoteAddr::new_from_key(remote_addr.socket_addr, remote_addr.network_interface.unwrap(), "GroupingServer");
+                    let server_id = if self.centralized {
+                        "ParameterServer"
+                    } else {
+                        "GroupingServer"
+                    };
+                    let server_addr = RemoteAddr::new_from_key(remote_addr.socket_addr, remote_addr.network_interface.unwrap(), server_id);
                     self.server_remote_addr = Some(server_addr);
-                    debug!("sent!");
 
-                    let model_aggregation = ModelAggregation::new(
-                        self.training.clone().unwrap().recipient(),
-                        self.cluster.clone().unwrap(),
-                        self.local_addr.clone(),
-                        self.server_remote_addr.clone().unwrap(),
-                        self.centralized
-                    ).start();
+                    let model_aggregation = if self.centralized {
+                        ParameterClient::new(
+                            self.init_model.as_ref().unwrap().copy(),
+                            self.training.clone().unwrap().recipient(),
+                            self.cluster.clone().unwrap(),
+                            self.local_addr.clone(),
+                            self.server_remote_addr.clone().unwrap(),
+                        ).start().recipient()
+                    } else {
+                        ModelAggregation::new(
+                            self.training.clone().unwrap().recipient(),
+                            self.cluster.clone().unwrap(),
+                            self.local_addr.clone(),
+                            self.server_remote_addr.clone().unwrap(),
+                        ).start().recipient()
+                    };
 
                     self.training.as_ref().unwrap().do_send(Addresses::new(
                         model_aggregation

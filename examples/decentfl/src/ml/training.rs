@@ -19,11 +19,11 @@ pub struct Test;
 #[derive(Message)]
 #[rtype("Result = ()")]
 pub struct Addresses {
-    model_aggregation: Addr<ModelAggregation>
+    model_aggregation: Recipient<ModelMessage>
 }
 
 impl Addresses {
-    pub fn new(model_aggregation: Addr<ModelAggregation>) -> Self {
+    pub fn new(model_aggregation: Recipient<ModelMessage>) -> Self {
         Self {
             model_aggregation
         }
@@ -43,7 +43,7 @@ pub struct Training {
     update_every: usize,
     own_addr: Option<Addr<Training>>,
     device: Device,
-    aggregation_protocol: Option<Addr<ModelAggregation>>,
+    aggregation_protocol: Option<Recipient<ModelMessage>>,
 }
 
 impl Training {
@@ -91,7 +91,7 @@ impl Training {
         }
 
         if (self.current_epoch % self.update_every) == 0 {
-            self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.to_flat_tensor().copy()))
+            self.aggregation_protocol.clone().unwrap().do_send(ModelMessage::Request(self.model.to_flat_tensor().copy()));
         } else {
             self.own_addr.next_epoch();
         }
