@@ -66,7 +66,8 @@ impl Handler<CentralModelAggregation> for ParameterServer {
 
     fn handle(&mut self, msg: CentralModelAggregation, _ctx: &mut Context<Self>) -> Self::Result {
         if self.participated_clients.insert(msg.source) {
-            let _ = self.global_model.add_out(&self.global_model, &msg.model);
+
+            let _ = self.global_model.add_out(&self.global_model, &msg.model.divide1(self.n_clients));
         }
 
         self.eventually_send_back_aggregate();
