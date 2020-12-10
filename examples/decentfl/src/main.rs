@@ -136,7 +136,8 @@ fn build_cluster_listener(args: Parameters, training: Option<Addr<Training>>, mo
         args.cluster_size,
         training,
         args.centralized,
-        model
+        model,
+        args.group_size
     ).start()
 }
 

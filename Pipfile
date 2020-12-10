@@ -13,6 +13,7 @@ jupyter = "*"
 pandas = "*"
 matplotlib = "*"
 jupyter-contrib-nbextensions = "*"
+inquirer = "*"
 
 [requires]
 python_version = "3.7"

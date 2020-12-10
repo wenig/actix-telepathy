@@ -53,12 +53,13 @@ pub struct ModelAggregation {
     accepted: Vec<RemoteAddr>,
     own_model: Option<Tensor>,
     shares: Vec<Tensor>,
-    aggregate: Vec<Tensor>
+    aggregate: Vec<Tensor>,
+    group_size: usize
 }
 
 // todo register at cluster
 impl ModelAggregation {
-    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: SocketAddr, server_addr: RemoteAddr) -> Self {
+    pub fn new(parent: Recipient<ModelMessage>, cluster: Addr<Cluster>, socket_addr: SocketAddr, server_addr: RemoteAddr, group_size: usize) -> Self {
         Self {
             own_addr: None,
             parent,
@@ -71,12 +72,18 @@ impl ModelAggregation {
             own_model: None,
             shares: vec![],
             aggregate: vec![],
+            group_size
         }
     }
 
     fn start_protocol(&mut self, model: Tensor) {
-        self.own_model = Some(model);
-        self.grouping_client.clone().expect("ModelAggregation Actor needs to be started").do_send(FindGroup::Request);
+        if self.group_size > 1 {
+            self.own_model = Some(model);
+            self.grouping_client.clone().expect("ModelAggregation Actor needs to be started").do_send(FindGroup::Request);
+        } else {
+            debug!("Skipping Aggregation - group_size == 1");
+            let _r = self.parent.do_send(ModelMessage::Response(model));
+        }
     }
 
     fn build_sub_cluster(&mut self) {

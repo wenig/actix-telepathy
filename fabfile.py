@@ -117,3 +117,17 @@ def download_results(c):
         c.get(os.path.join(file))
         local_file = file.split("/")[-1]
         os.replace(local_file, f"results/{local_file}")
+
+
+if __name__ == "__main__":
+    import inquirer
+
+    list_tasks = os.popen('fab -l').read()
+    output = list(filter(lambda x: x != "", map(lambda x: x.strip(), list_tasks.split("\n"))))
+    header = output[0]
+    tasks = output[1:]
+
+    questions = [inquirer.List('tasks', message=header, choices=tasks)]
+    answers = inquirer.prompt(questions)
+    print(answers)
+    os.system(f"fab -H phillip.wenig@ssh-hpi.hpi.uni-potsdam.de --prompt-for-login-password {answers['tasks']}")

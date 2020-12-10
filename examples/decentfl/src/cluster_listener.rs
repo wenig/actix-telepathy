@@ -27,11 +27,12 @@ pub struct OwnListener {
     cluster_full: bool,
     training: Option<Addr<Training>>,
     centralized: bool,
-    init_model: Option<Tensor>
+    init_model: Option<Tensor>,
+    group_size: usize
 }
 
 impl OwnListener {
-    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>, centralized: bool, init_model: Option<Tensor>) -> Self {
+    pub fn new(local_addr: SocketAddr, server_addr: SocketAddr, cluster_size: usize, training: Option<Addr<Training>>, centralized: bool, init_model: Option<Tensor>, group_size: usize) -> Self {
         OwnListener {
             local_addr,
             server_addr,
@@ -42,7 +43,8 @@ impl OwnListener {
             cluster_full: false,
             training,
             centralized,
-            init_model
+            init_model,
+            group_size
         }
     }
 
@@ -93,6 +95,7 @@ impl Handler<ClusterLog> for OwnListener {
                             self.cluster.clone().unwrap(),
                             self.local_addr.clone(),
                             self.server_remote_addr.clone().unwrap(),
+                            self.group_size
                         ).start().recipient()
                     };
 
