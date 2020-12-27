@@ -54,7 +54,9 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
         .expect(&format!("custom_serializer {} could not be found", &config.custom_serializer));
 
     let expanded = quote! {
-        impl Remotable for #name {
+        use log::*;
+
+        impl RemoteMessage for #name {
             type Serializer = #serializer;
             const IDENTIFIER: &'static str = #s;
 

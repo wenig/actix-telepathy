@@ -18,7 +18,7 @@ pub mod prelude {
     pub use actix_telepathy_derive::*;
 
     pub use crate::cluster::{Cluster, ClusterListener, ClusterLog, AddrApi, NodeResolving};
-    pub use crate::remote::{Remotable, RemoteAddr, RemoteWrapper};
+    pub use crate::remote::{RemoteMessage, RemoteAddr, RemoteWrapper};
     pub use crate::serialization::{DefaultSerialization, CustomSerialization};
     pub use crate::network::NetworkInterface;
 }

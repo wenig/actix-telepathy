@@ -3,7 +3,7 @@ use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
-use crate::remote::{RemoteWrapper, Remotable};
+use crate::remote::{RemoteWrapper, RemoteMessage};
 use crate::{RemoteAddr, Cluster, NodeResolving};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};

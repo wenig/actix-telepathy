@@ -49,6 +49,8 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 
     // Build the output, possibly using quasi-quotation
     let expanded = quote! {
+        use log::*;
+
         impl Handler<RemoteWrapper> for #name {
             type Result = ();
 

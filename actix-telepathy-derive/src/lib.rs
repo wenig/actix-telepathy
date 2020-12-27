@@ -4,6 +4,9 @@ use proc_macro::TokenStream;
 mod remote_actor;
 mod remote_message;
 
+// todo remove log dependency
+// todo rename remotable to remoteactor
+
 /// Helper to prepare actors for remote messages
 /// # Example
 /// ```
@@ -64,7 +67,7 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 /// In the previous example, the MyMessage struct gets extended the following way:
 ///
 /// ```
-/// impl Remotable for MyMessage {
+/// impl RemoteMessage for MyMessage {
 ///     type Serializer = DefaultSerialization;
 ///     const IDENTIFIER: &'static str = "MyMessage";
 ///

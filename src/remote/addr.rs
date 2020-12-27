@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use crate::network::NetworkInterface;
 use crate::codec::ClusterMessage;
-use crate::remote::{RemoteWrapper, Remotable, AddrRepresentation};
+use crate::remote::{RemoteWrapper, RemoteMessage, AddrRepresentation};
 use std::str::FromStr;
 use serde::{Serialize, Deserialize};
 use std::hash::{Hash};
@@ -43,13 +43,13 @@ impl RemoteAddr {
         self.id = AddrRepresentation::Key(id);
     }
 
-    pub fn do_send<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> () {
+    pub fn do_send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> () {
         self.network_interface.as_ref().expect("Network interface must be set!").do_send(ClusterMessage::Message(
             RemoteWrapper::new(self.clone(), msg)
         ));
     }
 
-    pub fn send<T: Remotable + Serialize>(&mut self, msg: Box<T>) -> Request<NetworkInterface, ClusterMessage> {
+    pub fn send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> Request<NetworkInterface, ClusterMessage> {
         self.network_interface.as_ref().expect("Network interface must be set!").send(ClusterMessage::Message(
             RemoteWrapper::new(self.clone(), msg)
         ))

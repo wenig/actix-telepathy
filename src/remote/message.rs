@@ -17,7 +17,7 @@ pub struct RemoteWrapper {
 }
 
 impl RemoteWrapper {
-    pub fn new<T: Remotable + Serialize>(destination: RemoteAddr, message: Box<T>) -> RemoteWrapper {
+    pub fn new<T: RemoteMessage + Serialize>(destination: RemoteAddr, message: Box<T>) -> RemoteWrapper {
         let serializer = message.get_serializer();
         RemoteWrapper {
             destination,
@@ -30,7 +30,7 @@ impl RemoteWrapper {
 
 
 /// Helper Trait to prepare messages to be sent over the network
-pub trait Remotable {
+pub trait RemoteMessage {
     type Serializer: CustomSerialization;
     const IDENTIFIER: &'static str;
 

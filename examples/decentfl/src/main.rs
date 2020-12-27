@@ -1,6 +1,7 @@
 mod ml;
 mod security;
 mod cluster_listener;
+mod messages;
 
 pub use security::random_additive;
 use structopt::StructOpt;
