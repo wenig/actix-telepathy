@@ -66,6 +66,15 @@ pub struct AddressResolver {
     rec2str: HashMap<Recipient<RemoteWrapper>, String>
 }
 
+impl Default for AddressResolver {
+    fn default() -> Self {
+        Self {
+            str2rec: HashMap::new(),
+            rec2str: HashMap::new()
+        }
+    }
+}
+
 pub struct NotAvailableError {}
 
 impl Debug for NotAvailableError {
@@ -158,3 +167,4 @@ impl Handler<AddressRequest> for AddressResolver {
 }
 
 impl Supervised for AddressResolver {}
+impl SystemService for AddressResolver {}

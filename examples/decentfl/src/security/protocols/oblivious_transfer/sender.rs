@@ -9,9 +9,10 @@ use std::ops::{Sub, Add};
 use rand::Rng;
 use gcd::Gcd;
 use tch::{Tensor, Kind, Device, IndexOp};
-use crate::security::protocols::oblivious_transfer::messages::{OTMessage1Request, OTMessage1Response, OTMessage2Request};
-use crate::security::protocols::oblivious_transfer::OTDone;
+use crate::security::protocols::oblivious_transfer::messages::{OTMessage1Request, OTMessage1Response, OTMessage2Request, OTStart};
+use crate::security::protocols::oblivious_transfer::{OTDone, ObliviousTransferReceiver};
 use rand::rngs::OsRng;
+use crate::security::protocols::oblivious_transfer::bigint_extensions::NegModPow;
 
 
 enum State {
@@ -25,18 +26,19 @@ enum State {
 #[remote_messages(OTMessage1Response)]
 pub struct ObliviousTransferSender {
     parent: Recipient<OTDone>,
-    receiver: RemoteAddr,
+    receiver: AnyAddr<ObliviousTransferReceiver>,
     messages: Vec<BigInt>,
     n: BigInt,
     e: BigInt,
     d: BigInt,
     x: [Vec<BigInt>; 2],
-    state: State
+    state: State,
+    own_addr: Option<AnyAddr<Self>>
 }
 
 
 impl ObliviousTransferSender {
-    pub fn new(parent: Recipient<OTDone>, prime_size: u64, field_size: u64, size: i64, receiver: RemoteAddr, messages: Tensor) -> Self {
+    pub fn new(parent: Recipient<OTDone>, prime_size: u64, field_size: u64, size: i64, receiver: AnyAddr<ObliviousTransferReceiver>, messages: Tensor) -> Self {
         assert_eq!(messages.size(), vec![1, 2]);
 
         let mut rng = OsRng::default();
@@ -47,6 +49,7 @@ impl ObliviousTransferSender {
             p = prime::new(prime_size as usize).expect("Could not create prime");
             q = prime::new(prime_size as usize).expect("Could not create prime");
         }
+
         let p = p.to_bigint().unwrap();
         let q = q.to_bigint().unwrap();
         let one = BigInt::from(1 as u16);
@@ -59,7 +62,7 @@ impl ObliviousTransferSender {
             e = rng.gen_bigint_range(&two, &phi_n);
         };
 
-        let d = e.modpow(&(-one), &phi_n);
+        let d = e.neg_modpow(&one, &phi_n);
         let mut x = [vec![], vec![]];
         let lbound = &BigInt::from(2);
         let ubound = &BigInt::from(field_size);
@@ -74,6 +77,8 @@ impl ObliviousTransferSender {
             BigInt::from(messages.int64_value(&[0, 1]) as u64)
         ];
 
+        println!("Hello world");
+
         Self {
             parent,
             receiver,
@@ -87,13 +92,16 @@ impl ObliviousTransferSender {
     }
 
     fn start_protocol(&mut self) {
+        debug!("start protocol");
         self.receiver.clone().do_send(Box::new(
             OTMessage1Request {
                 n: self.n.clone(),
                 e: self.e.clone(),
-                x: self.x.clone()
+                x: self.x.clone(),
+                source: self.own_address.unwrap
             }
         ));
+        debug!("m1 sent");
         self.state = State::PROTOCOL_STARTED
     }
 
@@ -121,6 +129,23 @@ impl ObliviousTransferSender {
 
 impl Actor for ObliviousTransferSender {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        match self.receiver {
+            AnyAddr::Local(addr) => {}
+            AnyAddr::Remote(addr) => { self.own_addr = Some(AnyAddr::Remote()) }
+        }
+        self.own_addr = Some(ctx)
+    }
+}
+
+
+impl Handler<OTStart> for ObliviousTransferSender {
+    type Result = ();
+
+    fn handle(&mut self, _msg: OTStart, ctx: &mut Self::Context) -> Self::Result {
+        self.start_protocol();
+    }
 }
 
 

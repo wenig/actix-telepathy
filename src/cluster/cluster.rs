@@ -59,7 +59,7 @@ pub struct Cluster {
     addrs: Vec<SocketAddr>,
     listeners: Vec<Recipient<ClusterLog>>,
     gossip: Option<Addr<Gossip>>,
-    address_resolver: Addr<AddressResolver>,
+    address_resolver: Option<Addr<AddressResolver>>,
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<SocketAddr, Addr<NetworkInterface>>
 }
@@ -71,8 +71,7 @@ impl Actor for Cluster {
     fn started(&mut self, ctx: &mut Self::Context) {
         self.own_addr = Some(ctx.address());
         let ip_addr4gossip = self.ip_address.clone();
-        let addr4gossip = ctx.address().clone();
-        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip, addr4gossip)));
+        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip)));
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
@@ -121,7 +120,7 @@ impl Handler<AddressRequest> for Cluster {
     type Result = Result<AddressResponse, ()>;
 
     fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
-        self.address_resolver.do_send(msg);
+        self.address_resolver.as_ref().unwrap().do_send(msg);
         Ok(AddressResponse::Register)
     }
 }
@@ -173,7 +172,7 @@ impl Cluster {
             for (rec, identifier) in rec_to_be_registered.iter() {
                 address_resolver.do_send(AddressRequest::Register(rec.clone(), identifier.to_string()));
             }
-            Cluster {ip_address, addrs: seed_nodes, listeners: cluster_listeners, gossip: None, address_resolver, own_addr: None, nodes: HashMap::new()}
+            Cluster {ip_address, addrs: seed_nodes, listeners: cluster_listeners, gossip: None, address_resolver: Some(address_resolver), own_addr: None, nodes: HashMap::new()}
         })
     }
 
@@ -187,7 +186,7 @@ impl Cluster {
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.clone();
+        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
         let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream, parent, gossip, address_resolver).start();
         self.nodes.insert(addr, node);
     }
@@ -196,9 +195,9 @@ impl Cluster {
         let own_ip = self.ip_address.clone();
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.clone();
+        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
         if !self.nodes.contains_key(&node_addr) {
-            let node = NetworkInterface::new(own_ip, node_addr.clone(), parent, gossip, address_resolver, seed).start();
+            let node = NetworkInterface::new(own_ip, node_addr.clone(), seed).start();
             self.nodes.insert(node_addr.clone(), node);
         }
     }
@@ -208,6 +207,25 @@ impl Cluster {
         self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
     }
 }
+
+// Singleton
+
+impl Default for Cluster {
+    fn default() -> Self {
+        Self {
+            ip_address: SocketAddr::from_str("localhost:8000").unwrap(),
+            addrs: vec![],
+            listeners: vec![],
+            gossip: None,
+            address_resolver: None,
+            own_addr: None,
+            nodes: HashMap::new()
+        }
+    }
+}
+
+impl Supervised for Cluster {}
+impl SystemService for Cluster {}
 
 /// Helper for registering actors to the cluster
 pub trait AddrApi {

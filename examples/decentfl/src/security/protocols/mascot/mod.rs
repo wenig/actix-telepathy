@@ -58,11 +58,11 @@ impl Default for Mascot {
 
 
 impl Mascot {
-    pub fn new(parent: Recipient<BeaverTriple>, cluster: Addr<Cluster>, socket_addr: SocketAddr, peers: Vec<RemoteAddr>, n_triples: i64) -> Self {
-        Self::new_advanced(parent, cluster, socket_addr, peers, n_triples, Default::default(), Default::default())
+    pub fn new(parent: Recipient<BeaverTriple>, socket_addr: SocketAddr, peers: Vec<RemoteAddr>, n_triples: i64) -> Self {
+        Self::new_advanced(parent, socket_addr, peers, n_triples, Default::default(), Default::default())
     }
 
-    pub fn new_advanced(parent: Recipient<BeaverTriple>, cluster: Addr<Cluster>, socket_addr: SocketAddr, peers: Vec<RemoteAddr>, n_triples: i64, field_size: u64, prime_size: u64) -> Self {
+    pub fn new_advanced(parent: Recipient<BeaverTriple>, socket_addr: SocketAddr, peers: Vec<RemoteAddr>, n_triples: i64, field_size: u64, prime_size: u64) -> Self {
         let a = Tensor::randint1(2, field_size as i64, &[n_triples as i64], (Kind::Int64, Device::Cpu));
         let b = Tensor::randint1(2, field_size as i64, &[1], (Kind::Int64, Device::Cpu));
         let own_position = peers.iter().position(|x| x.socket_addr == socket_addr).expect("Own SocketAddr is not part of peers!");
@@ -72,7 +72,7 @@ impl Mascot {
 
         Self {
             parent,
-            cluster,
+            cluster: Cluster::from_registry(),
             own_addr: None,
             socket_addr,
             peers,
@@ -108,6 +108,9 @@ impl Mascot {
     fn active(&mut self, receiver: usize) {
         self.state = State::ACTIVE;
         let mut bits: Vec<Tensor> = vec![];
+        let mut peer = self.peers.get(receiver).unwrap().clone();
+        peer.change_id(format!("ObliviousTransferReceiver_{}", receiver));
+        // todo don't create new OTSender for each bit
         for _ in 0..self.count_bit_size() {
             let m = Tensor::randint_like1(&self.a, 2, self.field_size as i64);
             let ot = ObliviousTransferSender::new(
@@ -115,7 +118,7 @@ impl Mascot {
                 self.prime_size,
                 self.field_size,
                 self.n_triples,
-                self.peers.get(receiver).unwrap().clone(),
+                peer.clone(),
                 Tensor::stack(&[m.copy(), m.copy() + self.a.as_ref()], 1)
             ).start();
             bits.push(m);
@@ -126,11 +129,13 @@ impl Mascot {
     fn passive(&mut self, sender: usize) {
         self.state = State::PASSIVE;
         let bit_array = Mascot::decompose_int2vec(self.b.int64_value(&[0]), self.count_bit_size());
+        let mut peer = self.peers.get(sender).unwrap().clone();
+        peer.change_id(format!("ObliviousTransferSender_{}", sender));
         for bi in bit_array.iter() {
             let _ot = ObliviousTransferReceiver::new(
                 self.own_addr.clone().unwrap().recipient(),
                 self.n_triples,
-                self.peers.get(sender).unwrap().clone(),
+                peer.clone(),
                 bi.clone() as u8
             ).start();
         }
@@ -208,3 +213,16 @@ impl Handler<OTDone> for Mascot {
     }
 }
 
+
+// ----------------------------
+//            TESTS
+// ----------------------------
+
+#[cfg(test)]
+mod tests {
+
+    #[test]
+    fn mascot_generates_correct_beaver_triples() {
+
+    }
+}

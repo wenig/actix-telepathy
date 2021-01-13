@@ -6,6 +6,7 @@ use std::str::FromStr;
 use serde::{Serialize, Deserialize};
 use std::hash::{Hash};
 use std::net::SocketAddr;
+use std::ops::Deref;
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
@@ -14,12 +15,12 @@ pub struct RemoteAddr {
     pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    pub network_interface: Option<Addr<NetworkInterface>>,
+    pub network_interface: Option<Recipient<ClusterMessage>>,
     pub(crate) id: AddrRepresentation
 }
 
 impl RemoteAddr {
-    pub fn new(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>, id: AddrRepresentation) -> Self {
+    pub fn new(socket_addr: SocketAddr, network_interface: Option<Recipient<ClusterMessage>>, id: AddrRepresentation) -> Self {
         RemoteAddr{socket_addr, network_interface, id}
     }
 
@@ -27,15 +28,15 @@ impl RemoteAddr {
         RemoteAddr{socket_addr, network_interface: None, id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_from_key(socket_addr: SocketAddr, network_interface: Addr<NetworkInterface>, id: &str) -> Self {
+    pub fn new_from_key(socket_addr: SocketAddr, network_interface: Recipient<ClusterMessage>, id: &str) -> Self {
         RemoteAddr{socket_addr, network_interface: Some(network_interface), id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_gossip(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>) -> Self {
+    pub fn new_gossip(socket_addr: SocketAddr, network_interface: Option<Recipient<ClusterMessage>>) -> Self {
         RemoteAddr::new(socket_addr, network_interface, AddrRepresentation::Gossip)
     }
 
-    pub fn set_network_interface(&mut self, network_interface: Addr<NetworkInterface>) {
+    pub fn set_network_interface(&mut self, network_interface: Recipient<ClusterMessage>) {
         self.network_interface = Some(network_interface);
     }
 
@@ -49,7 +50,7 @@ impl RemoteAddr {
         ));
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> Request<NetworkInterface, ClusterMessage> {
+    pub fn send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> RecipientRequest<ClusterMessage> {
         self.network_interface.as_ref().expect("Network interface must be set!").send(ClusterMessage::Message(
             RemoteWrapper::new(self.clone(), msg)
         ))
@@ -69,3 +70,18 @@ impl PartialEq for RemoteAddr {
 }
 
 impl Eq for RemoteAddr {}
+
+
+pub enum AnyAddr<T> {
+    Local(Addr<T>),
+    Remote(RemoteAddr)
+}
+
+impl<T: Actor> AnyAddr<T> {
+    pub fn do_send<M: RemoteMessage + Serialize + Message>(&mut self, msg: Box<M>) -> () {
+        match self {
+            AnyAddr::Local(addr) => addr.do_send(msg.deref()),
+            AnyAddr::Remote(addr) => addr.do_send(msg)
+        };
+    }
+}

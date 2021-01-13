@@ -9,9 +9,10 @@ use gcd::Gcd;
 use tch::{Tensor, Kind, Device, IndexOp};
 use crate::security::protocols::oblivious_transfer::messages::{OTMessage1Request, OTMessage1Response, OTMessage2Request};
 use rand::Rng;
-use crate::security::protocols::oblivious_transfer::OTDone;
+use crate::security::protocols::oblivious_transfer::{OTDone, ObliviousTransferSender};
 use rand::prelude::ThreadRng;
 use rand::rngs::OsRng;
+use tch::nn::Optimizer;
 
 
 enum State {
@@ -25,7 +26,7 @@ enum State {
 #[remote_messages(OTMessage1Request, OTMessage2Request)]
 pub struct ObliviousTransferReceiver {
     parent: Recipient<OTDone>,
-    sender: RemoteAddr,
+    sender: Option<AnyAddr<ObliviousTransferSender>>,
     b: u8,
     k: Option<BigInt>,
     size: i64,
@@ -34,10 +35,10 @@ pub struct ObliviousTransferReceiver {
 
 
 impl ObliviousTransferReceiver {
-    pub fn new(parent: Recipient<OTDone>, size: i64, sender: RemoteAddr, b: u8) -> Self {
+    pub fn new(parent: Recipient<OTDone>, size: i64, b: u8) -> Self {
         Self {
             parent,
-            sender,
+            sender: None,
             b,
             k: None,
             size,
@@ -46,6 +47,8 @@ impl ObliviousTransferReceiver {
     }
 
     fn receive_public_keys(&mut self, msg: OTMessage1Request) {
+        self.sender = Some(msg.source);
+
         let n = msg.n;
         let e = msg.e;
         let x = msg.x;
