@@ -72,16 +72,18 @@ impl PartialEq for RemoteAddr {
 impl Eq for RemoteAddr {}
 
 
-pub enum AnyAddr<T> {
+#[derive(Deserialize, Serialize)]
+pub enum AnyAddr<T: Actor> {
+    #[serde(skip_serializing, skip_deserializing)]
     Local(Addr<T>),
     Remote(RemoteAddr)
 }
 
-impl<T: Actor> AnyAddr<T> {
-    pub fn do_send<M: RemoteMessage + Serialize + Message>(&mut self, msg: Box<M>) -> () {
+impl<T: Actor> Clone for AnyAddr<T> {
+    fn clone(&self) -> Self {
         match self {
-            AnyAddr::Local(addr) => addr.do_send(msg.deref()),
-            AnyAddr::Remote(addr) => addr.do_send(msg)
-        };
+            AnyAddr::Local(addr) => {AnyAddr::Local(addr.clone())},
+            AnyAddr::Remote(addr) => {AnyAddr::Remote(addr.clone())}
+        }
     }
 }

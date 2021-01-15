@@ -42,12 +42,12 @@ impl ObliviousTransferSender {
         assert_eq!(messages.size(), vec![1, 2]);
 
         let mut rng = OsRng::default();
-        let mut p = prime::new(prime_size as usize).expect("Could not create prime");
-        let mut q = prime::new(prime_size as usize).expect("Could not create prime");
+        let mut p = prime::new(prime_size.clone() as usize).expect("Could not create prime");
+        let mut q = prime::new(prime_size.clone() as usize).expect("Could not create prime");
 
         while p == q {
-            p = prime::new(prime_size as usize).expect("Could not create prime");
-            q = prime::new(prime_size as usize).expect("Could not create prime");
+            p = prime::new(prime_size.clone() as usize).expect("Could not create prime");
+            q = prime::new(prime_size.clone() as usize).expect("Could not create prime");
         }
 
         let p = p.to_bigint().unwrap();
@@ -68,7 +68,7 @@ impl ObliviousTransferSender {
         let ubound = &BigInt::from(field_size);
         for c in 0..2 {
             for _ in 0..size {
-                x[c].push(rng.gen_bigint_range(lbound, ubound));
+                x[c.clone()].push(rng.gen_bigint_range(lbound, ubound));
             }
         }
 
@@ -76,8 +76,6 @@ impl ObliviousTransferSender {
             BigInt::from(messages.int64_value(&[0, 0]) as u64),
             BigInt::from(messages.int64_value(&[0, 1]) as u64)
         ];
-
-        println!("Hello world");
 
         Self {
             parent,
@@ -87,25 +85,32 @@ impl ObliviousTransferSender {
             e,
             d,
             x,
-            state: State::INITIAL
+            state: State::INITIAL,
+            own_addr: None
         }
     }
 
     fn start_protocol(&mut self) {
         debug!("start protocol");
-        self.receiver.clone().do_send(Box::new(
-            OTMessage1Request {
-                n: self.n.clone(),
-                e: self.e.clone(),
-                x: self.x.clone(),
-                source: self.own_address.unwrap
-            }
-        ));
+
+        let msg = OTMessage1Request {
+            n: self.n.clone(),
+            e: self.e.clone(),
+            x: self.x.clone(),
+            source: self.own_addr.as_ref().unwrap().clone()
+        };
+
+        match &self.receiver {
+            AnyAddr::Local(addr) => addr.do_send(msg),
+            AnyAddr::Remote(addr) => addr.clone().do_send(Box::new(msg))
+        };
+
         debug!("m1 sent");
-        self.state = State::PROTOCOL_STARTED
+        self.state = State::PROTOCOL_STARTED;
     }
 
     fn receive_response(&mut self, msg: OTMessage1Response) {
+        debug!("received response");
         let v = msg.v;
         let klist: [Vec<BigInt>; 2] = [
             v.iter().zip(self.x[0].iter()).map(|(v_, x_)| {
@@ -119,10 +124,18 @@ impl ObliviousTransferSender {
             klist[0].as_slice().into_iter().map(|x| (x + &self.messages[0]) % &self.n).collect(),
             klist[1].as_slice().into_iter().map(|x| (x + &self.messages[1]) % &self.n).collect()
         ];
-        self.receiver.clone().do_send(Box::new(
-            OTMessage2Request { mprimelist }
-        ));
-        self.state = State::PROTOCOL_CARRIED_OUT
+
+        let msg = OTMessage2Request { mprimelist };
+
+        match &self.receiver {
+            AnyAddr::Local(addr) => addr.do_send(msg),
+            AnyAddr::Remote(addr) => addr.clone().do_send(Box::new(msg))
+        }
+
+        self.parent.do_send(OTDone::Sender);
+
+        self.state = State::PROTOCOL_CARRIED_OUT;
+        debug!("sent mprimelist");
     }
 }
 
@@ -131,11 +144,16 @@ impl Actor for ObliviousTransferSender {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        match self.receiver {
-            AnyAddr::Local(addr) => {}
-            AnyAddr::Remote(addr) => { self.own_addr = Some(AnyAddr::Remote()) }
+        match &self.receiver {
+            AnyAddr::Local(addr) => {
+                self.own_addr = Some(AnyAddr::Local(ctx.address()))
+            }
+            AnyAddr::Remote(addr) => {
+                let mut own_addr = addr.clone();
+                own_addr.change_id(String::from("ObliviousTransferSender"));
+                self.own_addr = Some(AnyAddr::Remote(own_addr))
+            }
         }
-        self.own_addr = Some(ctx)
     }
 }
 

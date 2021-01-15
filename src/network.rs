@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use log::*;
-use std::net::SocketAddr;
+use std::net::{SocketAddr};
 use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead};
 use std::io::{Error};
@@ -69,7 +69,7 @@ impl NetworkInterface {
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
 
-    pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
+    pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream) -> NetworkInterface {
         let mut ni = Self::new(own_ip, addr, false);
         ni.stream.push(stream);
         ni

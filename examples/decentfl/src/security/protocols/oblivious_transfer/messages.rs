@@ -5,6 +5,7 @@ use glass_pumpkin::num_bigint::BigInt;
 use tch::Tensor;
 use serde::{Serialize, Deserialize};
 use crate::security::protocols::oblivious_transfer::ObliviousTransferSender;
+use std::any::Any;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -12,7 +13,7 @@ use crate::security::protocols::oblivious_transfer::ObliviousTransferSender;
 pub struct OTMessage1Request {
     pub n: BigInt,
     pub e: BigInt,
-    pub x: [Vec<BigInt>; 2]
+    pub x: [Vec<BigInt>; 2],
     pub source: AnyAddr<ObliviousTransferSender>
 }
 
@@ -34,7 +35,7 @@ pub struct OTMessage2Request {
 #[rtype(result = "()")]
 pub enum OTDone {
     Sender,
-    Receiver(Tensor, RemoteAddr)
+    Receiver(Tensor, AnyAddr<ObliviousTransferSender>)
 }
 
 #[derive(Message)]

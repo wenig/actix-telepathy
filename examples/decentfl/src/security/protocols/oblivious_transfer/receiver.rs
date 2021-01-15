@@ -4,6 +4,7 @@ use actix_telepathy::prelude::*;
 use serde::{Serialize, Deserialize};
 use glass_pumpkin::prime;
 use glass_pumpkin::num_bigint::{BigInt, RandBigInt};
+use num_traits::ToPrimitive;
 use std::ops::{Sub, Add};
 use gcd::Gcd;
 use tch::{Tensor, Kind, Device, IndexOp};
@@ -29,7 +30,6 @@ pub struct ObliviousTransferReceiver {
     sender: Option<AnyAddr<ObliviousTransferSender>>,
     b: u8,
     k: Option<BigInt>,
-    size: i64,
     state: State
 }
 
@@ -41,13 +41,13 @@ impl ObliviousTransferReceiver {
             sender: None,
             b,
             k: None,
-            size,
             state: State::INITIAL
         }
     }
 
     fn receive_public_keys(&mut self, msg: OTMessage1Request) {
         self.sender = Some(msg.source);
+        debug!("public keys received");
 
         let n = msg.n;
         let e = msg.e;
@@ -56,20 +56,29 @@ impl ObliviousTransferReceiver {
 
         self.k = Some(rng.gen_bigint_range(&BigInt::from(2 as u16), &n));
         let pow_add = self.k.as_ref().unwrap().modpow(&e, &n);
-        let v = x[self.b as usize].as_slice().into_iter().map(|x_| (x_ % &n).add(&pow_add)).collect();
+        let v = x[self.b.clone() as usize].as_slice().into_iter().map(|x_| (x_ % &n).add(&pow_add)).collect();
 
-        self.sender.clone().do_send(Box::new(
-            OTMessage1Response { v }
-        ));
+        let msg = OTMessage1Response { v };
+
+        match self.sender.as_ref().unwrap() {
+            AnyAddr::Local(addr) => addr.do_send(msg),
+            AnyAddr::Remote(addr) => addr.clone().do_send(Box::new(msg))
+        };
+
         self.state = State::DECISION_RESPONDED;
     }
 
     fn receive_mprimelist(&mut self, msg: OTMessage2Request) {
+        debug!("received mprimlist");
+
         let mprimelist = msg.mprimelist;
         let k = self.k.as_ref().unwrap();
-        let m: Vec<BigInt> = mprimelist[self.b as usize].as_slice().into_iter().map(|x| x - k).collect();
-        // todo send back m
+        let m: Vec<BigInt> = mprimelist[self.b.clone() as usize].as_slice().into_iter().map(|x| x - k).collect();
+        let m: Vec<i64> = m.into_iter().map(|x| x.to_i64().expect("Number should be in i64 range")).collect();
+        let tensor = Tensor::of_slice(m.as_slice());
+        self.parent.do_send(OTDone::Receiver(tensor, self.sender.as_ref().unwrap().clone()));
         self.state = State::PROTOCOL_CARRIED_OUT;
+        debug!("sent messages to parent");
     }
 }
 

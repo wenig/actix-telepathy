@@ -63,8 +63,8 @@ impl Mascot {
     }
 
     pub fn new_advanced(parent: Recipient<BeaverTriple>, socket_addr: SocketAddr, peers: Vec<RemoteAddr>, n_triples: i64, field_size: u64, prime_size: u64) -> Self {
-        let a = Tensor::randint1(2, field_size as i64, &[n_triples as i64], (Kind::Int64, Device::Cpu));
-        let b = Tensor::randint1(2, field_size as i64, &[1], (Kind::Int64, Device::Cpu));
+        let a = Tensor::randint1(2, field_size.clone() as i64, &[n_triples.clone() as i64], (Kind::Int64, Device::Cpu));
+        let b = Tensor::randint1(2, field_size.clone() as i64, &[1], (Kind::Int64, Device::Cpu));
         let own_position = peers.iter().position(|x| x.socket_addr == socket_addr).expect("Own SocketAddr is not part of peers!");
         let n_peers = peers.len();
         let x = vec![0; n_peers];
@@ -94,7 +94,7 @@ impl Mascot {
     }
 
     fn compose_to_int(x: Tensor) -> i64 {
-        let i = Tensor::arange(x.size()[0], (x.kind(), x.device()));
+        let i = Tensor::arange(x.size()[0].clone(), (x.kind(), x.device()));
         x.dot(&Tensor::pow2(2, &i)).int64_value(&[0])
     }
 
@@ -108,34 +108,31 @@ impl Mascot {
     fn active(&mut self, receiver: usize) {
         self.state = State::ACTIVE;
         let mut bits: Vec<Tensor> = vec![];
-        let mut peer = self.peers.get(receiver).unwrap().clone();
-        peer.change_id(format!("ObliviousTransferReceiver_{}", receiver));
+        let mut peer = self.peers.get_mut(receiver.clone() as usize).unwrap().clone();
+        peer.change_id(format!("ObliviousTransferReceiver_{}", receiver.clone()));
         // todo don't create new OTSender for each bit
         for _ in 0..self.count_bit_size() {
-            let m = Tensor::randint_like1(&self.a, 2, self.field_size as i64);
+            let m = Tensor::randint_like1(&self.a, 2, self.field_size.clone() as i64);
             let ot = ObliviousTransferSender::new(
                 self.own_addr.clone().unwrap().recipient(),
-                self.prime_size,
-                self.field_size,
-                self.n_triples,
-                peer.clone(),
+                self.prime_size.clone(),
+                self.field_size.clone(),
+                self.n_triples.clone(),
+                AnyAddr::Remote(peer.clone()),
                 Tensor::stack(&[m.copy(), m.copy() + self.a.as_ref()], 1)
             ).start();
             bits.push(m);
         }
-        self.x[receiver] = -Mascot::compose_to_int(Tensor::stack(bits.as_slice(), 0));
+        self.x[receiver as usize] = -Mascot::compose_to_int(Tensor::stack(bits.as_slice(), 0));
     }
 
-    fn passive(&mut self, sender: usize) {
+    fn passive(&mut self) {
         self.state = State::PASSIVE;
         let bit_array = Mascot::decompose_int2vec(self.b.int64_value(&[0]), self.count_bit_size());
-        let mut peer = self.peers.get(sender).unwrap().clone();
-        peer.change_id(format!("ObliviousTransferSender_{}", sender));
         for bi in bit_array.iter() {
             let _ot = ObliviousTransferReceiver::new(
                 self.own_addr.clone().unwrap().recipient(),
-                self.n_triples,
-                peer.clone(),
+                self.n_triples.clone(),
                 bi.clone() as u8
             ).start();
         }
@@ -148,7 +145,7 @@ impl Mascot {
                 if couple.active == self.own_position {
                     self.active(couple.passive)
                 } else if couple.passive == self.own_position {
-                    self.passive(couple.active)
+                    self.passive()
                 }
             },
             None => self.return_beaver_triples()
@@ -179,11 +176,18 @@ impl Mascot {
         }
     }
 
-    fn receiver_done(&mut self, tensor: Tensor, sender: RemoteAddr) {
+    fn receiver_done(&mut self, tensor: Tensor, sender: AnyAddr<ObliviousTransferSender>) {
         match self.state {
             State::PASSIVE => {
                 let y_position = self.peers.iter()
-                    .position(|x| sender.socket_addr == x.socket_addr)
+                    .position(|x| {
+                        match &sender {
+                            AnyAddr::Remote(addr) => {
+                                addr.socket_addr == x.socket_addr
+                            },
+                            _ => panic!("Wrong format for AnyAddr")
+                        }
+                    })
                     .expect("Sender is not part of peers sub-group");
                 self.y[y_position] = Mascot::compose_to_int(tensor);
                 self.check_counter()

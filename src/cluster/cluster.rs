@@ -187,7 +187,7 @@ impl Cluster {
         let parent = self.own_addr.clone().unwrap();
         let gossip = self.gossip.clone().unwrap();
         let address_resolver = self.address_resolver.as_ref().unwrap().clone();
-        let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream, parent, gossip, address_resolver).start();
+        let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream).start();
         self.nodes.insert(addr, node);
     }
 
