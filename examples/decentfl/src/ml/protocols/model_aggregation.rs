@@ -245,7 +245,7 @@ impl Handler<NodeResolving> for ModelAggregation {
                 for i in 0..group.len() {
                     let remote = current_group.get_mut(i).unwrap();
                     let node = group.get(i).unwrap().clone();
-                    remote.network_interface = node;
+                    remote.network_interface = Some(node.unwrap().recipient());
                 }
                 self.build_sub_cluster()
             },

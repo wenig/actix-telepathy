@@ -10,6 +10,7 @@ use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use crate::cluster::cluster::GossipResponse;
 use serde::export::fmt::Debug;
 use std::net::SocketAddr;
+use std::str::FromStr;
 
 #[derive(Message, Serialize, Deserialize, Debug, RemoteMessage)]
 #[rtype(result = "()")]
@@ -40,9 +41,20 @@ pub struct Gossip {
     cluster: Addr<Cluster>
 }
 
+impl Default for Gossip {
+    fn default() -> Self {
+        Self {
+            own_addr: SocketAddr::from_str("localhost:8000").unwrap(),
+            requested_members: HashSet::new(),
+            members: HashMap::new(),
+            cluster: Cluster::from_registry()
+        }
+    }
+}
+
 impl Gossip {
-    pub fn new(own_addr: SocketAddr, cluster: Addr<Cluster>) -> Gossip {
-        Gossip {own_addr, requested_members: HashSet::new(), members: HashMap::new(), cluster}
+    pub fn new(own_addr: SocketAddr) -> Gossip {
+        Gossip {own_addr, ..Default::default()}
     }
 
     fn add_member(&mut self, new_addr: SocketAddr, node: Addr<NetworkInterface>) {
@@ -77,7 +89,7 @@ impl Gossip {
         if members.len() > 0 {
             match self.members.get(&member_addr) {
                 Some(node) =>
-                    RemoteAddr::new_gossip(member_addr, Some(node.clone()))
+                    RemoteAddr::new_gossip(member_addr, Some(node.clone().recipient()))
                         .do_send(Box::new(GossipEvent { members })),
                 None => error!("Should be known by now")
             }
@@ -161,3 +173,4 @@ impl Handler<NodeResolving> for Gossip {
 }
 
 impl Supervised for Gossip {}
+impl SystemService for Gossip {}

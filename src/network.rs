@@ -1,6 +1,6 @@
 use actix::prelude::*;
 use log::*;
-use std::net::SocketAddr;
+use std::net::{SocketAddr};
 use tokio::net::TcpStream;
 use tokio_util::codec::{FramedRead};
 use std::io::{Error};
@@ -62,12 +62,15 @@ impl Actor for NetworkInterface {
 
 
 impl NetworkInterface {
-    pub fn new(own_ip: SocketAddr, addr: SocketAddr, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>, seed: bool) -> NetworkInterface {
+    pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
+        let parent = Cluster::from_registry();
+        let gossip = Gossip::from_registry();
+        let address_resolver = AddressResolver::from_registry();
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
 
-    pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream, parent: Addr<Cluster>, gossip: Addr<Gossip>, address_resolver: Addr<AddressResolver>) -> NetworkInterface {
-        let mut ni = Self::new(own_ip, addr, parent, gossip, address_resolver, false);
+    pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream) -> NetworkInterface {
+        let mut ni = Self::new(own_ip, addr, false);
         ni.stream.push(stream);
         ni
     }
@@ -123,7 +126,7 @@ impl NetworkInterface {
         match self.own_addr.clone() {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
-                let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
+                let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone().recipient()), AddrRepresentation::NetworkInterface);
                 self.parent.do_send(NodeEvents::MemberUp(self.addr.clone(), addr, remote_address, self.seed));
             },
             None => error!("NetworkInterface might not have been started already!")

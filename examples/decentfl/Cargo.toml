@@ -27,4 +27,6 @@ rusqlite = "0.24"
 glass_pumpkin = "0.4.0"
 num-bigint = { version = "0.3.1", features = ["serde"] }
 num-integer = "0.1.44"
+num-traits = "0.2.14"
 gcd = "2.0.1"
+async-std = "1.8.0"
