@@ -8,8 +8,8 @@ use crate::{RemoteAddr, Cluster, NodeResolving};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use crate::cluster::cluster::GossipResponse;
-use serde::export::fmt::Debug;
 use std::net::SocketAddr;
+use std::fmt::Debug;
 use std::str::FromStr;
 
 #[derive(Message, Serialize, Deserialize, Debug, RemoteMessage)]

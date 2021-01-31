@@ -184,18 +184,12 @@ impl Cluster {
 
     fn add_node_from_stream(&mut self, addr: SocketAddr, stream: TcpStream) {
         let own_ip = self.ip_address.clone();
-        let parent = self.own_addr.clone().unwrap();
-        let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
         let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream).start();
         self.nodes.insert(addr, node);
     }
 
     fn add_node(&mut self, node_addr: SocketAddr, seed: bool) {
         let own_ip = self.ip_address.clone();
-        let parent = self.own_addr.clone().unwrap();
-        let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
         if !self.nodes.contains_key(&node_addr) {
             let node = NetworkInterface::new(own_ip, node_addr.clone(), seed).start();
             self.nodes.insert(node_addr.clone(), node);
