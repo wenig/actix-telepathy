@@ -14,8 +14,8 @@ use std::net::{ToSocketAddrs, SocketAddr};
 use std::fs;
 
 
-#[derive(Message, Serialize, Deserialize, RemoteMessage)]
-#[rtype(Result = "()")]
+#[derive(Message, Serialize, Deserialize, RemoteMessage, MessageResponse)]
+#[rtype(result = "Welcome")]
 struct Welcome {}
 
 fn from_addr(s: &str) -> SocketAddr {
@@ -54,14 +54,21 @@ impl Actor for OwnListener {
 impl Handler<ClusterLog> for OwnListener {
     type Result = ();
 
-    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(addr, remote_addr) => {
                 RemoteAddr::new_from_key(
                     addr,
                     remote_addr.network_interface.unwrap(),
                     OwnListener::IDENTIFIER
-                ).do_send(Box::new(Welcome {}));
+                ).send(Box::new(Welcome {}))
+                    .into_actor(self)
+                    .map(|res, act, ctx| {
+                        match res {
+                            Ok(v) => debug!("Future, {:?}", v),
+                            Err(e) => error!("{}", e.to_string())
+                        }
+                    }).wait(ctx);
             },
             ClusterLog::MemberLeft(_addr) => debug!("ClusterLog: MemberLeft")
         }
@@ -69,16 +76,40 @@ impl Handler<ClusterLog> for OwnListener {
 }
 
 impl Handler<Welcome> for OwnListener {
-    type Result = ();
+    type Result = Welcome;
 
     fn handle(&mut self, _msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
         self.count = self.count + 1;
         debug!("Welcome said {}x", self.count);
-        if self.count == 100 {
-            fs::write(format!("./{}", self.filename.as_str()), "100").expect("Unable to write file");
-        }
+        Welcome {}
     }
 }
+
+
+impl Handler<AskRemoteWrapper> for OwnListener {
+    type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
+
+    fn handle(&mut self, mut msg: AskRemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
+        let conversation_id = msg.remote_wrapper.conversation_id.clone();
+        let destination = msg.remote_wrapper.source.as_ref().unwrap().clone();
+
+        let mut deserialized_msg: Welcome = Welcome::generate_serializer().deserialize(&(msg.remote_wrapper.message_buffer)[..]).expect("Cannot deserialized Welcome message");
+        let result = ctx.address().send(deserialized_msg);
+        let result = actix::fut::wrap_future::<_, Self>(result);
+
+        let update_self = result.map(move |res, _act, _ctx| {
+            match res {
+                Ok(v) => {
+                    Ok(RemoteWrapper::new(destination, Box::new(v), conversation_id))
+                },
+                Err(_e) => Err(())
+            }
+        });
+
+        Box::pin(update_self)
+    }
+}
+
 
 #[actix_rt::main]
 async fn main() {

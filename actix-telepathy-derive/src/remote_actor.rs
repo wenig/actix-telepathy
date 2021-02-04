@@ -4,13 +4,29 @@ use syn::{parse_macro_input, DeriveInput, Result};
 use syn::export::Span;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
+const REMOTE_ASK_MESSAGE: &str = "remote_ask_messages";
+
 
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
+    //let ask_remote = proc_macro2::TokenStream::from(remote_actor_remote_ask_messages_macro(input.clone()));
+    let remote = proc_macro2::TokenStream::from(remote_actor_remote_messages_macro(input));
+
+    TokenStream::from(
+        quote! {
+            #remote
+
+            //#ask_remote
+        }
+    )
+}
+
+
+pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
 
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let messages = get_message_types_attr(&input).expect("Expected at least on Message");
+    let messages = get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least on Message");
 
     let mut chained_if = quote! {};
     let mut first = true;
@@ -65,7 +81,80 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
 }
 
 
-fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
+pub fn remote_actor_remote_ask_messages_macro(input: TokenStream) -> TokenStream {
+
+    // Parse the input tokens into a syntax tree
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+    let messages = get_message_types_attr(&input, REMOTE_ASK_MESSAGE).expect("Expected at least on Message");
+
+    let mut chained_if = quote! {};
+    let mut first = true;
+
+    for attr in messages.iter() {
+        let name = attr.as_ref().unwrap();
+        let condition = quote! {
+            if #name::IDENTIFIER == msg.identifier {
+                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+                if msg.source.clone().is_some() {
+                    deserialized_msg.set_source(msg.source.unwrap());
+                }
+                ctx.address().send(deserialized_msg)
+            }
+        };
+        if first {
+            chained_if = quote! {
+                #condition
+            };
+            first = false;
+        } else {
+            chained_if = quote! {
+                #chained_if
+                else #condition
+            };
+        }
+    }
+    if !first {
+        chained_if = quote! {
+            #chained_if
+            else {
+                panic!("Identifier {} is unknown", &(msg.identifier));
+            }
+        }
+    }
+
+    // Build the output, possibly using quasi-quotation
+    let expanded = quote! {
+
+        impl Handler<AskRemoteWrapper> for #name {
+            type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
+
+            fn handle(&mut self, mut msg: AskRemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
+                let conversation_id = msg.remote_wrapper.conversation_id.clone();
+                let destination = msg.remote_wrapper.source.as_ref().unwrap().clone();
+                let result = #chained_if;
+                let result = actix::fut::wrap_future::<_, Self>(result);
+
+                let update_self = forwarded.map(move |res, _act, _ctx| {
+                    match res {
+                        Ok(v) => {
+                            RemoteWrapper::new(destination, msg, conversation_id)
+                        },
+                        Err(_e) => Err(())
+                    }
+                });
+
+                Box::pin(update_self)
+            }
+        }
+    };
+
+    // Hand the output tokens back to the compiler
+    TokenStream::from(expanded)
+}
+
+
+fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<syn::Type>>> {
     let attr = ast
         .attrs
         .iter()
@@ -73,7 +162,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             let a = a.parse_meta();
             match a {
                 Ok(meta) => {
-                    if meta.path().is_ident(REMOTE_MESSAGES) {
+                    if meta.path().is_ident(ident) {
                         Some(meta)
                     } else {
                         None
@@ -83,7 +172,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             }
         })
         .ok_or_else(|| {
-            syn::Error::new(Span::call_site(), format!("Expect an attribute `{}`", REMOTE_MESSAGES))
+            syn::Error::new(Span::call_site(), format!("Expect an attribute `{}`", ident))
         })?;
 
     if let syn::Meta::List(ref list) = attr {
@@ -95,7 +184,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
     } else {
         Err(syn::Error::new_spanned(
             attr,
-            format!("The correct syntax is #[{}(Message, Message, ...)]", REMOTE_MESSAGES),
+            format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
         ))
     }
 }

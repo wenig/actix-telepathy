@@ -14,7 +14,7 @@ pub struct RemoteWrapper {
     pub identifier: String,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    pub source: Option<Addr<NetworkInterface>>,
+    pub source: Option<RemoteAddr>,
     pub conversation_id: Option<Uuid>
 }
 
@@ -70,5 +70,5 @@ pub trait RemoteMessage {
 
     fn generate_serializer() -> Box<Self::Serializer>;
 
-    fn set_source(&mut self, source: Addr<NetworkInterface>);
+    fn set_source(&mut self, source: RemoteAddr);
 }
