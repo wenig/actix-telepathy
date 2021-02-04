@@ -11,13 +11,20 @@ use futures::executor::block_on;
 use std::net::{SocketAddr};
 use crate::cluster::gossip::{Gossip, GossipIgniting, MemberMgmt};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
-use crate::ClusterLog;
+use crate::{ClusterLog, CustomSystemService};
 
 
 #[derive(MessageResponse)]
 pub enum ConnectionApprovalResponse {
     Approved,
     Declined
+}
+
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct Test {
+    pub msg: String
 }
 
 
@@ -61,7 +68,9 @@ pub struct Cluster {
     gossip: Option<Addr<Gossip>>,
     address_resolver: Option<Addr<AddressResolver>>,
     own_addr: Option<Addr<Cluster>>,
-    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>
+    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
+
+    rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>
 }
 
 
@@ -69,16 +78,110 @@ impl Actor for Cluster {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
+        let listener = Cluster::bind(self.ip_address.to_string()).unwrap();
+
+        ctx.add_message_stream(Box::leak(listener).incoming().map(|st| {
+            let st = st.unwrap();
+            let addr = st.peer_addr().unwrap();
+            TcpConnect(st, addr)
+        }));
+
+        self.address_resolver = Some(AddressResolver::from_registry());
+        for (rec, identifier) in self.rec_to_be_registered.iter() {
+            self.address_resolver.as_ref().unwrap().do_send(AddressRequest::Register((*rec).clone(), identifier.to_string()));
+        }
+
         self.own_addr = Some(ctx.address());
         let ip_addr4gossip = self.ip_address.clone();
-        self.gossip = Some(Supervisor::start(move |_| Gossip::new(ip_addr4gossip)));
+        self.gossip = Some(Gossip::start_service_with(move || { Gossip::new(ip_addr4gossip) }));
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
             self.add_node(self.addrs.get(node_addr).unwrap().clone(), true);
         }
+        debug!("Cluster started {}", self.ip_address.clone().to_string());
     }
 }
+
+
+impl Cluster {
+    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>) -> Addr<Cluster> {
+        debug!("Cluster created");
+
+        Cluster::start_service_with(move ||
+            Cluster {
+                ip_address,
+                addrs: seed_nodes.clone(),
+                listeners: cluster_listeners.clone(),
+                gossip: None,
+                address_resolver: None,
+                own_addr: None,
+                nodes: Default::default(),
+                rec_to_be_registered: rec_to_be_registered.clone()
+            }
+        )
+    }
+
+    fn bind(addr: String) -> IoResult<Box<TcpListener>> {
+        let addr = net::SocketAddr::from_str(&addr).unwrap();
+        let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
+        debug!("Listening on {}", addr);
+        Ok(listener)
+    }
+
+    fn add_node_from_stream(&mut self, addr: SocketAddr, stream: TcpStream) {
+        let own_ip = self.ip_address.clone();
+        let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream).start();
+        self.nodes.insert(addr, node);
+    }
+
+    fn add_node(&mut self, node_addr: SocketAddr, seed: bool) {
+        let own_ip = self.ip_address.clone();
+        if !self.nodes.contains_key(&node_addr) {
+            let node = NetworkInterface::new(own_ip, node_addr.clone(), seed).start();
+            self.nodes.insert(node_addr.clone(), node);
+        }
+    }
+
+    #[allow(dead_code)]
+    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str) {
+        self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
+    }
+}
+
+// Singleton
+
+impl Default for Cluster {
+    fn default() -> Self {
+        let ip_addr = "127.0.0.1:8000";
+
+        Self {
+            ip_address: SocketAddr::from_str(ip_addr).unwrap(),
+            addrs: vec![],
+            listeners: vec![],
+            gossip: None,
+            address_resolver: None,
+            own_addr: None,
+            nodes: HashMap::new(),
+
+            rec_to_be_registered: vec![]
+        }
+    }
+}
+
+impl Supervised for Cluster {}
+impl SystemService for Cluster {}
+impl CustomSystemService for Cluster {}
+
+
+impl Handler<Test> for Cluster {
+    type Result = ();
+
+    fn handle(&mut self, msg: Test, _ctx: &mut Self::Context) -> Self:: Result {
+        debug!("{}", msg.msg)
+    }
+}
+
 
 impl Handler<TcpConnect> for Cluster {
     type Result = ();
@@ -156,76 +259,6 @@ impl Handler<ConnectionApproval> for Cluster {
     }
 }
 
-impl Cluster {
-    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, &str)>) -> Addr<Cluster> {
-        let listener = Cluster::bind(ip_address.to_string()).unwrap();
-
-        debug!("Listening on {}", ip_address);
-        Cluster::create(move |ctx| {
-            ctx.add_message_stream(Box::leak(listener).incoming().map(|st| {
-                let st = st.unwrap();
-                let addr = st.peer_addr().unwrap();
-                TcpConnect(st, addr)
-            }));
-
-            let address_resolver = Supervisor::start(|_| AddressResolver::new());
-            for (rec, identifier) in rec_to_be_registered.iter() {
-                address_resolver.do_send(AddressRequest::Register(rec.clone(), identifier.to_string()));
-            }
-            Cluster {ip_address, addrs: seed_nodes, listeners: cluster_listeners, gossip: None, address_resolver: Some(address_resolver), own_addr: None, nodes: HashMap::new()}
-        })
-    }
-
-    fn bind(addr: String) -> IoResult<Box<TcpListener>> {
-        let addr = net::SocketAddr::from_str(&addr).unwrap();
-        let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
-        Ok(listener)
-    }
-
-    fn add_node_from_stream(&mut self, addr: SocketAddr, stream: TcpStream) {
-        let own_ip = self.ip_address.clone();
-        let parent = self.own_addr.clone().unwrap();
-        let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
-        let node = NetworkInterface::from_stream(own_ip, addr.clone(), stream).start();
-        self.nodes.insert(addr, node);
-    }
-
-    fn add_node(&mut self, node_addr: SocketAddr, seed: bool) {
-        let own_ip = self.ip_address.clone();
-        let parent = self.own_addr.clone().unwrap();
-        let gossip = self.gossip.clone().unwrap();
-        let address_resolver = self.address_resolver.as_ref().unwrap().clone();
-        if !self.nodes.contains_key(&node_addr) {
-            let node = NetworkInterface::new(own_ip, node_addr.clone(), seed).start();
-            self.nodes.insert(node_addr.clone(), node);
-        }
-    }
-
-    #[allow(dead_code)]
-    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str) {
-        self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
-    }
-}
-
-// Singleton
-
-impl Default for Cluster {
-    fn default() -> Self {
-        Self {
-            ip_address: SocketAddr::from_str("localhost:8000").unwrap(),
-            addrs: vec![],
-            listeners: vec![],
-            gossip: None,
-            address_resolver: None,
-            own_addr: None,
-            nodes: HashMap::new()
-        }
-    }
-}
-
-impl Supervised for Cluster {}
-impl SystemService for Cluster {}
 
 /// Helper for registering actors to the cluster
 pub trait AddrApi {

@@ -11,7 +11,7 @@ actix = "0.10"
 actix-rt = "1.1"
 actix-telepathy = { path="../..", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-tch-serde = { git = "https://github.com/wenig/tch-serde"}
+tch-serde = "0.3"
 tokio = { version = "0.2", features = ["full"] }
 
 log = "0.4"

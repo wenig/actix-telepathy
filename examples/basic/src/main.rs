@@ -83,17 +83,17 @@ impl Handler<Welcome> for OwnListener {
 #[actix_rt::main]
 async fn main() {
     env_logger::init();
-
-    debug!("{}", "localhost:8000".to_socket_addrs().unwrap().next().unwrap());
-
     let args = Parameters::from_args();
 
     let cluster_listener = OwnListener::new(args.local_ip.to_string()).start();
-    let _cluster = Cluster::new(
+    let cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,
         vec![cluster_listener.clone().recipient()],
-        vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
+        vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER.to_string())]);
+
+    cluster.do_send(Test {msg: "test".to_string()});
+
     tokio::signal::ctrl_c().await.unwrap();
     println!("Ctrl-C received, shutting down");
     System::current().stop();

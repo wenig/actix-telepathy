@@ -20,6 +20,12 @@ pub enum ClusterMessage {
     Decline
 }
 
+#[derive(Message)]
+#[rtype(result = "Result<RemoteWrapper, ()>")]
+pub struct AskClusterMessage {
+    pub msg: ClusterMessage
+}
+
 pub struct ConnectCodec {
     prefix: bool
 }

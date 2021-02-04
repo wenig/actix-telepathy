@@ -6,6 +6,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use serde::export::Formatter;
+use crate::remote::message::AskRemoteWrapper;
 
 
 const NETWORKINTERFACE: &str = "networkinterface";
@@ -63,14 +64,18 @@ pub enum AddressResponse {
 
 pub struct AddressResolver {
     str2rec: HashMap<String, Recipient<RemoteWrapper>>,
-    rec2str: HashMap<Recipient<RemoteWrapper>, String>
+    rec2str: HashMap<Recipient<RemoteWrapper>, String>,
+    str2ask: HashMap<String, Recipient<AskRemoteWrapper>>,
+    ask2str: HashMap<Recipient<AskRemoteWrapper>, String>
 }
 
 impl Default for AddressResolver {
     fn default() -> Self {
         Self {
             str2rec: HashMap::new(),
-            rec2str: HashMap::new()
+            rec2str: HashMap::new(),
+            str2ask: HashMap::new(),
+            ask2str: HashMap::new()
         }
     }
 }
@@ -86,11 +91,21 @@ impl Debug for NotAvailableError {
 
 impl AddressResolver {
     pub fn new() -> Self {
-        AddressResolver {str2rec: HashMap::new(), rec2str: HashMap::new()}
+        AddressResolver::default()
     }
 
     pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         match self.str2rec.get(&id) {
+            Some(rec) => Ok(rec),
+            None => {
+                error!("ID {} is not registered", id);
+                Err(NotAvailableError {})
+            },
+        }
+    }
+
+    pub fn resolve_str_ask(&mut self, id: String) -> Result<&Recipient<AskRemoteWrapper>, NotAvailableError> {
+        match self.str2ask.get(&id) {
             Some(rec) => Ok(rec),
             None => {
                 error!("ID {} is not registered", id);
@@ -109,6 +124,16 @@ impl AddressResolver {
         }
     }
 
+    pub fn resolve_rec_ask(&mut self, rec: &Recipient<AskRemoteWrapper>) -> Result<&String, NotAvailableError> {
+        match self.ask2str.get(rec) {
+            Some(str) => Ok(str),
+            None => {
+                error!("Recipient is not registered");
+                Err(NotAvailableError {})
+            },
+        }
+    }
+
     pub fn resolve_rec_from_addr_representation(&mut self, addr_representation: AddrRepresentation) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         self.resolve_str(addr_representation.to_string())
     }
@@ -116,6 +141,10 @@ impl AddressResolver {
 
 impl Actor for AddressResolver {
     type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Context<Self>) {
+        debug!("AddressResolver actor started");
+    }
 }
 
 impl Handler<RemoteWrapper> for AddressResolver {
@@ -124,6 +153,28 @@ impl Handler<RemoteWrapper> for AddressResolver {
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone()).expect("Could not resolve Recipient for RemoteMessage");
         let _r = recipient.do_send(msg);
+    }
+}
+
+impl Handler<AskRemoteWrapper> for AddressResolver {
+    type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
+
+    fn handle(&mut self, msg: AskRemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
+        let destination_id = msg.remote_wrapper.destination.id.clone();
+        let recipient = self.resolve_str_ask(destination_id.to_string()).expect("Could not resolve Recipient for RemoteMessage");
+        let forwarded = recipient.send(msg);
+        let forwarded = actix::fut::wrap_future::<_, Self>(forwarded);
+
+        let update_self = forwarded.map(|res, _act, _ctx| {
+            match res {
+                Ok(v) => {
+                    v
+                },
+                Err(_e) => Err(())
+            }
+        });
+
+        Box::pin(update_self)
     }
 }
 

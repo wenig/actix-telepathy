@@ -6,14 +6,15 @@ use tokio_util::codec::{FramedRead};
 use std::io::{Error};
 
 use crate::cluster::{Cluster, NodeEvents, Gossip};
-use crate::codec::{ClusterMessage, ConnectCodec};
+use crate::codec::{ClusterMessage, ConnectCodec, AskClusterMessage};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
 use actix::io::{WriteHandler};
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
-use crate::{ConnectionApproval, ConnectionApprovalResponse};
+use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
+use crate::response_resolver::{ResponseResolver, RegisterResponse};
 
 
 pub struct NetworkInterface {
@@ -63,8 +64,8 @@ impl Actor for NetworkInterface {
 
 impl NetworkInterface {
     pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
-        let parent = Cluster::from_registry();
-        let gossip = Gossip::from_registry();
+        let parent = Cluster::from_custom_registry();
+        let gossip = Gossip::from_custom_registry();
         let address_resolver = AddressResolver::from_registry();
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
@@ -115,7 +116,7 @@ impl NetworkInterface {
                         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
                     }
                 },
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{}", err.to_string()),
             })
             .wait(ctx);
     }
@@ -137,12 +138,41 @@ impl NetworkInterface {
         &self.framed[0].write(msg);
     }
 
-    fn received_message(&mut self, mut msg: RemoteWrapper) {
+    fn received_message(&mut self, mut msg: RemoteWrapper, ctx: &mut Context<Self>) {
         msg.source = Some(self.own_addr.clone().unwrap());
         match msg.destination.id {
-            AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
-            AddrRepresentation::Gossip => self.gossip.do_send(msg),
-            AddrRepresentation::Key(_) => { self.address_resolver.do_send(msg); }
+            AddrRepresentation::NetworkInterface => panic!("NetworkInterface does not interact as RemoteActor"),
+            AddrRepresentation::Gossip => self.forward_message(true, msg, ctx),
+            AddrRepresentation::Key(_) => self.forward_message(false, msg, ctx)
+        }
+    }
+
+    fn forward_message(&mut self, to_gossip: bool, msg: RemoteWrapper, ctx: &mut Context<Self>) {
+        match msg.conversation_id {
+            Some(_) => {
+                assert!(!to_gossip, "Gossip cannot receive AskRemoteWrappers");
+                self.address_resolver.send(msg.as_ask())
+                    .into_actor(self)
+                    .map(|res: Result<Result<RemoteWrapper, ()>, MailboxError>, act, _ctx| {
+                        match res {
+                            Ok(res) => match res {
+                                Ok(remote_wrapper) => act.transmit_message(
+                                    ClusterMessage::Message(remote_wrapper)
+                                ),
+                                Err(_) => error!("No RemoteWrapper was returned!")
+                            },
+                            Err(e) => error!("{}", e.to_string())
+                        }
+                    })
+                    .wait(ctx);
+            },
+            None => {
+                if to_gossip {
+                    self.gossip.do_send(msg);
+                } else {
+                    self.address_resolver.do_send(msg);
+                }
+            }
         };
     }
 
@@ -176,7 +206,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
             Ok(msg) => match msg {
                 ClusterMessage::Request(reply_port, seed) => self.set_reply_port(reply_port, ctx, seed),
                 ClusterMessage::Response => self.finish_connecting(),
-                ClusterMessage::Message(remote_message) => self.received_message(remote_message),
+                ClusterMessage::Message(remote_message) => self.received_message(remote_message, ctx),
                 ClusterMessage::Decline => ctx.stop()
             },
             Err(err) => error!("{}", err)
@@ -185,11 +215,38 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
 }
 
 impl Handler<ClusterMessage> for NetworkInterface {
-    // todo: give back future in case of send instead of do_send
     type Result = ();
 
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
         self.transmit_message(msg);
+    }
+}
+
+impl Handler<AskClusterMessage> for NetworkInterface {
+    type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
+
+    fn handle(&mut self, msg: AskClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        let remote_wrapper = match &msg.msg {
+            ClusterMessage::Message(remote_wrapper) => Some(remote_wrapper),
+            _ => None
+        }.expect("Only ClusterMessage::Message can be send in an asking way!");
+
+        let id = remote_wrapper.conversation_id.unwrap().clone();
+        let send_to_other = ResponseResolver::from_registry().send(RegisterResponse {id});
+        let send_to_other = actix::fut::wrap_future::<_, Self>(send_to_other);
+
+        let update_self = send_to_other.map(|res, _act, _ctx| {
+            match res {
+                Ok(v) => {
+                    v
+                },
+                Err(_e) => Err(())
+            }
+        });
+
+        self.transmit_message(msg.msg);
+
+        Box::pin(update_self)
     }
 }
 
