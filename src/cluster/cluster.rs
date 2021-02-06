@@ -12,6 +12,7 @@ use std::net::{SocketAddr};
 use crate::cluster::gossip::{Gossip, GossipIgniting, MemberMgmt};
 use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
 use crate::ClusterLog;
+use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Broker};
 
 
 #[derive(MessageResponse)]
@@ -102,15 +103,11 @@ impl Handler<NodeEvents> for Cluster {
                 } else {
                     self.gossip.clone().unwrap().do_send(MemberMgmt::MemberUp(host.clone(), node));
                 }
-                for listener in self.listeners.iter() {
-                    let _r = listener.do_send(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
-                }
+                self.issue_system_async(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
             },
             NodeEvents::MemberDown(host) => {
                 self.gossip.clone().unwrap().do_send(GossipIgniting::MemberDown(host.clone()));
-                for listener in self.listeners.iter() {
-                    let _r = listener.do_send(ClusterLog::MemberLeft(host.clone()));
-                }
+                self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
             }
         }
     }
@@ -207,7 +204,7 @@ impl Cluster {
 impl Default for Cluster {
     fn default() -> Self {
         Self {
-            ip_address: SocketAddr::from_str("localhost:8000").unwrap(),
+            ip_address: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
             addrs: vec![],
             listeners: vec![],
             gossip: None,

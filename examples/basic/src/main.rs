@@ -12,6 +12,7 @@ use serializer::MySerializer;
 use tokio;
 use std::net::{ToSocketAddrs, SocketAddr};
 use std::fs;
+use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Broker};
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -49,6 +50,10 @@ impl Supervised for OwnListener {}
 
 impl Actor for OwnListener {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.subscribe_system_async::<ClusterLog>(ctx);
+    }
 }
 
 impl Handler<ClusterLog> for OwnListener {

@@ -1,6 +1,7 @@
 use actix::prelude::*;
 use crate::remote::RemoteAddr;
 use std::net::SocketAddr;
+use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Broker};
 
 /// Message sent to ClusterListeners if members join or leave the cluster
 #[derive(Message)]

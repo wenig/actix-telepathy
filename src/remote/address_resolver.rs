@@ -5,7 +5,7 @@ use crate::remote::RemoteWrapper;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use serde::__private::Formatter;
+use serde::export::Formatter;
 
 
 const NETWORKINTERFACE: &str = "networkinterface";

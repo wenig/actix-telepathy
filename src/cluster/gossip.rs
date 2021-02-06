@@ -44,7 +44,7 @@ pub struct Gossip {
 impl Default for Gossip {
     fn default() -> Self {
         Self {
-            own_addr: SocketAddr::from_str("localhost:8000").unwrap(),
+            own_addr: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
             requested_members: HashSet::new(),
             members: HashMap::new(),
             cluster: Cluster::from_registry()
