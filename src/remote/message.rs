@@ -29,10 +29,6 @@ impl RemoteWrapper {
             conversation_id
         }
     }
-
-    pub fn as_ask(&self) -> AskRemoteWrapper {
-        AskRemoteWrapper {remote_wrapper: (*self).clone() }
-    }
 }
 
 
@@ -46,14 +42,6 @@ impl Clone for RemoteWrapper {
             conversation_id: self.conversation_id.clone()
         }
     }
-}
-
-
-/// Wrapper for responding RemoteWrapper
-#[derive(Message)]
-#[rtype(result = "Result<RemoteWrapper, ()>")]
-pub struct AskRemoteWrapper {
-    pub remote_wrapper: RemoteWrapper
 }
 
 

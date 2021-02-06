@@ -9,15 +9,8 @@ const REMOTE_ASK_MESSAGE: &str = "remote_ask_messages";
 
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     //let ask_remote = proc_macro2::TokenStream::from(remote_actor_remote_ask_messages_macro(input.clone()));
-    let remote = proc_macro2::TokenStream::from(remote_actor_remote_messages_macro(input));
-
-    TokenStream::from(
-        quote! {
-            #remote
-
-            //#ask_remote
-        }
-    )
+    let remote = remote_actor_remote_messages_macro(input);
+    remote
 }
 
 
@@ -79,80 +72,6 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     // Hand the output tokens back to the compiler
     TokenStream::from(expanded)
 }
-
-
-pub fn remote_actor_remote_ask_messages_macro(input: TokenStream) -> TokenStream {
-
-    // Parse the input tokens into a syntax tree
-    let input = parse_macro_input!(input as DeriveInput);
-    let name = &input.ident;
-    let messages = get_message_types_attr(&input, REMOTE_ASK_MESSAGE).expect("Expected at least on Message");
-
-    let mut chained_if = quote! {};
-    let mut first = true;
-
-    for attr in messages.iter() {
-        let name = attr.as_ref().unwrap();
-        let condition = quote! {
-            if #name::IDENTIFIER == msg.identifier {
-                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
-                if msg.source.clone().is_some() {
-                    deserialized_msg.set_source(msg.source.unwrap());
-                }
-                ctx.address().send(deserialized_msg)
-            }
-        };
-        if first {
-            chained_if = quote! {
-                #condition
-            };
-            first = false;
-        } else {
-            chained_if = quote! {
-                #chained_if
-                else #condition
-            };
-        }
-    }
-    if !first {
-        chained_if = quote! {
-            #chained_if
-            else {
-                panic!("Identifier {} is unknown", &(msg.identifier));
-            }
-        }
-    }
-
-    // Build the output, possibly using quasi-quotation
-    let expanded = quote! {
-
-        impl Handler<AskRemoteWrapper> for #name {
-            type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
-
-            fn handle(&mut self, mut msg: AskRemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
-                let conversation_id = msg.remote_wrapper.conversation_id.clone();
-                let destination = msg.remote_wrapper.source.as_ref().unwrap().clone();
-                let result = #chained_if;
-                let result = actix::fut::wrap_future::<_, Self>(result);
-
-                let update_self = forwarded.map(move |res, _act, _ctx| {
-                    match res {
-                        Ok(v) => {
-                            RemoteWrapper::new(destination, msg, conversation_id)
-                        },
-                        Err(_e) => Err(())
-                    }
-                });
-
-                Box::pin(update_self)
-            }
-        }
-    };
-
-    // Hand the output tokens back to the compiler
-    TokenStream::from(expanded)
-}
-
 
 fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<syn::Type>>> {
     let attr = ast

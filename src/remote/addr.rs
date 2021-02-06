@@ -50,9 +50,7 @@ impl RemoteAddr {
     }
 
     pub fn send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> RecipientRequest<ClusterMessage> {
-        self.network_interface.as_ref().expect("Network interface must be set!").send(ClusterMessage::Message(
-            RemoteWrapper::new(self.clone(), msg, Some(Uuid::new_v4()))
-        ))
+        unimplemented!("So far, it is not possible to receive responses from remote destinations as futures!")
     }
 }
 

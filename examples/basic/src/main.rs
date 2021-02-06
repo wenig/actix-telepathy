@@ -16,7 +16,7 @@ use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Br
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage, MessageResponse)]
-#[rtype(result = "Welcome")]
+#[rtype(result = "()")]
 struct Welcome {}
 
 fn from_addr(s: &str) -> SocketAddr {
@@ -66,14 +66,7 @@ impl Handler<ClusterLog> for OwnListener {
                     addr,
                     remote_addr.network_interface.unwrap(),
                     OwnListener::IDENTIFIER
-                ).send(Box::new(Welcome {}))
-                    .into_actor(self)
-                    .map(|res, act, ctx| {
-                        match res {
-                            Ok(v) => debug!("Future, {:?}", v),
-                            Err(e) => error!("{}", e.to_string())
-                        }
-                    }).wait(ctx);
+                ).do_send(Box::new(Welcome {}));
             },
             ClusterLog::MemberLeft(_addr) => debug!("ClusterLog: MemberLeft")
         }
@@ -81,37 +74,11 @@ impl Handler<ClusterLog> for OwnListener {
 }
 
 impl Handler<Welcome> for OwnListener {
-    type Result = Welcome;
+    type Result = ();
 
     fn handle(&mut self, _msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
         self.count = self.count + 1;
         debug!("Welcome said {}x", self.count);
-        Welcome {}
-    }
-}
-
-
-impl Handler<AskRemoteWrapper> for OwnListener {
-    type Result = ResponseActFuture<Self, Result<RemoteWrapper, ()>>;
-
-    fn handle(&mut self, mut msg: AskRemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
-        let conversation_id = msg.remote_wrapper.conversation_id.clone();
-        let destination = msg.remote_wrapper.source.as_ref().unwrap().clone();
-
-        let mut deserialized_msg: Welcome = Welcome::generate_serializer().deserialize(&(msg.remote_wrapper.message_buffer)[..]).expect("Cannot deserialized Welcome message");
-        let result = ctx.address().send(deserialized_msg);
-        let result = actix::fut::wrap_future::<_, Self>(result);
-
-        let update_self = result.map(move |res, _act, _ctx| {
-            match res {
-                Ok(v) => {
-                    Ok(RemoteWrapper::new(destination, Box::new(v), conversation_id))
-                },
-                Err(_e) => Err(())
-            }
-        });
-
-        Box::pin(update_self)
     }
 }
 
@@ -125,7 +92,6 @@ async fn main() {
     let cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes,
-        vec![cluster_listener.clone().recipient()],
         vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER.to_string())]);
 
     cluster.do_send(Test {msg: "test".to_string()});
