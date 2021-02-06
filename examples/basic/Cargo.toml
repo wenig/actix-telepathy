@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 actix = "0.10"
 actix-rt = "1.1"
+actix-broker = "0.3.1"
 actix-telepathy = { path="../..", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
