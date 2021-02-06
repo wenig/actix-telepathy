@@ -4,7 +4,6 @@ use syn::{parse_macro_input, DeriveInput, Result};
 use syn::export::Span;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
-const REMOTE_ASK_MESSAGE: &str = "remote_ask_messages";
 
 
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {

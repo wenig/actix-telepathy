@@ -1,11 +1,14 @@
-use actix::prelude::*;
-use crate::codec::ClusterMessage;
-use crate::remote::{RemoteWrapper, RemoteMessage, AddrRepresentation};
-use std::str::FromStr;
-use serde::{Serialize, Deserialize};
-use std::hash::{Hash};
+use std::hash::Hash;
 use std::net::SocketAddr;
-use uuid::Uuid;
+use std::str::FromStr;
+
+use actix::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use crate::codec::ClusterMessage;
+use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
+
+pub mod resolver;
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
@@ -49,7 +52,7 @@ impl RemoteAddr {
         ));
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> RecipientRequest<ClusterMessage> {
+    pub fn send<T: RemoteMessage + Serialize>(&mut self, _msg: Box<T>) -> RecipientRequest<ClusterMessage> {
         unimplemented!("So far, it is not possible to receive responses from remote destinations as futures!")
     }
 }

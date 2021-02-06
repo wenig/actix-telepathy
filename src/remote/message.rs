@@ -1,7 +1,6 @@
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::{RemoteAddr, CustomSerialization};
-use crate::network::NetworkInterface;
 use uuid::Uuid;
 
 

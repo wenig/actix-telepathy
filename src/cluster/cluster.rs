@@ -10,9 +10,9 @@ use futures::StreamExt;
 use futures::executor::block_on;
 use std::net::{SocketAddr};
 use crate::cluster::gossip::{Gossip, GossipIgniting, MemberMgmt};
-use crate::remote::{RemoteAddr, AddressResolver, AddressRequest, AddressResponse, RemoteWrapper};
+use crate::remote::{RemoteAddr, AddrResolver, AddrRequest, AddrResponse, RemoteWrapper};
 use crate::{ClusterLog, CustomSystemService};
-use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Broker};
+use actix_broker::{BrokerIssue};
 
 
 #[derive(MessageResponse)]
@@ -66,7 +66,7 @@ pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
     gossip: Option<Addr<Gossip>>,
-    address_resolver: Option<Addr<AddressResolver>>,
+    address_resolver: Option<Addr<AddrResolver>>,
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
 
@@ -86,9 +86,9 @@ impl Actor for Cluster {
             TcpConnect(st, addr)
         }));
 
-        self.address_resolver = Some(AddressResolver::from_registry());
+        self.address_resolver = Some(AddrResolver::from_registry());
         for (rec, identifier) in self.rec_to_be_registered.iter() {
-            self.address_resolver.as_ref().unwrap().do_send(AddressRequest::Register((*rec).clone(), identifier.to_string()));
+            self.address_resolver.as_ref().unwrap().do_send(AddrRequest::Register((*rec).clone(), identifier.to_string()));
         }
 
         self.own_addr = Some(ctx.address());
@@ -213,12 +213,12 @@ impl Handler<NodeEvents> for Cluster {
     }
 }
 
-impl Handler<AddressRequest> for Cluster {
-    type Result = Result<AddressResponse, ()>;
+impl Handler<AddrRequest> for Cluster {
+    type Result = Result<AddrResponse, ()>;
 
-    fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
         self.address_resolver.as_ref().unwrap().do_send(msg);
-        Ok(AddressResponse::Register)
+        Ok(AddrResponse::Register)
     }
 }
 
@@ -264,7 +264,7 @@ pub trait AddrApi {
 
 impl AddrApi for Addr<Cluster> {
     fn register_actor(&self, addr: Recipient<RemoteWrapper>, actor_identifier: &str) -> () {
-        let _r = self.do_send(AddressRequest::Register(addr, actor_identifier.to_string()));
+        let _r = self.do_send(AddrRequest::Register(addr, actor_identifier.to_string()));
     }
 
     fn request_node_addr(&self, socket_addr: SocketAddr, rec: Recipient<NodeResolving>) -> () {

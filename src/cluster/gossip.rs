@@ -175,7 +175,7 @@ impl Handler<NodeResolving> for Gossip {
 impl Supervised for Gossip {}
 impl SystemService for Gossip {}
 impl CustomSystemService for Gossip {
-    fn custom_service_started(&mut self, ctx: &mut Context<Self>) {
+    fn custom_service_started(&mut self, _ctx: &mut Context<Self>) {
         debug!("Gossip Service started");
     }
 }

@@ -6,8 +6,8 @@ use tokio_util::codec::{FramedRead};
 use std::io::{Error};
 
 use crate::cluster::{Cluster, NodeEvents, Gossip};
-use crate::codec::{ClusterMessage, ConnectCodec, AskClusterMessage};
-use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
+use crate::codec::{ClusterMessage, ConnectCodec};
+use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::{WriteHandler};
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
@@ -26,7 +26,7 @@ pub struct NetworkInterface {
     own_addr: Option<Addr<NetworkInterface>>,
     parent: Addr<Cluster>,
     gossip: Addr<Gossip>,
-    address_resolver: Addr<AddressResolver>,
+    address_resolver: Addr<AddrResolver>,
     counter: i8,
     seed: bool
 }
@@ -66,7 +66,7 @@ impl NetworkInterface {
     pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
         let parent = Cluster::from_custom_registry();
         let gossip = Gossip::from_custom_registry();
-        let address_resolver = AddressResolver::from_registry();
+        let address_resolver = AddrResolver::from_registry();
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
 
