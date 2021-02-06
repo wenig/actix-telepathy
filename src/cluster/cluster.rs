@@ -65,7 +65,6 @@ pub struct GossipResponse(pub(crate) SocketAddr);
 pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
-    listeners: Vec<Recipient<ClusterLog>>,
     gossip: Option<Addr<Gossip>>,
     address_resolver: Option<Addr<AddressResolver>>,
     own_addr: Option<Addr<Cluster>>,
@@ -106,14 +105,13 @@ impl Actor for Cluster {
 
 
 impl Cluster {
-    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, cluster_listeners: Vec<Recipient<ClusterLog>>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>) -> Addr<Cluster> {
+    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>) -> Addr<Cluster> {
         debug!("Cluster created");
 
         Cluster::start_service_with(move ||
             Cluster {
                 ip_address,
                 addrs: seed_nodes.clone(),
-                listeners: cluster_listeners.clone(),
                 gossip: None,
                 address_resolver: None,
                 own_addr: None,
@@ -159,7 +157,6 @@ impl Default for Cluster {
         Self {
             ip_address: SocketAddr::from_str(ip_addr).unwrap(),
             addrs: vec![],
-            listeners: vec![],
             gossip: None,
             address_resolver: None,
             own_addr: None,
