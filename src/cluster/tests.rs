@@ -1,16 +1,18 @@
+use log::*;
 use actix_rt;
 use crate::Cluster;
 use port_scanner::{local_port_available, request_open_port};
 
+
 #[actix_rt::test]
 async fn cluster_binds_port() {
-    let port = request_open_port().unwrap_or(8000);
-    let _cluster_addr = Cluster::new(
-        format!("127.0.0.1:{}", port).parse().unwrap(),
-        vec![], vec![]
-    );
+    env_logger::init();
 
-    assert!(!local_port_available(port));
+    let port = request_open_port().unwrap_or(8000);
+    let _listener = Cluster::bind(format!("127.0.0.1:{}", port));
+
+    debug!("port {}", port);
+    assert_eq!(local_port_available(port), false);
 }
 
 #[actix_rt::test]
