@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput, Result};
-use syn::export::Span;
+use syn::__private::Span;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
 
