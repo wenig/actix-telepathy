@@ -9,13 +9,11 @@ use crate::cluster::{Cluster, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::{WriteHandler, FramedWrite};
-use tokio::io::AsyncWrite;
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
-use std::collections::VecDeque;
 
 
 pub struct NetworkInterface {
