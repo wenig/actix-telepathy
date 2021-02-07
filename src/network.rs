@@ -8,24 +8,23 @@ use std::io::{Error};
 use crate::cluster::{Cluster, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
-use actix::io::{WriteHandler};
+use actix::io::{WriteHandler, FramedWrite};
+use tokio::io::AsyncWrite;
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
+use std::collections::VecDeque;
 
 
 pub struct NetworkInterface {
     own_ip: SocketAddr,
     pub addr: SocketAddr,
     stream: Vec<TcpStream>,
-    framed: Vec<actix::io::FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
+    framed: Vec<FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
     connected: bool,
     own_addr: Option<Addr<NetworkInterface>>,
-    parent: Addr<Cluster>,
-    gossip: Addr<Gossip>,
-    address_resolver: Addr<AddrResolver>,
     counter: i8,
     seed: bool
 }
@@ -56,17 +55,13 @@ impl Actor for NetworkInterface {
 
     fn stopped(&mut self, _ctx: &mut Context<Self>) {
         debug!("NetworkInterface stopped! {}", self.addr);
-        //self.parent.do_send(NodeEvents::MemberDown(self.addr.clone().to_string()));
     }
 }
 
 
 impl NetworkInterface {
     pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
-        let parent = Cluster::from_custom_registry();
-        let gossip = Gossip::from_custom_registry();
-        let address_resolver = AddrResolver::from_registry();
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
+        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, counter: 0, seed}
     }
 
     pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream) -> NetworkInterface {
@@ -87,6 +82,8 @@ impl NetworkInterface {
 
     fn connect_to_stream(&mut self, ctx: &mut Context<Self>){
         let addr = self.addr.clone().to_string();
+
+
         actix::actors::resolver::Resolver::from_registry()
             .send(actix::actors::resolver::Connect::host(addr))
             .into_actor(self)
@@ -127,7 +124,7 @@ impl NetworkInterface {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
                 let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone().recipient()), AddrRepresentation::NetworkInterface);
-                self.parent.do_send(NodeEvents::MemberUp(self.addr.clone(), addr, remote_address, self.seed));
+                Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(self.addr.clone(), addr, remote_address, self.seed));
             },
             None => error!("NetworkInterface might not have been started already!")
         };
@@ -141,8 +138,8 @@ impl NetworkInterface {
         msg.source = self.own_addr.clone();
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => panic!("NetworkInterface does not interact as RemoteActor"),
-            AddrRepresentation::Gossip => self.gossip.do_send(msg),
-            AddrRepresentation::Key(_) => self.address_resolver.do_send(msg)
+            AddrRepresentation::Gossip => Gossip::from_custom_registry().do_send(msg),
+            AddrRepresentation::Key(_) => AddrResolver::from_registry().do_send(msg)
         }
     }
 
@@ -152,7 +149,7 @@ impl NetworkInterface {
         let addr = self.addr.clone();
         self.seed = seed;
 
-        self.parent.send(ConnectionApproval { addr, send_addr })
+        Cluster::from_custom_registry().send(ConnectionApproval { addr, send_addr })
             .into_actor(self)
             .map(|res, act, ctx| match res {
                 Ok(message_response) => match message_response {
