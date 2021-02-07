@@ -68,7 +68,7 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
                 Box::new(#serializer {})
             }
 
-            fn set_source(&mut self, addr: RemoteAddr) {
+            fn set_source(&mut self, addr: Addr<NetworkInterface>) {
                 #set_source
             }
         }

@@ -14,7 +14,6 @@ use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
-use std::str::FromStr;
 
 
 pub struct NetworkInterface {
@@ -139,10 +138,7 @@ impl NetworkInterface {
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {
-        msg.source = Some(RemoteAddr::new(self.addr.clone(),
-                                          Some(self.own_addr.as_ref().unwrap().clone().recipient()),
-                                          AddrRepresentation::from_str("id").unwrap()
-        ));
+        msg.source = self.own_addr.clone();
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => panic!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
