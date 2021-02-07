@@ -3,7 +3,7 @@ use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
-use crate::remote::{RemoteWrapper, RemoteMessage};
+use crate::remote::{RemoteWrapper, RemoteMessage, RemoteActor};
 use crate::{RemoteAddr, Cluster, NodeResolving, CustomSystemService, GossipResponse};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
@@ -99,7 +99,8 @@ impl Gossip {
 impl Actor for Gossip {
     type Context = Context<Self>;
 
-    fn started(&mut self, _ctx: &mut Context<Self>) {
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient(), "gossip".to_string());
         debug!("Gossip actor started");
     }
 }

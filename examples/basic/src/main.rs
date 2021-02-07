@@ -50,6 +50,7 @@ impl Actor for OwnListener {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient(), OwnListener::IDENTIFIER.to_string());
         self.subscribe_system_async::<ClusterLog>(ctx);
     }
 }
@@ -89,8 +90,7 @@ async fn main() {
     let cluster_listener = OwnListener::new().start();
     let cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
-        args.seed_nodes,
-        vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER.to_string())]);
+        args.seed_nodes);
 
     cluster.do_send(Test {msg: "test".to_string()});
 

@@ -74,12 +74,9 @@ pub struct GossipResponse(pub(crate) SocketAddr);
 pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
-    gossip: Option<Addr<Gossip>>,
-    address_resolver: Option<Addr<AddrResolver>>,
+    gossip: Addr<Gossip>,
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
-
-    rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>
 }
 
 
@@ -95,14 +92,7 @@ impl Actor for Cluster {
             TcpConnect(st, addr)
         }));
 
-        self.address_resolver = Some(AddrResolver::from_registry());
-        for (rec, identifier) in self.rec_to_be_registered.iter() {
-            self.address_resolver.as_ref().unwrap().do_send(AddrRequest::Register((*rec).clone(), identifier.to_string()));
-        }
-
         self.own_addr = Some(ctx.address());
-        let ip_addr4gossip = self.ip_address.clone();
-        self.gossip = Some(Gossip::start_service_with(move || { Gossip::new(ip_addr4gossip) }));
 
         let addrs_len = self.addrs.len();
         for node_addr in 0..addrs_len {
@@ -114,18 +104,16 @@ impl Actor for Cluster {
 
 
 impl Cluster {
-    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, rec_to_be_registered: Vec<(Recipient<RemoteWrapper>, String)>) -> Addr<Cluster> {
+    pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>) -> Addr<Cluster> {
         debug!("Cluster created");
 
         Cluster::start_service_with(move ||
             Cluster {
-                ip_address,
+                ip_address: ip_address.clone(),
                 addrs: seed_nodes.clone(),
-                gossip: None,
-                address_resolver: None,
+                gossip: Gossip::start_service_with(move || { Gossip::new(ip_address) }),
                 own_addr: None,
                 nodes: Default::default(),
-                rec_to_be_registered: rec_to_be_registered.clone()
             }
         )
     }
@@ -150,11 +138,6 @@ impl Cluster {
             self.nodes.insert(node_addr.clone(), node);
         }
     }
-
-    #[allow(dead_code)]
-    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str) {
-        self.own_addr.as_ref().unwrap().register_actor(rec, actor_identifier)
-    }
 }
 
 // Singleton
@@ -166,12 +149,9 @@ impl Default for Cluster {
         Self {
             ip_address: SocketAddr::from_str(ip_addr).unwrap(),
             addrs: vec![],
-            gossip: None,
-            address_resolver: None,
+            gossip: Gossip::from_custom_registry(),
             own_addr: None,
             nodes: HashMap::new(),
-
-            rec_to_be_registered: vec![]
         }
     }
 }
@@ -208,26 +188,17 @@ impl Handler<NodeEvents> for Cluster {
         match msg {
             NodeEvents::MemberUp(host, node, remote_addr, seed) => {
                 if seed {
-                    self.gossip.clone().unwrap().do_send(GossipIgniting::MemberUp(host.clone(), node));
+                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(host.clone(), node));
                 } else {
-                    self.gossip.clone().unwrap().do_send(MemberMgmt::MemberUp(host.clone(), node));
+                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(host.clone(), node));
                 }
                 self.issue_system_async(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
             },
             NodeEvents::MemberDown(host) => {
-                self.gossip.clone().unwrap().do_send(GossipIgniting::MemberDown(host.clone()));
+                Gossip::from_custom_registry().do_send(GossipIgniting::MemberDown(host.clone()));
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
             }
         }
-    }
-}
-
-impl Handler<AddrRequest> for Cluster {
-    type Result = Result<AddrResponse, ()>;
-
-    fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
-        self.address_resolver.as_ref().unwrap().do_send(msg);
-        Ok(AddrResponse::Register)
     }
 }
 
@@ -235,7 +206,7 @@ impl Handler<NodeResolving> for Cluster {
     type Result = ();
 
     fn handle(&mut self, msg: NodeResolving, _ctx: &mut Context<Self>) -> Self::Result {
-        self.gossip.clone().unwrap().do_send(msg);
+        self.gossip.do_send(msg);
     }
 }
 
@@ -259,28 +230,5 @@ impl Handler<ConnectionApproval> for Cluster {
             self.nodes.insert(msg.addr, node);
             ConnectionApprovalResponse::Approved
         }
-    }
-}
-
-
-/// Helper for registering actors to the cluster
-pub trait AddrApi {
-    fn register_actor(&self, rec: Recipient<RemoteWrapper>, actor_identifier: &str);
-    fn request_node_addr(&self, socket_addr: SocketAddr, rec: Recipient<NodeResolving>);
-    fn request_node_addrs(&self, socket_addrs: Vec<SocketAddr>, rec: Recipient<NodeResolving>);
-}
-
-
-impl AddrApi for Addr<Cluster> {
-    fn register_actor(&self, addr: Recipient<RemoteWrapper>, actor_identifier: &str) -> () {
-        let _r = self.do_send(AddrRequest::Register(addr, actor_identifier.to_string()));
-    }
-
-    fn request_node_addr(&self, socket_addr: SocketAddr, rec: Recipient<NodeResolving>) -> () {
-        self.do_send(NodeResolving::Request(socket_addr, rec))
-    }
-
-    fn request_node_addrs(&self, socket_addrs: Vec<SocketAddr>, rec: Recipient<NodeResolving>) -> () {
-        self.do_send(NodeResolving::VecRequest(socket_addrs, rec))
     }
 }
