@@ -11,12 +11,11 @@ use serde::{Serialize, Deserialize};
 use serializer::MySerializer;
 use tokio;
 use std::net::{ToSocketAddrs, SocketAddr};
-use std::fs;
-use actix_broker::{BrokerSubscribe, BrokerIssue, SystemBroker, ArbiterBroker, Broker};
+use actix_broker::{BrokerSubscribe};
 
 
-#[derive(Message, Serialize, Deserialize, RemoteMessage)]
-#[rtype(Result = "()")]
+#[derive(Message, Serialize, Deserialize, RemoteMessage, MessageResponse)]
+#[rtype(result = "()")]
 struct Welcome {}
 
 fn from_addr(s: &str) -> SocketAddr {
@@ -34,14 +33,13 @@ struct Parameters {
 #[remote_messages(Welcome)]
 struct OwnListener {
     count: usize,
-    filename: String
 }
 
 impl OwnListener {
     const IDENTIFIER: &'static str = "own_listener";
 
-    pub fn new(filename: String) -> Self {
-        OwnListener {count: 0, filename}
+    pub fn new() -> Self {
+        OwnListener {count: 0}
     }
 }
 
@@ -52,6 +50,7 @@ impl Actor for OwnListener {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient(), OwnListener::IDENTIFIER.to_string());
         self.subscribe_system_async::<ClusterLog>(ctx);
     }
 }
@@ -79,26 +78,20 @@ impl Handler<Welcome> for OwnListener {
     fn handle(&mut self, _msg: Welcome, _ctx: &mut Context<Self>) -> Self::Result {
         self.count = self.count + 1;
         debug!("Welcome said {}x", self.count);
-        if self.count == 100 {
-            fs::write(format!("./{}", self.filename.as_str()), "100").expect("Unable to write file");
-        }
     }
 }
+
 
 #[actix_rt::main]
 async fn main() {
     env_logger::init();
-
-    debug!("{}", "localhost:8000".to_socket_addrs().unwrap().next().unwrap());
-
     let args = Parameters::from_args();
 
-    let cluster_listener = OwnListener::new(args.local_ip.to_string()).start();
+    let _cluster_listener = OwnListener::new().start();
     let _cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
-        args.seed_nodes,
-        vec![cluster_listener.clone().recipient()],
-        vec![(cluster_listener.recipient(), OwnListener::IDENTIFIER)]);
+        args.seed_nodes);
+
     tokio::signal::ctrl_c().await.unwrap();
     println!("Ctrl-C received, shutting down");
     System::current().stop();

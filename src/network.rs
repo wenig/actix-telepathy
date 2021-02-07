@@ -7,13 +7,13 @@ use std::io::{Error};
 
 use crate::cluster::{Cluster, NodeEvents, Gossip};
 use crate::codec::{ClusterMessage, ConnectCodec};
-use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddressResolver};
+use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::{WriteHandler};
 use tokio::net::tcp::OwnedWriteHalf;
 use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
-use crate::{ConnectionApproval, ConnectionApprovalResponse};
+use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
 
 
 pub struct NetworkInterface {
@@ -25,7 +25,7 @@ pub struct NetworkInterface {
     own_addr: Option<Addr<NetworkInterface>>,
     parent: Addr<Cluster>,
     gossip: Addr<Gossip>,
-    address_resolver: Addr<AddressResolver>,
+    address_resolver: Addr<AddrResolver>,
     counter: i8,
     seed: bool
 }
@@ -63,9 +63,9 @@ impl Actor for NetworkInterface {
 
 impl NetworkInterface {
     pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
-        let parent = Cluster::from_registry();
-        let gossip = Gossip::from_registry();
-        let address_resolver = AddressResolver::from_registry();
+        let parent = Cluster::from_custom_registry();
+        let gossip = Gossip::from_custom_registry();
+        let address_resolver = AddrResolver::from_registry();
         NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, parent, gossip, address_resolver, counter: 0, seed }
     }
 
@@ -115,7 +115,7 @@ impl NetworkInterface {
                         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
                     }
                 },
-                Err(err) => error!("{}", err),
+                Err(err) => error!("{}", err.to_string()),
             })
             .wait(ctx);
     }
@@ -138,12 +138,12 @@ impl NetworkInterface {
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {
-        msg.source = Some(self.own_addr.clone().unwrap());
+        msg.source = self.own_addr.clone();
         match msg.destination.id {
-            AddrRepresentation::NetworkInterface => debug!("NetworkInterface does not interact as RemoteActor"),
+            AddrRepresentation::NetworkInterface => panic!("NetworkInterface does not interact as RemoteActor"),
             AddrRepresentation::Gossip => self.gossip.do_send(msg),
-            AddrRepresentation::Key(_) => { self.address_resolver.do_send(msg); }
-        };
+            AddrRepresentation::Key(_) => self.address_resolver.do_send(msg)
+        }
     }
 
     fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>, seed: bool) {
@@ -185,7 +185,6 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
 }
 
 impl Handler<ClusterMessage> for NetworkInterface {
-    // todo: give back future in case of send instead of do_send
     type Result = ();
 
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {

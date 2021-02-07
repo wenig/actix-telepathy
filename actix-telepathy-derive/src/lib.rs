@@ -42,7 +42,7 @@ mod remote_message;
 /// ```
 ///
 /// `remote_messages` can take multiple Message Types which get checked for their identifiers.
-#[proc_macro_derive(RemoteActor, attributes(remote_messages))]
+#[proc_macro_derive(RemoteActor, attributes(remote_messages, remote_ask_messages))]
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     remote_actor::remote_actor_macro(input)
 }

@@ -1,7 +1,7 @@
 use actix::prelude::*;
 use serde::{Serialize, Deserialize};
-use crate::{RemoteAddr, CustomSerialization};
-use crate::network::NetworkInterface;
+use crate::{RemoteAddr, CustomSerialization, NetworkInterface};
+use uuid::Uuid;
 
 
 /// Wrapper for messages to be sent to remote actor
@@ -13,17 +13,32 @@ pub struct RemoteWrapper {
     pub identifier: String,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    pub source: Option<Addr<NetworkInterface>>
+    pub source: Option<Addr<NetworkInterface>>,
+    pub conversation_id: Option<Uuid>
 }
 
 impl RemoteWrapper {
-    pub fn new<T: RemoteMessage + Serialize>(destination: RemoteAddr, message: Box<T>) -> RemoteWrapper {
+    pub fn new<T: RemoteMessage + Serialize>(destination: RemoteAddr, message: Box<T>, conversation_id: Option<Uuid>) -> RemoteWrapper {
         let serializer = message.get_serializer();
         RemoteWrapper {
             destination,
             message_buffer: serializer.serialize(message.as_ref()).expect("Cannot serialize message"),
             identifier: message.get_identifier().to_string(),
-            source: None
+            source: None,
+            conversation_id
+        }
+    }
+}
+
+
+impl Clone for RemoteWrapper {
+    fn clone(&self) -> Self {
+        RemoteWrapper {
+            destination: self.destination.clone(),
+            message_buffer: self.message_buffer.clone(),
+            identifier: self.identifier.clone(),
+            source: self.source.clone(),
+            conversation_id: self.conversation_id.clone()
         }
     }
 }

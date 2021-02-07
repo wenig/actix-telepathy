@@ -3,11 +3,10 @@ use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
-use crate::remote::{RemoteWrapper, RemoteMessage};
-use crate::{RemoteAddr, Cluster, NodeResolving};
+use crate::remote::{RemoteWrapper, RemoteMessage, RemoteActor};
+use crate::{RemoteAddr, Cluster, NodeResolving, CustomSystemService, GossipResponse};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use crate::cluster::cluster::GossipResponse;
 use std::net::SocketAddr;
 use std::fmt::Debug;
 use std::str::FromStr;
@@ -36,18 +35,18 @@ pub enum MemberMgmt {
 #[remote_messages(GossipEvent)]
 pub struct Gossip {
     own_addr: SocketAddr,
+    cluster: Addr<Cluster>,
     requested_members: HashSet<SocketAddr>,
     members: HashMap<SocketAddr, Addr<NetworkInterface>>,
-    cluster: Addr<Cluster>
 }
 
 impl Default for Gossip {
     fn default() -> Self {
         Self {
             own_addr: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
+            cluster: Cluster::from_custom_registry(),
             requested_members: HashSet::new(),
             members: HashMap::new(),
-            cluster: Cluster::from_registry()
         }
     }
 }
@@ -100,7 +99,8 @@ impl Gossip {
 impl Actor for Gossip {
     type Context = Context<Self>;
 
-    fn started(&mut self, _ctx: &mut Context<Self>) {
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient(), "gossip".to_string());
         debug!("Gossip actor started");
     }
 }
@@ -174,3 +174,8 @@ impl Handler<NodeResolving> for Gossip {
 
 impl Supervised for Gossip {}
 impl SystemService for Gossip {}
+impl CustomSystemService for Gossip {
+    fn custom_service_started(&mut self, _ctx: &mut Context<Self>) {
+        debug!("Gossip Service started");
+    }
+}

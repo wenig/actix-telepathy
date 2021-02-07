@@ -1,7 +1,8 @@
 mod addr;
 mod message;
-mod address_resolver;
+mod actor;
 
-pub use self::address_resolver::{AddrRepresentation, AddressResolver, AddressRequest, AddressResponse};
-pub use self::addr::{RemoteAddr, AnyAddr};
-pub use self::message::{RemoteWrapper, RemoteMessage};
+pub use addr::resolver::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
+pub use self::addr::{AnyAddr, RemoteAddr};
+pub use self::message::{RemoteMessage, RemoteWrapper};
+pub use self::actor::RemoteActor;

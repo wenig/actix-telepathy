@@ -48,29 +48,29 @@ impl Clone for AddrRepresentation {
 
 
 #[derive(Message)]
-#[rtype(result = "Result<AddressResponse, ()>")]
-pub enum AddressRequest {
+#[rtype(result = "Result<AddrResponse, ()>")]
+pub enum AddrRequest {
     Register(Recipient<RemoteWrapper>, String),
     ResolveStr(String),
     ResolveRec(Recipient<RemoteWrapper>)
 }
 
-pub enum AddressResponse {
+pub enum AddrResponse {
     Register,
     ResolveStr(Recipient<RemoteWrapper>),
     ResolveRec(String)
 }
 
-pub struct AddressResolver {
+pub struct AddrResolver {
     str2rec: HashMap<String, Recipient<RemoteWrapper>>,
-    rec2str: HashMap<Recipient<RemoteWrapper>, String>
+    rec2str: HashMap<Recipient<RemoteWrapper>, String>,
 }
 
-impl Default for AddressResolver {
+impl Default for AddrResolver {
     fn default() -> Self {
         Self {
             str2rec: HashMap::new(),
-            rec2str: HashMap::new()
+            rec2str: HashMap::new(),
         }
     }
 }
@@ -84,9 +84,9 @@ impl Debug for NotAvailableError {
     }
 }
 
-impl AddressResolver {
+impl AddrResolver {
     pub fn new() -> Self {
-        AddressResolver {str2rec: HashMap::new(), rec2str: HashMap::new()}
+        AddrResolver::default()
     }
 
     pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
@@ -114,11 +114,15 @@ impl AddressResolver {
     }
 }
 
-impl Actor for AddressResolver {
+impl Actor for AddrResolver {
     type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Context<Self>) {
+        debug!("AddressResolver actor started");
+    }
 }
 
-impl Handler<RemoteWrapper> for AddressResolver {
+impl Handler<RemoteWrapper> for AddrResolver {
     type Result = ();
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
@@ -127,12 +131,12 @@ impl Handler<RemoteWrapper> for AddressResolver {
     }
 }
 
-impl Handler<AddressRequest> for AddressResolver {
-    type Result = Result<AddressResponse, ()>;
+impl Handler<AddrRequest> for AddrResolver {
+    type Result = Result<AddrResponse, ()>;
 
-    fn handle(&mut self, msg: AddressRequest, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            AddressRequest::Register(rec, identifier) => {
+            AddrRequest::Register(rec, identifier) => {
                 let is_new = match self.rec2str.get(&rec) {
                     Some(_) => false,
                     None => true,
@@ -140,25 +144,25 @@ impl Handler<AddressRequest> for AddressResolver {
 
                 if is_new {
                     self.str2rec.insert(identifier.clone(), rec.clone());
-                    self.rec2str.insert(rec, identifier);
-                    debug!("Actor registered");
-                    Ok(AddressResponse::Register)
+                    self.rec2str.insert(rec, identifier.clone());
+                    debug!("Actor '{}' registered", identifier);
+                    Ok(AddrResponse::Register)
                 } else {
                     debug!("Recipient is already added");
                     Err(())
                 }
             },
-            AddressRequest::ResolveStr(id) => {
+            AddrRequest::ResolveStr(id) => {
                 let rec = self.resolve_str(id);
                 match rec {
-                    Ok(r) => Ok(AddressResponse::ResolveStr((*r).clone())),
+                    Ok(r) => Ok(AddrResponse::ResolveStr((*r).clone())),
                     Err(_) => Err(())
                 }
             },
-            AddressRequest::ResolveRec(rec) => {
+            AddrRequest::ResolveRec(rec) => {
                 let id = self.resolve_rec(&rec);
                 match id {
-                    Ok(i) => Ok(AddressResponse::ResolveRec(i.clone())),
+                    Ok(i) => Ok(AddrResponse::ResolveRec(i.clone())),
                     Err(_) => Err(())
                 }
             }
@@ -166,5 +170,5 @@ impl Handler<AddressRequest> for AddressResolver {
     }
 }
 
-impl Supervised for AddressResolver {}
-impl SystemService for AddressResolver {}
+impl Supervised for AddrResolver {}
+impl SystemService for AddrResolver {}

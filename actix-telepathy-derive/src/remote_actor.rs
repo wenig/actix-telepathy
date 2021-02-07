@@ -5,12 +5,20 @@ use syn::export::Span;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
 
+
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
+    //let ask_remote = proc_macro2::TokenStream::from(remote_actor_remote_ask_messages_macro(input.clone()));
+    let remote = remote_actor_remote_messages_macro(input);
+    remote
+}
+
+
+pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
 
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
-    let messages = get_message_types_attr(&input).expect("Expected at least on Message");
+    let messages = get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least on Message");
 
     let mut chained_if = quote! {};
     let mut first = true;
@@ -51,6 +59,8 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use log::*;
 
+        impl RemoteActor for #name {}
+
         impl Handler<RemoteWrapper> for #name {
             type Result = ();
 
@@ -64,8 +74,7 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
-fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
+fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<syn::Type>>> {
     let attr = ast
         .attrs
         .iter()
@@ -73,7 +82,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             let a = a.parse_meta();
             match a {
                 Ok(meta) => {
-                    if meta.path().is_ident(REMOTE_MESSAGES) {
+                    if meta.path().is_ident(ident) {
                         Some(meta)
                     } else {
                         None
@@ -83,7 +92,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             }
         })
         .ok_or_else(|| {
-            syn::Error::new(Span::call_site(), format!("Expect an attribute `{}`", REMOTE_MESSAGES))
+            syn::Error::new(Span::call_site(), format!("Expect an attribute `{}`", ident))
         })?;
 
     if let syn::Meta::List(ref list) = attr {
@@ -95,7 +104,7 @@ fn get_message_types_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
     } else {
         Err(syn::Error::new_spanned(
             attr,
-            format!("The correct syntax is #[{}(Message, Message, ...)]", REMOTE_MESSAGES),
+            format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
         ))
     }
 }

@@ -42,7 +42,7 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
         Some(source) => {
             let attr = source.clone().unwrap();
             quote! {
-                self.#attr.network_interface = Some(addr.recipient());
+                self.#attr.network_interface = Some(addr);
             }
         },
         None => quote! {}

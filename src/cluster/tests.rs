@@ -7,7 +7,7 @@ async fn cluster_binds_port() {
     let port = request_open_port().unwrap_or(8000);
     let _cluster_addr = Cluster::new(
         format!("127.0.0.1:{}", port).parse().unwrap(),
-        vec![], vec![], vec![]
+        vec![], vec![]
     );
 
     assert!(!local_port_available(port));
