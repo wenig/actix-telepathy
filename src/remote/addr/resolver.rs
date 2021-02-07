@@ -144,8 +144,8 @@ impl Handler<AddrRequest> for AddrResolver {
 
                 if is_new {
                     self.str2rec.insert(identifier.clone(), rec.clone());
-                    self.rec2str.insert(rec, identifier);
-                    debug!("Actor registered");
+                    self.rec2str.insert(rec, identifier.clone());
+                    debug!("Actor '{}' registered", identifier);
                     Ok(AddrResponse::Register)
                 } else {
                     debug!("Recipient is already added");

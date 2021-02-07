@@ -19,7 +19,7 @@ use futures::StreamExt;
 use futures::executor::block_on;
 use std::net::{SocketAddr};
 use crate::cluster::gossip::{GossipIgniting, MemberMgmt};
-use crate::remote::{RemoteAddr, AddrResolver, AddrRequest, AddrResponse, RemoteWrapper};
+use crate::remote::{RemoteAddr};
 use crate::{CustomSystemService};
 use actix_broker::{BrokerIssue};
 
@@ -28,13 +28,6 @@ use actix_broker::{BrokerIssue};
 pub enum ConnectionApprovalResponse {
     Approved,
     Declined
-}
-
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct Test {
-    pub msg: String
 }
 
 
@@ -159,15 +152,6 @@ impl Default for Cluster {
 impl Supervised for Cluster {}
 impl SystemService for Cluster {}
 impl CustomSystemService for Cluster {}
-
-
-impl Handler<Test> for Cluster {
-    type Result = ();
-
-    fn handle(&mut self, msg: Test, _ctx: &mut Self::Context) -> Self:: Result {
-        debug!("{}", msg.msg)
-    }
-}
 
 
 impl Handler<TcpConnect> for Cluster {

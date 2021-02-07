@@ -87,12 +87,10 @@ async fn main() {
     env_logger::init();
     let args = Parameters::from_args();
 
-    let cluster_listener = OwnListener::new().start();
-    let cluster = Cluster::new(
+    let _cluster_listener = OwnListener::new().start();
+    let _cluster = Cluster::new(
         args.local_ip.to_socket_addrs().unwrap().next().unwrap(),
         args.seed_nodes);
-
-    cluster.do_send(Test {msg: "test".to_string()});
 
     tokio::signal::ctrl_c().await.unwrap();
     println!("Ctrl-C received, shutting down");

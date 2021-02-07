@@ -1,5 +1,5 @@
 use crate::{AddrResolver, AddrRequest, RemoteWrapper};
-use actix::{SystemService, Context, AsyncContext, Recipient};
+use actix::{SystemService, Recipient};
 
 pub trait RemoteActor {
     fn register(&mut self, rec: Recipient<RemoteWrapper>, identifier: String) {

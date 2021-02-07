@@ -20,7 +20,7 @@ pub mod prelude {
     #[cfg(feature = "derive")]
     pub use actix_telepathy_derive::*;
 
-    pub use crate::cluster::{Cluster, ClusterListener, ClusterLog, NodeResolving, Test};
+    pub use crate::cluster::{Cluster, ClusterListener, ClusterLog, NodeResolving};
     pub use crate::remote::{RemoteMessage, RemoteAddr, RemoteWrapper, AnyAddr, RemoteActor};
     pub use crate::serialization::{DefaultSerialization, CustomSerialization};
     pub use crate::network::NetworkInterface;
