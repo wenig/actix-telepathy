@@ -11,7 +11,6 @@ async fn cluster_binds_port() {
     let port = request_open_port().unwrap_or(8000);
     let _listener = Cluster::bind(format!("127.0.0.1:{}", port));
 
-    debug!("port {}", port);
     assert_eq!(local_port_available(port), false);
 }
 
