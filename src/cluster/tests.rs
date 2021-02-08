@@ -1,12 +1,13 @@
 use log::*;
 use actix_rt;
-use crate::{Cluster, ClusterListener, ClusterLog, NetworkInterface};
+use crate::{Cluster, ClusterListener, ClusterLog, NetworkInterface, Gossip, CustomSystemService, NodeResolving};
 use port_scanner::{local_port_available, request_open_port};
 use std::net::SocketAddr;
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use tokio::time::{delay_for, Duration};
 use std::sync::{Arc, Mutex};
+use crate::cluster::gossip::MemberMgmt;
 
 
 struct OwnListener {
@@ -64,6 +65,24 @@ async fn cluster_adds_node_and_from_stream() {
 
 // Gossip
 
+#[actix_rt::test]
+async fn gossip_adds_member_and_resolves_it() {
+    let local_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _network_interface = NetworkInterface::new(other_ip, local_ip, true).start();
+    delay_for(Duration::from_secs(1)).await;
+    let r = Gossip::from_custom_registry().send(NodeResolving {addrs: vec![other_ip]});
+    // todo: read result
+}
+
+#[actix_rt::test]
+async fn gossip_adds_member_and_introduces_other_members() {
+}
+
+#[actix_rt::test]
+async fn gossip_removes_member() {
+}
 
 
 

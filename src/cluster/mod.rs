@@ -3,7 +3,7 @@ mod gossip;
 #[cfg(test)]
 mod tests;
 
-pub use self::gossip::Gossip;
+pub use self::gossip::{Gossip, NodeResolving};
 pub use self::listener::{ClusterListener, ClusterLog};
 
 
@@ -48,15 +48,6 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 pub enum NodeEvents{
     MemberUp(SocketAddr, Addr<NetworkInterface>, RemoteAddr, bool),
     MemberDown(SocketAddr)
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub enum NodeResolving{
-    Request(SocketAddr, Recipient<NodeResolving>),
-    VecRequest(Vec<SocketAddr>, Recipient<NodeResolving>),
-    Response(Addr<NetworkInterface>),
-    VecResponse(Vec<Option<Addr<NetworkInterface>>>)
 }
 
 #[derive(Message)]
@@ -183,14 +174,6 @@ impl Handler<NodeEvents> for Cluster {
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
             }
         }
-    }
-}
-
-impl Handler<NodeResolving> for Cluster {
-    type Result = ();
-
-    fn handle(&mut self, msg: NodeResolving, _ctx: &mut Context<Self>) -> Self::Result {
-        self.gossip.do_send(msg);
     }
 }
 
