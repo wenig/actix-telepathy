@@ -4,8 +4,7 @@ use std::collections::HashMap;
 use crate::remote::RemoteWrapper;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
-use serde::export::Formatter;
+use std::fmt::{Debug, Formatter};
 
 
 const NETWORKINTERFACE: &str = "networkinterface";
