@@ -17,36 +17,21 @@ actix-telepathy = "0.1.0"
 ### main.rs
 
 ```rust
-use actix::{System, Supervisor, Supervised, Handler, Context};
-use actix_telepathy::*;
+use actix_rt;
+use actix_telepathy::prelude::*;
+use actix::prelude::*;
+use tokio;
+use std::net::{ToSocketAddrs, SocketAddr};
 
-struct OwnListener {}
+#[actix_rt::main]
+async fn main() {
+    let bind_addr = "127.0.0.1:1992".parse().unwrap();
+    let seed_nodes = vec![];
+    let _cluster = Cluster::new(bind_addr, seed_nodes);
 
-impl ClusterListener for OwnListener {}
-impl Supervised for OwnListener {}
-
-impl Actor for OwnListener {
-    type Context = Context<Self>;
-}
-
-impl Handler<ClusterLog> for OwnListener {
-    type Result = ();
-
-    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
-        match msg {
-            ClusterLog::NewMember(addr, mut remote_addr) => {
-                remote_addr.do_send(Box::new("welcome"))
-            },
-            ClusterLog::MemberLeft(addr) => debug!("ClusterLog: MemberLeft")
-        }
-    }
-}
-
-fn main() {
-    actix::System::run(|| {
-        let cluster_listener = Supervisor::start(|_| OwnListener {});
-        let cluster = Cluster::new(local_ip, seed_nodes, vec![cluster_listener.recipient()]);
-    });
+    tokio::signal::ctrl_c().await.unwrap();
+    println!("Ctrl-C received, shutting down");
+    System::current().stop();
 }
 ```
 
