@@ -1,3 +1,5 @@
+![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
+
 # Actix Telepathy
 
 Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Cluster](https://github.com/akka/akka), Actix Telepathy is an extension to the Rust actor framework [Actix](https://github.com/actix/actix). It empowers Rust users to build distributed application within the actor framework.
