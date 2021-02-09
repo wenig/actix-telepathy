@@ -7,7 +7,6 @@ use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use tokio::time::{delay_for, Duration};
 use std::sync::{Arc, Mutex};
-use crate::cluster::gossip::MemberMgmt;
 
 
 struct OwnListener {
@@ -32,6 +31,39 @@ impl Handler<ClusterLog> for OwnListener {
             ClusterLog::NewMember(addr, _remote_addr) => {
                 debug!("new member {}", addr.to_string());
                 (*(self.connections.lock().unwrap())).push(addr);
+            },
+            ClusterLog::MemberLeft(_addr) => {}
+        }
+    }
+}
+
+struct OwnListenerAskingGossip {
+    pub asking: SocketAddr,
+    pub addrs: Arc<Mutex<Vec<Addr<NetworkInterface>>>>
+}
+impl ClusterListener for OwnListenerAskingGossip {}
+impl Supervised for OwnListenerAskingGossip {}
+
+impl Actor for OwnListenerAskingGossip {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.subscribe_system_async::<ClusterLog>(ctx);
+    }
+}
+
+impl Handler<ClusterLog> for OwnListenerAskingGossip {
+    type Result = ();
+
+    fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            ClusterLog::NewMember(_addr, _remote_addr) => {
+                Gossip::from_custom_registry().send(NodeResolving {addrs: vec![self.asking.clone()]})
+                    .into_actor(self)
+                    .map(|res: Result<Result<Vec<Addr<NetworkInterface>>, ()>, MailboxError>, act, _ctx| match res.unwrap() {
+                        Ok(addrs) => (*(act.addrs.lock().unwrap())).push(addrs.get(0).unwrap().clone()),
+                        Err(_) => ()
+                    }).wait(ctx);
             },
             ClusterLog::MemberLeft(_addr) => {}
         }
@@ -69,11 +101,12 @@ async fn cluster_adds_node_and_from_stream() {
 async fn gossip_adds_member_and_resolves_it() {
     let local_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
     let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
-    let cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let addrs = Arc::new(Mutex::new(vec![]));
+    let _own_listener = OwnListenerAskingGossip {asking: other_ip.clone(), addrs: Arc::clone(&addrs)}.start();
     let _network_interface = NetworkInterface::new(other_ip, local_ip, true).start();
     delay_for(Duration::from_secs(1)).await;
-    let r = Gossip::from_custom_registry().send(NodeResolving {addrs: vec![other_ip]});
-    // todo: read result
+    assert_eq!(addrs.lock().unwrap().len(), 2);
 }
 
 #[actix_rt::test]
