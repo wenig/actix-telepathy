@@ -3,7 +3,7 @@ mod gossip;
 #[cfg(test)]
 mod tests;
 
-pub use self::gossip::Gossip;
+pub use self::gossip::{Gossip, NodeResolving};
 pub use self::listener::{ClusterListener, ClusterLog};
 
 
@@ -52,22 +52,12 @@ pub enum NodeEvents{
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub enum NodeResolving{
-    Request(SocketAddr, Recipient<NodeResolving>),
-    VecRequest(Vec<SocketAddr>, Recipient<NodeResolving>),
-    Response(Addr<NetworkInterface>),
-    VecResponse(Vec<Option<Addr<NetworkInterface>>>)
-}
-
-#[derive(Message)]
-#[rtype(result = "()")]
 pub struct GossipResponse(pub(crate) SocketAddr);
 
 /// Central Actor for cluster handling
 pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
-    gossip: Addr<Gossip>,
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
 }
@@ -99,12 +89,12 @@ impl Actor for Cluster {
 impl Cluster {
     pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>) -> Addr<Cluster> {
         debug!("Cluster created");
+        Gossip::start_service_with(move || { Gossip::new(ip_address.clone()) });
 
         Cluster::start_service_with(move ||
             Cluster {
                 ip_address: ip_address.clone(),
                 addrs: seed_nodes.clone(),
-                gossip: Gossip::start_service_with(move || { Gossip::new(ip_address) }),
                 own_addr: None,
                 nodes: Default::default(),
             }
@@ -142,7 +132,6 @@ impl Default for Cluster {
         Self {
             ip_address: SocketAddr::from_str(ip_addr).unwrap(),
             addrs: vec![],
-            gossip: Gossip::from_custom_registry(),
             own_addr: None,
             nodes: HashMap::new(),
         }
@@ -183,14 +172,6 @@ impl Handler<NodeEvents> for Cluster {
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
             }
         }
-    }
-}
-
-impl Handler<NodeResolving> for Cluster {
-    type Result = ();
-
-    fn handle(&mut self, msg: NodeResolving, _ctx: &mut Context<Self>) -> Self::Result {
-        self.gossip.do_send(msg);
     }
 }
 
