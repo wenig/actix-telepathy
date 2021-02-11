@@ -65,7 +65,14 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
                         Err(_) => ()
                     }).wait(ctx);
             },
-            ClusterLog::MemberLeft(_addr) => {}
+            ClusterLog::MemberLeft(addr) => {
+                Gossip::from_custom_registry().send(NodeResolving {addrs: vec![addr]})
+                    .into_actor(self)
+                    .map(|res: Result<Result<Vec<Addr<NetworkInterface>>, ()>, MailboxError>, _act, _ctx| match res.unwrap() {
+                        Ok(addrs) => assert_eq!(addrs.len(), 0),
+                        Err(_) => ()
+                    }).wait(ctx);
+            }
         }
     }
 }
@@ -110,14 +117,28 @@ async fn gossip_adds_member_and_resolves_it() {
 }
 
 #[actix_rt::test]
-async fn gossip_adds_member_and_introduces_other_members() {
-}
-
-#[actix_rt::test]
 async fn gossip_removes_member() {
+    let local_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let addrs = Arc::new(Mutex::new(vec![]));
+    let _own_listener = OwnListenerAskingGossip {asking: other_ip.clone(), addrs: Arc::clone(&addrs)}.start();
+    let _network_interface = NetworkInterface::new(other_ip, local_ip, true).start();
+    delay_for(Duration::from_secs(1)).await;
+    assert_eq!(addrs.lock().unwrap().len(), 2);
 }
 
+#[test]
+fn gossip_adds_member_and_introduces_other_members() {
+    env_logger::init();
 
+
+}
+
+#[actix_rt::main]
+async fn build_cluster() {
+
+}
 
 // ClusterListener
 
