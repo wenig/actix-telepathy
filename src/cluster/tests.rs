@@ -100,7 +100,7 @@ impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
             ClusterLog::NewMember(_addr, _remote_addr) => {
                 (*(self.addrs.lock().unwrap())).push(1);
             },
-            ClusterLog::MemberLeft(addr) => {
+            ClusterLog::MemberLeft(_addr) => {
             }
         }
     }
@@ -173,9 +173,9 @@ fn gossip_adds_member_and_introduces_other_members() {
     let ip3: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
 
     let arr = [
-        TestParams {ip: ip1.clone(), seeds: vec![], start: 0, delay: 0, end: 500, expect: 0},
-        TestParams {ip: ip2.clone(), seeds: vec![ip1.clone()], start: 200, delay: 200, end: 0, expect: 2},
-        TestParams {ip: ip3.clone(), seeds: vec![ip1.clone()], start: 200, delay: 200, end: 0, expect: 2},
+        TestParams {ip: ip1.clone(), seeds: vec![], start: 0, delay: 0, end: 1000, expect: 0},
+        TestParams {ip: ip2.clone(), seeds: vec![ip1.clone()], start: 200, delay: 800, end: 0, expect: 2},
+        TestParams {ip: ip3.clone(), seeds: vec![ip1.clone()], start: 200, delay: 800, end: 0, expect: 2},
     ];
     arr.par_iter().for_each(|p| build_cluster(p.ip, p.seeds.clone(), p.start, p.delay, p.end, p.expect));
 }
