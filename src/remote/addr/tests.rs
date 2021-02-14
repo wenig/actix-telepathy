@@ -1,40 +1,59 @@
-use log::*;
-use actix_rt;
-use crate::{ClusterListener, ClusterLog, NetworkInterface, Gossip, NodeResolving, AddrResolver, AddrRequest};
-use port_scanner::{local_port_available, request_open_port};
 use actix::prelude::*;
-use actix_broker::BrokerSubscribe;
-use tokio::time::{delay_for, Duration};
-use std::sync::{Arc, Mutex};
-use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use log::*;
-use actix::prelude::*;
-use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
-use crate::remote::{RemoteWrapper, RemoteMessage, RemoteActor};
-use crate::{RemoteAddr, Cluster, CustomSystemService, GossipResponse};
-use crate::{DefaultSerialization, CustomSerialization};
-use std::net::SocketAddr;
-use std::fmt::Debug;
-use std::str::FromStr;
+use crate::prelude::*;
+use actix_telepathy_derive::{RemoteActor, RemoteMessage};
+use crate::{AddrResolver, AddrRequest, AddrResponse};
+use std::any::Any;
+use tokio::time::delay_for;
+use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
-#[derive(Message, Serialize, Deserialize, Debug, RemoteMessage)]
+
+#[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(result = "()")]
 struct TestMessage {}
 
 
 #[derive(RemoteActor)]
 #[remote_messages(TestMessage)]
-struct TestActor {}
+struct TestActor {
+    identifiers: Arc<Mutex<Vec<String>>>
+}
+
 
 impl Actor for TestActor {
     type Context = Context<Self>;
 }
 
+impl Handler<TestMessage> for TestActor {
+    type Result = ();
+
+    fn handle(&mut self, _msg: TestMessage, ctx: &mut Context<Self>) -> Self::Result {
+        AddrResolver::from_registry().send(AddrRequest::ResolveRec(ctx.address().recipient()))
+            .into_actor(self)
+            .map(|res, act, _ctx| match res {
+                Ok(res) => match res {
+                    Ok(addr_res) => {
+                        match addr_res {
+                            AddrResponse::ResolveRec(identifer) => act.identifiers.lock().unwrap().push(identifer),
+                            _ => panic!("Wrong Response returned!")
+                        }
+                    },
+                    Err(_) => panic!("Couldn't resolve Addr!")
+                },
+                Err(_) => panic!("Couldn't resolve Addr!")
+            }).wait(ctx)
+    }
+}
+
 
 #[actix_rt::test]
 async fn addr_resolver_registers_and_resolves_addr() {
-    let ta = TestActor {}.start();
-    AddrResolver::from_registry().do_send(AddrRequest::Register(ta.recipient(), "testActor".to_string()));
-
+    let identifier = "testActor".to_string();
+    let identifiers = Arc::new(Mutex::new(vec![]));
+    let ta = TestActor {identifiers: identifiers.clone()}.start();
+    AddrResolver::from_registry().do_send(AddrRequest::Register(ta.clone().recipient(), identifier.clone()));
+    ta.do_send(TestMessage {});
+    delay_for(Duration::from_secs(1)).await;
+    assert_eq!((*(identifiers.lock().unwrap())).get(0).unwrap(), &identifier);
 }
