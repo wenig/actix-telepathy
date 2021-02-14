@@ -9,6 +9,8 @@ use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 
 pub mod resolver;
+#[cfg(test)]
+mod tests;
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
