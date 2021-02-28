@@ -1,0 +1,7 @@
+/target
+Cargo.lock
+Pipfile.lock
+/__pycache__
+.env
+**/*.db
+.ipynb_checkpoints/
