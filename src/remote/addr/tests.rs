@@ -3,7 +3,6 @@ use serde::{Serialize, Deserialize};
 use crate::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use crate::{AddrResolver, AddrRequest, AddrResponse};
-use std::any::Any;
 use tokio::time::delay_for;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
