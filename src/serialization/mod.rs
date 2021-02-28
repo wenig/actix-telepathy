@@ -52,7 +52,7 @@ pub trait CustomSerialization {
 
 /// The default serialization used for remote messages
 ///
-/// The default de/serializer is the Rust version of Flatbuffers - Flatbuffers.
+/// The default de/serializer is the Rust version of Flatbuffers - Flexbuffers.
 pub struct DefaultSerialization {}
 
 impl CustomSerialization for DefaultSerialization {
