@@ -1,7 +1,7 @@
 use actix_rt;
 use crate::CustomSystemService;
-use actix::{Supervised, Actor, SystemService, Message, Handler, Context, ContextFutureSpawner};
-use futures::{TryFutureExt, FutureExt};
+use actix::{Supervised, Actor, SystemService, Message, Handler, Context};
+use futures::{FutureExt};
 
 
 #[derive(Message)]
@@ -57,6 +57,7 @@ async fn system_service_created_and_retrieved() {
 }
 
 #[actix_rt::test]
+#[should_panic]
 async fn panics_when_not_yet_started() {
-
+    TestService::from_custom_registry();
 }
