@@ -5,3 +5,4 @@ Pipfile.lock
 .env
 **/*.db
 .ipynb_checkpoints/
+.idea
