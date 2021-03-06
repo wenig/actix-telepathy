@@ -3,6 +3,12 @@ name = "actix_telepathy_derive"
 version = "0.1.0"
 authors = ["wenig <info@pwenig.de>"]
 edition = "2018"
+license = "Apache-2.0"
+repository = "https://github.com/wenig/actix-telepathy/"
+readme = "README.md"
+description = "Macros for cluster extension for the actix actor framework"
+keywords = ["actor", "distributed", "decentralized", "network", "actix"]
+categories = ["network-programming"]
 
 [lib]
 proc-macro = true

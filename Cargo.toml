@@ -9,7 +9,6 @@ readme = "README.md"
 description = "Cluster extension for the actix actor framework"
 keywords = ["actor", "distributed", "decentralized", "network", "actix"]
 categories = ["network-programming"]
-exclude = ["examples/basics/telepathy.yaml"]
 
 [lib]
 name = "actix_telepathy"
