@@ -48,7 +48,7 @@ impl RemoteAddr {
         self.id = AddrRepresentation::Key(id);
     }
 
-    pub fn do_send<T: RemoteMessage + Serialize>(&mut self, msg: Box<T>) -> () {
+    pub fn do_send<T: RemoteMessage + Serialize>(&mut self, msg: T) -> () {
         let _r = self.network_interface.as_ref().expect("Network interface must be set!").do_send(ClusterMessage::Message(
             RemoteWrapper::new(self.clone(), msg, None)
         ));
