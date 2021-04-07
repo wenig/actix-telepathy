@@ -92,7 +92,7 @@ impl Gossip {
             match self.members.get(&member_addr) {
                 Some(node) =>
                     RemoteAddr::new_gossip(member_addr, Some(node.clone().recipient()))
-                        .do_send(Box::new(GossipEvent { members })),
+                        .do_send(GossipEvent { members }),
                 None => error!("Should be known by now")
             }
         }

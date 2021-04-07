@@ -18,11 +18,11 @@ pub struct RemoteWrapper {
 }
 
 impl RemoteWrapper {
-    pub fn new<T: RemoteMessage + Serialize>(destination: RemoteAddr, message: Box<T>, conversation_id: Option<Uuid>) -> RemoteWrapper {
+    pub fn new<T: RemoteMessage + Serialize>(destination: RemoteAddr, message: T, conversation_id: Option<Uuid>) -> RemoteWrapper {
         let serializer = message.get_serializer();
         RemoteWrapper {
             destination,
-            message_buffer: serializer.serialize(message.as_ref()).expect("Cannot serialize message"),
+            message_buffer: serializer.serialize(&message).expect("Cannot serialize message"),
             identifier: message.get_identifier().to_string(),
             source: None,
             conversation_id
