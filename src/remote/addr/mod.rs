@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
+use actix::dev::ToEnvelope;
 
 pub mod resolver;
 #[cfg(test)]
@@ -75,10 +76,25 @@ impl Eq for RemoteAddr {}
 
 
 #[derive(Deserialize, Serialize)]
-pub enum AnyAddr<T: Actor> {
+pub enum AnyAddr<A: Actor> {
     #[serde(skip_serializing, skip_deserializing)]
-    Local(Addr<T>),
+    Local(Addr<A>),
     Remote(RemoteAddr)
+}
+
+impl<A: Actor> AnyAddr<A> {
+    fn do_send<M>(&self, msg: M)
+    where
+        M: RemoteMessage,
+        M::Result: Send,
+        A: Handler<M>,
+        A::Context: ToEnvelope<A, M>
+    {
+        match self {
+            AnyAddr::Local(addr) => addr.do_send(msg),
+            AnyAddr::Remote(addr) => addr.do_send(msg)
+        }
+    }
 }
 
 impl<T: Actor> Clone for AnyAddr<T> {
