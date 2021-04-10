@@ -81,6 +81,15 @@ pub enum AnyAddr<T: Actor> {
     Remote(RemoteAddr)
 }
 
+impl<T: Actor> AnyAddr<T> {
+    fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) -> () {
+        match self {
+            AnyAddr::Local(addr) => addr.do_send(msg),
+            AnyAddr::Remote(addr) => addr.do_send(msg)
+        }
+    }
+}
+
 impl<T: Actor> Clone for AnyAddr<T> {
     fn clone(&self) -> Self {
         match self {
