@@ -48,13 +48,13 @@ impl RemoteAddr {
         self.id = AddrRepresentation::Key(id);
     }
 
-    pub fn do_send<T: RemoteMessage + Serialize>(&mut self, msg: T) -> () {
+    pub fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) -> () {
         let _r = self.network_interface.as_ref().expect("Network interface must be set!").do_send(ClusterMessage::Message(
             RemoteWrapper::new(self.clone(), msg, None)
         ));
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&mut self, _msg: Box<T>) -> RecipientRequest<ClusterMessage> {
+    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: Box<T>) -> RecipientRequest<ClusterMessage> {
         unimplemented!("So far, it is not possible to receive responses from remote destinations as futures!")
     }
 }
