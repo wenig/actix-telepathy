@@ -83,7 +83,7 @@ pub enum AnyAddr<A: Actor> {
 }
 
 impl<A: Actor> AnyAddr<A> {
-    fn do_send<M>(&self, msg: M)
+    pub fn do_send<M>(&self, msg: M)
     where
         M: RemoteMessage,
         M::Result: Send,
