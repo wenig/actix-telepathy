@@ -64,7 +64,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         impl Handler<RemoteWrapper> for #name {
             type Result = ();
 
-            fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
+            fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Self::Context) -> Self::Result {
                 #chained_if
             }
         }
