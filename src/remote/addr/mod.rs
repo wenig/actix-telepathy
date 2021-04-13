@@ -69,7 +69,7 @@ impl Clone for RemoteAddr {
 
 impl PartialEq for RemoteAddr {
     fn eq(&self, other: &Self) -> bool {
-        self.socket_addr.eq(&other.socket_addr)
+        self.socket_addr.eq(&other.socket_addr) && self.id.eq(&other.id)
     }
 }
 
@@ -106,3 +106,21 @@ impl<T: Actor> Clone for AnyAddr<T> {
         }
     }
 }
+
+
+impl<T: Actor> PartialEq for AnyAddr<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            AnyAddr::Local(addr) => match other {
+                AnyAddr::Local(other_addr) => addr.eq(other_addr),
+                AnyAddr::Remote(_) => false
+            },
+            AnyAddr::Remote(addr) => match other {
+                AnyAddr::Local(_) => false,
+                AnyAddr::Remote(other_addr) => addr.eq(other_addr)
+            }
+        }
+    }
+}
+
+impl<T: Actor> Eq for AnyAddr<T> {}
