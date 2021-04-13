@@ -48,6 +48,7 @@ impl Actor for NetworkInterface {
             self.connect_to_stream(ctx);
             return Running::Continue
         }
+        Cluster::from_custom_registry().do_send(NodeEvents::MemberDown(self.addr));
         Running::Stop
     }
 
