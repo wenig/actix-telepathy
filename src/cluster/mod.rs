@@ -170,6 +170,7 @@ impl Handler<NodeEvents> for Cluster {
             NodeEvents::MemberDown(host) => {
                 Gossip::from_custom_registry().do_send(GossipIgniting::MemberDown(host.clone()));
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
+                self.nodes.remove(&host);
             }
         }
     }
