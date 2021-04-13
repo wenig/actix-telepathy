@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use actix::dev::ToEnvelope;
+use crate::NetworkInterface;
 
 pub mod resolver;
 #[cfg(test)]
@@ -20,12 +21,12 @@ pub struct RemoteAddr {
     pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
-    pub network_interface: Option<Recipient<ClusterMessage>>,
+    pub network_interface: Option<Addr<NetworkInterface>>,
     pub(crate) id: AddrRepresentation
 }
 
 impl RemoteAddr {
-    pub fn new(socket_addr: SocketAddr, network_interface: Option<Recipient<ClusterMessage>>, id: AddrRepresentation) -> Self {
+    pub fn new(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>, id: AddrRepresentation) -> Self {
         RemoteAddr{socket_addr, network_interface, id}
     }
 
@@ -33,15 +34,15 @@ impl RemoteAddr {
         RemoteAddr{socket_addr, network_interface: None, id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_from_key(socket_addr: SocketAddr, network_interface: Recipient<ClusterMessage>, id: &str) -> Self {
+    pub fn new_from_key(socket_addr: SocketAddr, network_interface: Addr<NetworkInterface>, id: &str) -> Self {
         RemoteAddr{socket_addr, network_interface: Some(network_interface), id: AddrRepresentation::from_str(id).unwrap()}
     }
 
-    pub fn new_gossip(socket_addr: SocketAddr, network_interface: Option<Recipient<ClusterMessage>>) -> Self {
+    pub fn new_gossip(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>) -> Self {
         RemoteAddr::new(socket_addr, network_interface, AddrRepresentation::Gossip)
     }
 
-    pub fn set_network_interface(&mut self, network_interface: Recipient<ClusterMessage>) {
+    pub fn set_network_interface(&mut self, network_interface: Addr<NetworkInterface>) {
         self.network_interface = Some(network_interface);
     }
 
