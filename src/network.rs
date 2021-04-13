@@ -121,7 +121,7 @@ impl NetworkInterface {
         match self.own_addr.clone() {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
-                let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone().recipient()), AddrRepresentation::NetworkInterface);
+                let remote_address = RemoteAddr::new(self.addr.clone(), Some(addr.clone()), AddrRepresentation::NetworkInterface);
                 Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(self.addr.clone(), addr, remote_address, self.seed));
             },
             None => error!("NetworkInterface might not have been started already!")

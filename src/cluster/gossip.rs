@@ -91,7 +91,7 @@ impl Gossip {
         if members.len() > 0 {
             match self.members.get(&member_addr) {
                 Some(node) =>
-                    RemoteAddr::new_gossip(member_addr, Some(node.clone().recipient()))
+                    RemoteAddr::new_gossip(member_addr, Some(node.clone()))
                         .do_send(GossipEvent { members }),
                 None => error!("Should be known by now")
             }
