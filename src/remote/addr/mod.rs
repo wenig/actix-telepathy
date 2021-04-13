@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -69,7 +69,7 @@ impl Clone for RemoteAddr {
 
 impl PartialEq for RemoteAddr {
     fn eq(&self, other: &Self) -> bool {
-        self.socket_addr.eq(&other.socket_addr)
+        self.socket_addr.eq(&other.socket_addr) && self.id.eq(&other.id)
     }
 }
 
@@ -103,6 +103,33 @@ impl<T: Actor> Clone for AnyAddr<T> {
         match self {
             AnyAddr::Local(addr) => {AnyAddr::Local(addr.clone())},
             AnyAddr::Remote(addr) => {AnyAddr::Remote(addr.clone())}
+        }
+    }
+}
+
+
+impl<T: Actor> PartialEq for AnyAddr<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            AnyAddr::Local(addr) => match other {
+                AnyAddr::Local(other_addr) => addr.eq(other_addr),
+                AnyAddr::Remote(_) => false
+            },
+            AnyAddr::Remote(addr) => match other {
+                AnyAddr::Local(_) => false,
+                AnyAddr::Remote(other_addr) => addr.eq(other_addr)
+            }
+        }
+    }
+}
+
+impl<T: Actor> Eq for AnyAddr<T> {}
+
+impl<T: Actor> Hash for AnyAddr<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            AnyAddr::Local(addr) => addr.hash(state),
+            AnyAddr::Remote(addr) => addr.hash(state)
         }
     }
 }

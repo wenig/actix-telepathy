@@ -45,6 +45,22 @@ impl Clone for AddrRepresentation {
     }
 }
 
+impl PartialEq for AddrRepresentation {
+    fn eq(&self, other: &Self) -> bool {
+        let self_key = self.to_string();
+        (self_key == other.to_string() && self_key != "Key")
+        || (self_key == "Key" && match self {
+            AddrRepresentation::Key(key) => match other {
+                AddrRepresentation::Key(other_key) => key == other_key,
+                _ => false
+            } ,
+            _ => false
+        })
+    }
+}
+
+impl Eq for AddrRepresentation {}
+
 
 #[derive(Message)]
 #[rtype(result = "Result<AddrResponse, ()>")]

@@ -2,7 +2,7 @@ use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use crate::{AddrResolver, AddrRequest, AddrResponse};
+use crate::{AddrResolver, AddrRequest, AddrResponse, AddrRepresentation};
 use tokio::time::delay_for;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
@@ -55,4 +55,26 @@ async fn addr_resolver_registers_and_resolves_addr() {
     ta.do_send(TestMessage {});
     delay_for(Duration::from_secs(1)).await;
     assert_eq!((*(identifiers.lock().unwrap())).get(0).unwrap(), &identifier);
+}
+
+#[test]
+fn addr_representation_eq_not_key() {
+    let own = AddrRepresentation::NetworkInterface;
+    let other1 = AddrRepresentation::NetworkInterface;
+    let other2 = AddrRepresentation::Gossip;
+    let other3 = AddrRepresentation::Key("test".to_string());
+
+    assert!(own.eq(&other1));
+    assert!(own.ne(&other2));
+    assert!(own.ne(&other3));
+}
+
+#[test]
+fn addr_representation_eq_key() {
+    let own = AddrRepresentation::Key("own".to_string());
+    let other1 = AddrRepresentation::Key("own".to_string());
+    let other2 = AddrRepresentation::Key("other2".to_string());
+
+    assert!(own.eq(&other1));
+    assert!(own.ne(&other2));
 }
