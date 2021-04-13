@@ -1,4 +1,4 @@
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
 
@@ -124,3 +124,12 @@ impl<T: Actor> PartialEq for AnyAddr<T> {
 }
 
 impl<T: Actor> Eq for AnyAddr<T> {}
+
+impl<T: Actor> Hash for AnyAddr<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        match self {
+            AnyAddr::Local(addr) => addr.hash(state),
+            AnyAddr::Remote(addr) => addr.hash(state)
+        }
+    }
+}
