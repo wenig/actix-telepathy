@@ -16,7 +16,7 @@ mod tests;
 
 
 /// Similar to actix::prelude::Addr but supports communication to remote actors on other nodes.
-#[derive(Deserialize, Serialize, Hash, Debug)]
+#[derive(Deserialize, Serialize, Debug)]
 pub struct RemoteAddr {
     pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
@@ -74,6 +74,13 @@ impl PartialEq for RemoteAddr {
 }
 
 impl Eq for RemoteAddr {}
+
+impl Hash for RemoteAddr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.socket_addr.hash(state);
+        self.id.hash(state);
+    }
+}
 
 
 #[derive(Deserialize, Serialize)]

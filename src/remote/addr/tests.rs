@@ -2,10 +2,17 @@ use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use crate::{AddrResolver, AddrRequest, AddrResponse, AddrRepresentation};
+use crate::{AddrResolver, AddrRequest, AddrResponse, AddrRepresentation, Gossip};
 use tokio::time::delay_for;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use actix::dev::channel::AddressSender;
+use std::net::SocketAddr;
+use port_scanner::request_open_port;
+use rayon::iter::IntoParallelRefIterator;
+use rayon::iter::ParallelIterator;
+use actix_broker::BrokerSubscribe;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -77,4 +84,76 @@ fn addr_representation_eq_key() {
 
     assert!(own.eq(&other1));
     assert!(own.ne(&other2));
+}
+
+struct TestParams {
+    ip: SocketAddr,
+    seeds: Vec<SocketAddr>,
+    last: bool
+}
+
+#[test]
+#[ignore] //github workflows don't get the timing right
+fn remote_addr_ignores_hash() {
+    let ip1: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+    let ip3: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000)).parse().unwrap();
+
+    let arr = [
+        TestParams {ip: ip1.clone(), seeds: vec![], last: false},
+        TestParams {ip: ip2.clone(), seeds: vec![ip1.clone()], last: false},
+        TestParams {ip: ip3.clone(), seeds: vec![ip1.clone()], last: true},
+    ];
+    arr.par_iter().for_each(|p| build_cluster(p.ip, p.seeds.clone(), p.last));
+}
+
+#[actix_rt::main]
+async fn build_cluster(own_ip: SocketAddr, other_ip: Vec<SocketAddr>, last: bool) {
+    let _cluster = Cluster::new(own_ip, other_ip);
+    if last {
+        let returned: Arc<Mutex<Option<usize>>> = Arc::new(Mutex::new(None));
+        let listener = OwnListenerGossipIntroduction {addrs: vec![], returned: returned.clone()}.start();
+        delay_for(Duration::from_millis(200)).await;
+        returned.lock().unwrap().expect("Something should be returned");
+    } else {
+        delay_for(Duration::from_millis(200)).await;
+    }
+}
+
+struct OwnListenerGossipIntroduction {
+    pub addrs: Vec<RemoteAddr>,
+    pub returned: Arc<Mutex<Option<usize>>>
+}
+impl ClusterListener for OwnListenerGossipIntroduction {}
+impl Supervised for OwnListenerGossipIntroduction {}
+
+impl Actor for OwnListenerGossipIntroduction {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.subscribe_system_async::<ClusterLog>(ctx);
+    }
+}
+
+impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
+    type Result = ();
+
+    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            ClusterLog::NewMember(_addr, remote_addr) => {
+                self.addrs.push(remote_addr);
+                if self.addrs.len() >= 2 {
+                    let mut remote_addr = self.addrs.get(0).unwrap().clone();
+                    let mut remote_addr2 = remote_addr.clone();
+                    remote_addr2.network_interface = None;
+                    //let remote_addr3 = self.addrs.get(1).unwrap().clone();
+
+                    let mut map = HashMap::<RemoteAddr, usize>::new();
+                    map.insert(remote_addr, 0);
+                    (*(self.returned.lock().unwrap())) = map.remove(&remote_addr2);
+                }
+            },
+            _ => ()
+        }
+    }
 }
