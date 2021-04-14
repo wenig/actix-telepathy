@@ -175,7 +175,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
                 ClusterMessage::Decline => ctx.stop()
             },
-            Err(err) => error!("{}", err)
+            Err(err) => warn!("{}", err)
         }
     }
 }
