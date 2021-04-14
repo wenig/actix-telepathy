@@ -103,8 +103,6 @@ impl Encoder<ClusterMessage> for ConnectCodec {
                 let buffer_ref: &[u8] = buffer.as_ref();
                 let header_ref: &[u8] = header.as_ref();
 
-                println!("{}", format!("Network Message size {}", header_ref.len() + buffer_ref.len()));
-
                 dst.reserve(header_ref.len() + buffer_ref.len() + (ENDIAN_LENGTH * 2));
                 dst.put_u32((header_ref.len() + buffer_ref.len()) as u32);
                 dst.put_u32(header_ref.len() as u32);
