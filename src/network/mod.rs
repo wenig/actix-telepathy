@@ -1,3 +1,6 @@
+mod reader;
+mod writer;
+
 use actix::prelude::*;
 use log::*;
 use std::net::{SocketAddr};
