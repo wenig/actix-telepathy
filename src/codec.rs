@@ -54,8 +54,6 @@ impl Decoder for ConnectCodec {
             NetworkEndian::read_u32(src.as_ref()) as usize
         };
 
-        println!("{}", format!("Network Message size {}", size));
-
         if src.len() >= size + ENDIAN_LENGTH {
             let _s = src.split_to(ENDIAN_LENGTH);
             let buf = src.split_to(size);
@@ -77,6 +75,9 @@ impl Encoder<ClusterMessage> for ConnectCodec {
         }
 
         let msg = flexbuffers::to_vec(&item).unwrap();
+
+        println!("{}", format!("Network Message size {}", msg.len()));
+
         let msg_ref: &[u8] = msg.as_ref();
 
         dst.reserve(msg_ref.len() + ENDIAN_LENGTH);
