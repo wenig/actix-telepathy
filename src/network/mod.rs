@@ -1,3 +1,5 @@
+mod writer;
+
 use actix::prelude::*;
 use log::*;
 use std::net::{SocketAddr};
@@ -14,17 +16,18 @@ use std::thread::sleep;
 use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
+use crate::network::writer::Writer;
 
 
 pub struct NetworkInterface {
     own_ip: SocketAddr,
     pub addr: SocketAddr,
     stream: Vec<TcpStream>,
-    framed: Vec<FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
     connected: bool,
     own_addr: Option<Addr<NetworkInterface>>,
     counter: i8,
-    seed: bool
+    seed: bool,
+    writer: Option<Addr<Writer>>,
 }
 
 
@@ -60,7 +63,7 @@ impl Actor for NetworkInterface {
 
 impl NetworkInterface {
     pub fn new(own_ip: SocketAddr, addr: SocketAddr, seed: bool) -> NetworkInterface {
-        NetworkInterface {own_ip, addr, stream: vec![], framed: vec![], connected: false, own_addr: None, counter: 0, seed}
+        NetworkInterface {own_ip, addr, stream: vec![], connected: false, own_addr: None, counter: 0, seed, writer: None}
     }
 
     pub fn from_stream(own_ip: SocketAddr, addr: SocketAddr, stream: TcpStream) -> NetworkInterface {
@@ -74,8 +77,7 @@ impl NetworkInterface {
         let (r, w) = stream.into_split();
 
         let framed = actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
-        self.framed.push(framed);
-
+        self.writer = Some(Writer::new(framed).start());
         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
     }
 
@@ -105,9 +107,8 @@ impl NetworkInterface {
                             actix::io::FramedWrite::new(w, ConnectCodec::new(), ctx);
                         let reply_port = act.own_ip.port();
                         framed.write(ClusterMessage::Request(reply_port, act.seed));
-                        act.framed.push(framed);
+                        act.writer = Some(Writer::new(framed).start());
 
-                        // read side of the connection
                         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
                     }
                 },
@@ -130,7 +131,7 @@ impl NetworkInterface {
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
-        &self.framed[0].write(msg);
+        &self.writer.as_ref().unwrap().do_send(msg);
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {
@@ -175,7 +176,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
                 ClusterMessage::Decline => ctx.stop()
             },
-            Err(err) => error!("{}", err)
+            Err(err) => warn!("{}", err)
         }
     }
 }

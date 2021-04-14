@@ -9,6 +9,8 @@ use uuid::Uuid;
 #[rtype(result = "()")]
 pub struct RemoteWrapper {
     pub destination: RemoteAddr,
+    #[serde(skip_serializing)]
+    #[serde(skip_deserializing)]
     pub message_buffer: Vec<u8>,
     pub identifier: String,
     #[serde(skip_serializing)]
