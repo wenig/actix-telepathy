@@ -54,7 +54,7 @@ impl Decoder for ConnectCodec {
             NetworkEndian::read_u32(src.as_ref()) as usize
         };
 
-        println!(format!("Network Message size {}", size));
+        println!("{}", format!("Network Message size {}", size));
 
         if src.len() >= size + ENDIAN_LENGTH {
             let _s = src.split_to(ENDIAN_LENGTH);
