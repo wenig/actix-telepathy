@@ -3,7 +3,7 @@ use std::io;
 use flexbuffers;
 use tokio_util::codec::{Encoder, Decoder};
 use futures::io::Error;
-use bytes::{BytesMut, BufMut};
+use bytes::{BytesMut, BufMut, Buf};
 use byteorder::{NetworkEndian, ByteOrder};
 use serde::{Serialize, Deserialize};
 use crate::remote::RemoteWrapper;
@@ -71,9 +71,9 @@ impl Decoder for ConnectCodec {
         };
 
         if src.len() >= size + (ENDIAN_LENGTH * 2) {
-            src.split_to(ENDIAN_LENGTH);
+            src.advance(ENDIAN_LENGTH);
             let header_size = NetworkEndian::read_u32(src.as_ref()) as usize;
-            src.split_to(ENDIAN_LENGTH);
+            src.advance(ENDIAN_LENGTH);
 
             if size > header_size {
                 let header = src.split_to(header_size);
