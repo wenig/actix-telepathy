@@ -59,7 +59,9 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use log::*;
 
-        impl RemoteActor for #name {}
+        impl RemoteActor for #name {
+            const ACTOR_ID: &'static str = "#name";
+        }
 
         impl Handler<RemoteWrapper> for #name {
             type Result = ();

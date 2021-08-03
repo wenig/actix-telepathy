@@ -103,8 +103,8 @@ impl Actor for Gossip {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        self.register(ctx.address().recipient(), "gossip".to_string());
-        debug!("Gossip actor started");
+        self.register(ctx.address().recipient(), Self::ACTOR_ID.to_string());
+        debug!("{} actor started", Self::ACTOR_ID);
     }
 }
 
