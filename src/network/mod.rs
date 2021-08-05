@@ -16,6 +16,7 @@ use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
 use crate::network::writer::Writer;
+use std::time::SystemTime;
 
 
 pub struct NetworkInterface {
@@ -130,7 +131,9 @@ impl NetworkInterface {
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
+        let s_time = SystemTime::now();
         &self.writer.as_ref().unwrap().do_send(msg);
+        debug!("Writing to stream: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {

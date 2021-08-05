@@ -58,6 +58,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     // Build the output, possibly using quasi-quotation
     let expanded = quote! {
         use log::*;
+        use std::time::SystemTime;
 
         impl RemoteActor for #name {}
 
@@ -65,7 +66,9 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
             type Result = ();
 
             fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Self::Context) -> Self::Result {
+                let s_time = SystemTime::now();
                 #chained_if
+                debug!("RemoteActor Handling RemoteWrapper: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
             }
         }
     };

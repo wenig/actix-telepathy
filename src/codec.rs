@@ -7,6 +7,9 @@ use bytes::{BytesMut, BufMut, Buf};
 use byteorder::{NetworkEndian, ByteOrder};
 use serde::{Serialize, Deserialize};
 use crate::remote::RemoteWrapper;
+use std::time::SystemTime;
+use log::*;
+
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 const ENDIAN_LENGTH: usize = 4;
@@ -51,6 +54,7 @@ impl Decoder for ConnectCodec {
     type Error = Error;
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let s_time = SystemTime::now();
         if !self.prefix {
             if src.len() < 11 {
                 return Ok(None)
@@ -65,10 +69,13 @@ impl Decoder for ConnectCodec {
 
         let size = {
             if src.len() < ENDIAN_LENGTH {
+                debug!("Decoding: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
                 return Ok(None)
             }
             NetworkEndian::read_u32(src.as_ref()) as usize
         };
+
+        let result;
 
         if src.len() >= size + (ENDIAN_LENGTH * 2) {
             src.advance(ENDIAN_LENGTH);
@@ -80,14 +87,16 @@ impl Decoder for ConnectCodec {
                 let buf = src.split_to(size - header_size);
                 let mut cluster_message = flexbuffers::from_slice::<ClusterMessage>(&header).unwrap();
                 cluster_message.set_buffer(buf.to_vec());
-                Ok(Some(cluster_message))
+                result = Ok(Some(cluster_message));
             } else {
                 let buf = src.split_to(size);
-                Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()))
+                result = Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()));
             }
         } else {
-            Ok(None)
+            result = Ok(None);
         }
+        debug!("Decoding: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
+        result
     }
 }
 
@@ -95,6 +104,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
     type Error = Error;
 
     fn encode(&mut self, item: ClusterMessage, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        let s_time = SystemTime::now();
         match &item {
             ClusterMessage::Request(_, _) => dst.extend_from_slice(PREFIX),
             ClusterMessage::Response => dst.extend_from_slice(PREFIX),
@@ -109,6 +119,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
                 dst.put(header_ref);
                 dst.put(buffer_ref);
 
+                debug!("Encoding: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
                 return Ok(());
             },
             _ => {}

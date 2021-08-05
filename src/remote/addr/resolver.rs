@@ -5,6 +5,7 @@ use crate::remote::RemoteWrapper;
 use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
+use std::time::SystemTime;
 
 
 const NETWORKINTERFACE: &str = "networkinterface";
@@ -141,7 +142,9 @@ impl Handler<RemoteWrapper> for AddrResolver {
     type Result = ();
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
+        let s_time = SystemTime::now();
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone()).expect("Could not resolve Recipient for RemoteMessage");
+        debug!("Address resolving: {}", SystemTime::now().duration_since(s_time).unwrap().as_millis());
         let _r = recipient.do_send(msg);
     }
 }

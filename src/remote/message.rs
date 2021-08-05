@@ -2,6 +2,8 @@ use actix::prelude::*;
 use serde::{Serialize, Deserialize};
 use crate::{RemoteAddr, CustomSerialization, NetworkInterface};
 use uuid::Uuid;
+use log::*;
+use std::time::SystemTime;
 
 
 /// Wrapper for messages to be sent to remote actor
@@ -21,14 +23,17 @@ pub struct RemoteWrapper {
 
 impl RemoteWrapper {
     pub fn new<T: RemoteMessage>(destination: RemoteAddr, message: T, conversation_id: Option<Uuid>) -> RemoteWrapper {
+        let s_time = SystemTime::now();
         let serializer = message.get_serializer();
-        RemoteWrapper {
+        let wrapper = RemoteWrapper {
             destination,
             message_buffer: serializer.serialize(&message).expect("Cannot serialize message"),
             identifier: message.get_identifier().to_string(),
             source: None,
             conversation_id
-        }
+        };
+        debug!("Serializing content: {}", SystemTime::now().duration_since(s_time).expect("Didn't work").as_millis());
+        wrapper
     }
 }
 
