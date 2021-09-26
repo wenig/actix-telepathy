@@ -1,4 +1,5 @@
 mod writer;
+mod resolver;
 
 use actix::prelude::*;
 use log::*;
@@ -16,6 +17,7 @@ use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
 use crate::network::writer::Writer;
+use crate::network::resolver::{Resolver, Connect};
 
 
 pub struct NetworkInterface {
@@ -84,8 +86,8 @@ impl NetworkInterface {
         let addr = self.addr.clone().to_string();
 
 
-        actix::actors::resolver::Resolver::from_registry()
-            .send(actix::actors::resolver::Connect::host(addr))
+        Resolver::from_registry()
+            .send(Connect::host(addr))
             .into_actor(self)
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
