@@ -15,13 +15,14 @@ use std::collections::{HashMap};
 use log::*;
 use crate::network::NetworkInterface;
 use std::str::FromStr;
-use futures::StreamExt;
 use futures::executor::block_on;
 use std::net::{SocketAddr};
 use crate::cluster::gossip::{GossipIgniting, MemberMgmt};
 use crate::remote::{RemoteAddr};
 use crate::{CustomSystemService};
 use actix_broker::{BrokerIssue};
+use futures::{StreamExt};
+use tokio_stream::wrappers::TcpListenerStream;
 
 
 #[derive(MessageResponse)]
@@ -69,11 +70,13 @@ impl Actor for Cluster {
     fn started(&mut self, ctx: &mut Self::Context) {
         let listener = Cluster::bind(self.ip_address.to_string()).unwrap();
 
-        ctx.add_message_stream(Box::leak(listener).incoming().map(|st| {
+        let st = Box::leak(listener).map(|st| {
             let st = st.unwrap();
             let addr = st.peer_addr().unwrap();
             TcpConnect(st, addr)
-        }));
+        });
+
+        ctx.add_message_stream(st);
 
         self.own_addr = Some(ctx.address());
 
@@ -101,9 +104,13 @@ impl Cluster {
         )
     }
 
-    fn bind(addr: String) -> IoResult<Box<TcpListener>> {
+    fn bind(addr: String) -> IoResult<Box<TcpListenerStream>> {
         let addr = net::SocketAddr::from_str(&addr).unwrap();
-        let listener = Box::new(block_on(TcpListener::bind(&addr)).unwrap());
+        let listener = Box::new(
+            TcpListenerStream::new(
+                block_on(TcpListener::bind(&addr)).unwrap()
+            )
+        );
         debug!("Listening on {}", addr);
         Ok(listener)
     }

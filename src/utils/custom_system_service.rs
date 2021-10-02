@@ -1,4 +1,4 @@
-use actix::{Actor, Context, Addr, Arbiter, Supervisor, System, SystemService};
+use actix::{Actor, Context, Addr, Supervisor, System, SystemService, ArbiterHandle};
 use std::any::{TypeId, Any};
 use std::collections::HashMap;
 use once_cell::sync::Lazy;
@@ -11,13 +11,13 @@ static SREG: Lazy<Mutex<HashMap<usize, PatchedSystemRegistry>>> =
 
 #[derive(Debug)]
 struct PatchedSystemRegistry {
-    system: Arbiter,
+    system: ArbiterHandle,
     registry: HashMap<TypeId, Box<dyn Any + Send>>,
 }
 
 
 impl PatchedSystemRegistry {
-    pub(crate) fn new(system: Arbiter) -> Self {
+    pub(crate) fn new(system: ArbiterHandle) -> Self {
         Self {
             system,
             registry: HashMap::default(),
@@ -44,32 +44,30 @@ pub trait CustomSystemService: Actor<Context = Context<Self>> + SystemService {
     fn custom_service_started(&mut self, ctx: &mut Context<Self>) {}
 
     fn add_to_registry(addr: Addr<Self>) -> Addr<Self> {
-        System::with_current(|sys| {
-            let mut sreg = SREG.lock();
-            let reg = sreg
-                .entry(sys.id())
-                .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
-            reg.registry.insert(TypeId::of::<Self>(), Box::new(addr.clone()));
-            addr
-        })
+        let sys = System::current();
+        let mut sreg = SREG.lock();
+        let reg = sreg
+            .entry(sys.id())
+            .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
+        reg.registry.insert(TypeId::of::<Self>(), Box::new(addr.clone()));
+        addr
     }
 
     /// Get actor's address from system registry
     fn from_custom_registry() -> Addr<Self> {
-        System::with_current(|sys| {
-            let mut sreg = SREG.lock();
-            let reg = sreg
-                .entry(sys.id())
-                .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
+        let sys = System::current();
+        let mut sreg = SREG.lock();
+        let reg = sreg
+            .entry(sys.id())
+            .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
 
-            if let Some(addr) = reg.registry.get(&TypeId::of::<Self>()) {
-                if let Some(addr) = addr.downcast_ref::<Addr<Self>>() {
-                    return addr.clone();
-                }
+        if let Some(addr) = reg.registry.get(&TypeId::of::<Self>()) {
+            if let Some(addr) = addr.downcast_ref::<Addr<Self>>() {
+                return addr.clone();
             }
+        }
 
-            panic!("Please start Actor before asking for it in registry!");
-        })
+        panic!("Please start Actor before asking for it in registry!");
     }
 }
 

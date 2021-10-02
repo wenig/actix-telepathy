@@ -3,7 +3,6 @@ use serde::{Serialize, Deserialize};
 use crate::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use crate::{AddrResolver, AddrRequest, AddrResponse, AddrRepresentation};
-use tokio::time::delay_for;
 use std::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
@@ -12,6 +11,7 @@ use port_scanner::request_open_port;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use actix_broker::BrokerSubscribe;
+use tokio::time::sleep;
 
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
@@ -59,7 +59,7 @@ async fn addr_resolver_registers_and_resolves_addr() {
     let ta = TestActor {identifiers: identifiers.clone()}.start();
     AddrResolver::from_registry().do_send(AddrRequest::Register(ta.clone().recipient(), identifier.clone()));
     ta.do_send(TestMessage {});
-    delay_for(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
     assert_eq!((*(identifiers.lock().unwrap())).get(0).unwrap(), &identifier);
 }
 
@@ -112,10 +112,10 @@ async fn build_cluster(own_ip: SocketAddr, other_ip: Vec<SocketAddr>, last: bool
     if last {
         let returned: Arc<Mutex<Option<usize>>> = Arc::new(Mutex::new(None));
         let _listener = OwnListenerGossipIntroduction {addrs: vec![], returned: returned.clone()}.start();
-        delay_for(Duration::from_millis(200)).await;
+        sleep(Duration::from_millis(200)).await;
         returned.lock().unwrap().expect("Something should be returned");
     } else {
-        delay_for(Duration::from_millis(200)).await;
+        sleep(Duration::from_millis(200)).await;
     }
 }
 
