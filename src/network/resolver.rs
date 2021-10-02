@@ -1,31 +1,5 @@
-//! DNS resolver and connector utility actor taken from https://github.com/actix/actix/blob/v0.10.0/src/actors/resolver.rs
-//!
-//! ## Example
-//!
-//! ```rust
-//! use actix::actors::resolver;
-//! use actix::prelude::*;
-//!
-//! #[actix_rt::main]
-//! async fn main() {
-//!     Arbiter::spawn(async {
-//!         let resolver = resolver::Resolver::from_registry();
-//!         let addrs = resolver
-//!             .send(resolver::Resolve::host("localhost"))
-//!             .await
-//!             .unwrap();
-//!
-//!         println!("RESULT: {:?}", addrs);
-//!     });
-//!
-//!     let resolver = resolver::Resolver::from_registry();
-//!     let addrs = resolver
-//!         .send(resolver::Connect::host_and_port("localhost", 5000))
-//!         .await
-//!         .unwrap();
-//!     println!("RESULT: {:?}", addrs);
-//! }
-//! ```
+//! DNS resolver and connector utility actor taken and adapted from https://github.com/actix/actix/blob/v0.10.0/src/actors/resolver.rs
+
 use std::collections::VecDeque;
 use std::future::Future;
 use std::io;
@@ -39,33 +13,17 @@ use log::warn;
 use tokio::net::TcpStream;
 
 use actix::prelude::*;
-use actix::fut::Either;
-use actix::clock::Delay;
-use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
+use trust_dns_resolver::{TokioAsyncResolver as AsyncResolver};
 use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
 use trust_dns_resolver::lookup_ip::LookupIp;
 use trust_dns_resolver::error::ResolveError;
+use futures::prelude::future::Either;
+use tokio::time::{sleep, Sleep};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Resolve {
     pub name: String,
     pub port: Option<u16>,
-}
-
-impl Resolve {
-    pub fn host<T: AsRef<str>>(host: T) -> Resolve {
-        Resolve {
-            name: host.as_ref().to_owned(),
-            port: None,
-        }
-    }
-
-    pub fn host_and_port<T: AsRef<str>>(host: T, port: u16) -> Resolve {
-        Resolve {
-            name: host.as_ref().to_owned(),
-            port: Some(port),
-        }
-    }
 }
 
 impl Message for Resolve {
@@ -86,22 +44,6 @@ impl Connect {
             port: None,
             timeout: Duration::from_secs(1),
         }
-    }
-
-    pub fn host_and_port<T: AsRef<str>>(host: T, port: u16) -> Connect {
-        Connect {
-            name: host.as_ref().to_owned(),
-            port: Some(port),
-            timeout: Duration::from_secs(1),
-        }
-    }
-
-    /// Set connect timeout
-    ///
-    /// By default timeout is set to a 1 second.
-    pub fn timeout(mut self, timeout: Duration) -> Connect {
-        self.timeout = timeout;
-        self
     }
 }
 
@@ -141,15 +83,6 @@ pub struct Resolver {
     err: Option<String>,
 }
 
-impl Resolver {
-    pub fn new(config: ResolverConfig, options: ResolverOpts) -> Resolver {
-        Resolver {
-            resolver: None,
-            cfg: Some((config, options)),
-            err: None,
-        }
-    }
-}
 
 impl Actor for Resolver {
     type Context = Context<Self>;
@@ -159,19 +92,16 @@ impl Actor for Resolver {
             async move { cfg }
                 .into_actor(self)
                 .then(
-                    |cfg, this, _| -> Pin<Box<dyn ActorFuture<Actor = Self, Output = _>>> {
+                    |cfg, this, _| -> Pin<Box<dyn ActorFuture<Self, Output = _>>> {
                         if let Some(cfg) = cfg {
-                            return Box::pin(
-                                AsyncResolver::tokio(cfg.0, cfg.1).into_actor(this),
+                            return Box::pin( async {
+                                    AsyncResolver::tokio(cfg.0, cfg.1)
+                                }.into_actor(this)
                             );
                         }
                         Box::pin(
                             async {
-                                match AsyncResolver::from_system_conf(
-                                    tokio::runtime::Handle::current(),
-                                )
-                                .await
-                                {
+                                match AsyncResolver::tokio_from_system_conf() {
                                     Ok(resolver) => Ok(resolver),
                                     Err(err) => {
                                         warn!(
@@ -182,7 +112,6 @@ impl Actor for Resolver {
                                             ResolverConfig::default(),
                                             ResolverOpts::default(),
                                         )
-                                        .await
                                     }
                                 }
                             }
@@ -345,13 +274,12 @@ impl ResolveFut {
     }
 }
 
-impl ActorFuture for ResolveFut {
+impl<A: Actor> ActorFuture<A> for ResolveFut {
     type Output = Result<VecDeque<SocketAddr>, ResolverError>;
-    type Actor = Resolver;
     fn poll(
         mut self: Pin<&mut Self>,
-        _: &mut Resolver,
-        _: &mut Context<Resolver>,
+        _: &mut A,
+        _: &mut A::Context,
         task: &mut task::Context<'_>,
     ) -> Poll<Self::Output> {
         if let Some(err) = self.error.take() {
@@ -384,11 +312,31 @@ impl ActorFuture for ResolveFut {
     }
 }
 
+struct HasSleep {
+    sleep: Pin<Box<Sleep>>
+}
+
+impl HasSleep {
+    pub fn new(duration: Duration) -> Self {
+        Self {
+            sleep: Pin::from(Box::new(sleep(duration)))
+        }
+    }
+}
+
+impl Future for HasSleep {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> Poll<Self::Output> {
+        self.get_mut().sleep.as_mut().poll(cx)
+    }
+}
+
 /// A TCP stream connector.
 #[allow(clippy::type_complexity)]
 pub struct TcpConnector {
     addrs: VecDeque<SocketAddr>,
-    timeout: Delay,
+    timeout: HasSleep,
     stream: Option<Pin<Box<dyn Future<Output = Result<TcpStream, io::Error>>>>>,
 }
 
@@ -401,22 +349,21 @@ impl TcpConnector {
         TcpConnector {
             addrs,
             stream: None,
-            timeout: tokio::time::delay_for(timeout),
+            timeout: HasSleep::new(timeout)
         }
     }
 }
 
-impl ActorFuture for TcpConnector {
+impl<A: Actor> ActorFuture<A> for TcpConnector {
     type Output = Result<TcpStream, ResolverError>;
-    type Actor = Resolver;
 
     fn poll(
         self: Pin<&mut Self>,
-        _: &mut Resolver,
-        _: &mut Context<Resolver>,
+        _: &mut A,
+        _: &mut A::Context,
         cx: &mut task::Context<'_>,
     ) -> Poll<Self::Output> {
-        let mut this = self.get_mut();
+        let this = self.get_mut();
 
         // timeout
         if let Poll::Ready(_) = Pin::new(&mut this.timeout).poll(cx) {

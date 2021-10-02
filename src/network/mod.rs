@@ -5,7 +5,6 @@ use actix::prelude::*;
 use log::*;
 use std::net::{SocketAddr};
 use tokio::net::TcpStream;
-use tokio_util::codec::{FramedRead};
 use std::io::{Error};
 
 use crate::cluster::{Cluster, NodeEvents, Gossip};
@@ -13,11 +12,12 @@ use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::{WriteHandler};
 use std::thread::sleep;
-use actix::clock::Duration;
 use std::fmt;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
 use crate::network::writer::Writer;
 use crate::network::resolver::{Resolver, Connect};
+use tokio::time::Duration;
+use tokio_util::codec::FramedRead;
 
 
 pub struct NetworkInterface {
@@ -84,7 +84,6 @@ impl NetworkInterface {
 
     fn connect_to_stream(&mut self, ctx: &mut Context<Self>){
         let addr = self.addr.clone().to_string();
-
 
         Resolver::from_registry()
             .send(Connect::host(addr))
