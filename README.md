@@ -1,4 +1,8 @@
+[![crates.io](https://img.shields.io/crates/v/actix-telepathy?label=latest)](https://crates.io/crates/actix-telepathy)
 ![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.3.0/status.svg)](https://deps.rs/crate/actix-telepathy/0.3.0)
+![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
 # Actix Telepathy
 
@@ -15,7 +19,7 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 ```toml
 [dependencies]
 actix = "0.10"
-actix-telepathy = "0.2.0"
+actix-telepathy = "0.3.0"
 ```
 
 ### main.rs
