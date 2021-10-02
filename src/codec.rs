@@ -1,12 +1,12 @@
 use actix::prelude::*;
 use std::io;
 use flexbuffers;
-use tokio_util::codec::{Encoder, Decoder};
 use futures::io::Error;
 use bytes::{BytesMut, BufMut, Buf};
 use byteorder::{NetworkEndian, ByteOrder};
 use serde::{Serialize, Deserialize};
 use crate::remote::RemoteWrapper;
+use tokio_util::codec::{Decoder, Encoder};
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 const ENDIAN_LENGTH: usize = 4;

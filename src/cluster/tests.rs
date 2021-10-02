@@ -5,7 +5,7 @@ use port_scanner::{local_port_available, request_open_port};
 use std::net::SocketAddr;
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
-use tokio::time::{delay_for, Duration};
+use tokio::time::{Duration, sleep};
 use std::sync::{Arc, Mutex};
 use rayon::prelude::*;
 
@@ -125,7 +125,7 @@ async fn cluster_adds_node_and_from_stream() {
     let _addr = own_listener.start();
     let _network_interface = NetworkInterface::new("127.0.0.1:1993".parse().unwrap(),
                                                    "127.0.0.1:1992".parse().unwrap(), true).start();
-    delay_for(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
     assert!(connections.lock().unwrap().contains(&("127.0.0.1:1993".parse().unwrap())));
     assert!(connections.lock().unwrap().contains(&("127.0.0.1:1992".parse().unwrap())));
 }
@@ -141,7 +141,7 @@ async fn gossip_adds_member_and_resolves_it() {
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {asking: other_ip.clone(), addrs: Arc::clone(&addrs)}.start();
     let _network_interface = NetworkInterface::new(other_ip, local_ip, true).start();
-    delay_for(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
     assert_eq!(addrs.lock().unwrap().len(), 2);
 }
 
@@ -153,7 +153,7 @@ async fn gossip_removes_member() {
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {asking: other_ip.clone(), addrs: Arc::clone(&addrs)}.start();
     let _network_interface = NetworkInterface::new(other_ip, local_ip, true).start();
-    delay_for(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(1)).await;
     assert_eq!(addrs.lock().unwrap().len(), 2);
 }
 
@@ -183,11 +183,11 @@ fn gossip_adds_member_and_introduces_other_members() {
 
 #[actix_rt::main]
 async fn build_cluster(own_ip: SocketAddr, other_ip: Vec<SocketAddr>, start: u64, delay: u64, end: u64, expect: usize) {
-    delay_for(Duration::from_millis(start)).await;
+    sleep(Duration::from_millis(start)).await;
     let _cluster = Cluster::new(own_ip, other_ip);
     let addrs = Arc::new(Mutex::new(vec![]));
     let _cluster_listener = OwnListenerGossipIntroduction {addrs: Arc::clone(&addrs)}.start();
-    delay_for(Duration::from_millis(delay)).await;
+    sleep(Duration::from_millis(delay)).await;
     assert_eq!((*(addrs.lock().unwrap())).len(), expect);
-    delay_for(Duration::from_millis(end)).await;
+    sleep(Duration::from_millis(end)).await;
 }
