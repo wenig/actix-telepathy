@@ -7,13 +7,16 @@ use crate::prelude::*;
 
 #[derive(Message, Serialize, Deserialize, RemoteMessage)]
 #[rtype(Result = "()")]
-struct MyRemoteMessage<T> {
+struct MyRemoteMessage<T: Serialize + Send> {
     value: T
 }
 
 
+type MyFloatMessage = MyRemoteMessage<f32>;
+
+
 #[derive(RemoteActor)]
-#[remote_messages(MyRemoteMessage<f32>)]
+#[remote_messages(MyFloatMessage)]
 struct MyRemoteActor {}
 
 
@@ -22,18 +25,17 @@ impl Actor for MyRemoteActor {
 }
 
 
-impl Handler<MyRemoteMessage<f32>> for MyRemoteActor {
+impl Handler<MyFloatMessage> for MyRemoteActor {
     type Result = ();
 
-    fn handle(&mut self, msg: MyRemoteMessage<f32>, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: MyFloatMessage, _ctx: &mut Self::Context) -> Self::Result {
         let _r = msg.value + 1.0;
     }
 }
 
 
 #[actix_rt::test]
-fn generic_remote_messages() {
+async fn generic_remote_messages() {
     let addr = MyRemoteActor {}.start();
     addr.do_send(MyRemoteMessage { value: 4.2 });
-    sleep(Duration::from_millis(200));
 }

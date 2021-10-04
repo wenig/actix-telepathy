@@ -35,6 +35,7 @@ fn load_config_yaml() -> Config {
 pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let s = name.to_string();
     let sources = get_with_source_attr(&input).expect("Expected correct syntax");
 
@@ -56,7 +57,7 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use log::*;
 
-        impl RemoteMessage for #name {
+        impl #impl_generics RemoteMessage for #name #ty_generics #where_clause {
             type Serializer = #serializer;
             const IDENTIFIER: &'static str = #s;
 
