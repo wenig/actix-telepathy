@@ -14,8 +14,7 @@ use actix_broker::BrokerSubscribe;
 use tokio::time::sleep;
 
 
-#[derive(Message, Serialize, Deserialize, RemoteMessage)]
-#[rtype(result = "()")]
+#[derive(RemoteMessage, Serialize, Deserialize)]
 struct TestMessage {}
 
 
