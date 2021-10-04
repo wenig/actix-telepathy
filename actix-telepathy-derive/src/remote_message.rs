@@ -73,6 +73,10 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
                 #set_source
             }
         }
+
+        impl Message for #name {
+            type Result = ();
+        }
     };
 
     TokenStream::from(expanded)
