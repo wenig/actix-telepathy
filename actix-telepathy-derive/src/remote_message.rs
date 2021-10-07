@@ -74,7 +74,7 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl Message for #name {
+        impl #impl_generics Message for #name #ty_generics #where_clause {
             type Result = ();
         }
     };
