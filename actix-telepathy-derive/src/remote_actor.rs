@@ -18,6 +18,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let messages = get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least on Message");
 
     let mut chained_if = quote! {};
@@ -59,11 +60,11 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     let expanded = quote! {
         use log::*;
 
-        impl RemoteActor for #name {
+        impl #impl_generics RemoteActor for #name #ty_generics #where_clause {
             const ACTOR_ID: &'static str = "#name";
         }
 
-        impl Handler<RemoteWrapper> for #name {
+        impl #impl_generics Handler<RemoteWrapper> for #name #ty_generics #where_clause {
             type Result = ();
 
             fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Self::Context) -> Self::Result {
