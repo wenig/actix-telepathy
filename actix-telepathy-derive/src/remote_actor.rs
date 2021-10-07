@@ -61,7 +61,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         use log::*;
 
         impl #impl_generics RemoteActor for #name #ty_generics #where_clause {
-            const ACTOR_ID: &'static str = "#name";
+            const ACTOR_ID: &'static str = "#name#ty_generics";
         }
 
         impl #impl_generics Handler<RemoteWrapper> for #name #ty_generics #where_clause {

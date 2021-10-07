@@ -1,12 +1,18 @@
 use std::collections::HashMap;
 use actix::prelude::*;
+use ndarray::Array1;
 use crate::prelude::*;
 use crate::protocols::cluster_nodes::ClusterNodes;
-use reduce::ReduceMessageF32;
+use reduce::{ReduceMessage};
+use crate::CustomSystemService;
+use log::*;
 
 pub mod reduce;
 pub mod cluster_nodes;
 mod helpers;
+
+
+pub type ProtocolDataType = Array1<f32>;
 
 /// # ProtocolsReceiver<V>
 ///
@@ -16,6 +22,7 @@ mod helpers;
 /// ## Template for new protocols
 ///
 /// ```rust
+/// // V: Sum + Product + Send + Unpin + 'static + Sized + Serialize
 /// pub trait ProtocolName {
 ///     fn protocol_name<V: Add + Mul + Div>(&mut self, value: V, receiver_node_id: usize, /* ... */);
 ///     /* ... */
@@ -40,15 +47,22 @@ mod helpers;
 ///
 /// ```
 #[derive(RemoteActor)]
-#[remote_messages(ReduceMessageF32)]
-pub struct ProtocolsReceiver<V> {
-    message_buffer: HashMap<String, ProtocolBuffer<V>>,
+#[remote_messages(ReduceMessage)]
+pub struct ProtocolsReceiver {
+    message_buffer: HashMap<String, ProtocolBuffer<ProtocolDataType>>,
     cluster_nodes: ClusterNodes,
-    recipient: Option<Recipient<ProtocolFinished<V>>>
+    recipient: Option<Recipient<ProtocolFinished<ProtocolDataType>>>
 }
 
-impl<V> ProtocolsReceiver<V> {
-    pub fn add_to_buffer(&mut self, protocol_id: String, value: V, protocol_operation: ProtocolOperation) {
+impl ProtocolsReceiver {
+    pub fn new(recipient: Recipient<ProtocolFinished<ProtocolDataType>>) -> Self {
+        Self {
+            recipient: Some(recipient),
+            ..Default::default()
+        }
+    }
+
+    pub fn add_to_buffer(&mut self, protocol_id: String, value: ProtocolDataType, protocol_operation: ProtocolOperation) {
         match self.message_buffer.get_mut(&protocol_id) {
             None => {
                 let mut protocol_buffer = ProtocolBuffer::new(protocol_operation);
@@ -59,7 +73,7 @@ impl<V> ProtocolsReceiver<V> {
         }
     }
 
-    pub fn try_finish_protocol(&mut self, protocol_id: String) -> Option<Vec<V>> {
+    pub fn try_finish_protocol(&mut self, protocol_id: String) -> Option<Vec<ProtocolDataType>> {
         let protocol_buffer = self.message_buffer.get(&protocol_id)
             .expect(&format!("Unknown protocol_id '{}' received", protocol_id));
 
@@ -71,13 +85,13 @@ impl<V> ProtocolsReceiver<V> {
     }
 }
 
-impl<V> Actor for ProtocolsReceiver<V> {
+impl Actor for ProtocolsReceiver {
     type Context = Context<Self>;
 }
 
-impl<V> Supervised for ProtocolsReceiver<V> {}
+impl Supervised for ProtocolsReceiver {}
 
-impl<V> Default for ProtocolsReceiver<V> {
+impl Default for ProtocolsReceiver {
     fn default() -> Self {
         Self {
             message_buffer: Default::default(),
@@ -87,10 +101,15 @@ impl<V> Default for ProtocolsReceiver<V> {
     }
 }
 
-impl<V> SystemService for ProtocolsReceiver<V> {}
+impl SystemService for ProtocolsReceiver {}
+impl CustomSystemService for ProtocolsReceiver {
+    fn custom_service_started(&mut self, _ctx: &mut Context<Self>) {
+        debug!("ProtocolReceiver started");
+    }
+}
 
 
-enum ProtocolOperation {
+pub enum ProtocolOperation {
     Reduce,
     AllReduce,
     Collect,
