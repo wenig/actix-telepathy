@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use actix::dev::ToEnvelope;
-use crate::{NetworkInterface, RemoteActor};
+use crate::{NetworkInterface};
 
 pub mod resolver;
 #[cfg(test)]
