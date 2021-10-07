@@ -1,6 +1,8 @@
 use std::collections::HashMap;
-use actix::{Actor, Context, Recipient, Supervised, SystemService, Message};
+use actix::prelude::*;
+use crate::prelude::*;
 use crate::protocols::cluster_nodes::ClusterNodes;
+use reduce::ReduceMessageF32;
 
 pub mod reduce;
 pub mod cluster_nodes;
@@ -37,6 +39,8 @@ mod helpers;
 /// }
 ///
 /// ```
+#[derive(RemoteActor)]
+#[remote_messages(ReduceMessageF32)]
 pub struct ProtocolsReceiver<V> {
     message_buffer: HashMap<String, ProtocolBuffer<V>>,
     cluster_nodes: ClusterNodes,

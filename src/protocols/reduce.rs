@@ -81,6 +81,8 @@ impl<V: Add + Mul + Div> Handler<ReduceMessage<V>> for ProtocolsReceiver<V> {
     }
 }
 
+pub type ReduceMessageF32 = ReduceMessage<f32>;
+
 #[cfg(test)]
 mod tests {
     use std::ops::{Add, Div, Mul};
