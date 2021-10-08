@@ -16,7 +16,7 @@ pub type ProtocolDataType = Array1<f32>;
 
 /// # ProtocolsReceiver<V>
 ///
-/// A registry actor that is resposible for receiving and collecting messages. Node organistion is
+/// A registry actor that is responsible for receiving and collecting messages. Node organistion is
 /// handled by the `ClusterNodes` struct.
 ///
 /// ## Template for new protocols
@@ -55,9 +55,10 @@ pub struct ProtocolsReceiver {
 }
 
 impl ProtocolsReceiver {
-    pub fn new(recipient: Recipient<ProtocolFinished<ProtocolDataType>>) -> Self {
+    pub fn new(recipient: Recipient<ProtocolFinished<ProtocolDataType>>, cluster_nodes: ClusterNodes) -> Self {
         Self {
             recipient: Some(recipient),
+            cluster_nodes,
             ..Default::default()
         }
     }
@@ -69,7 +70,9 @@ impl ProtocolsReceiver {
                 protocol_buffer.push(value);
                 self.message_buffer.insert(protocol_id, protocol_buffer);
             },
-            Some(buffer) => buffer.push(value)
+            Some(buffer) => {
+                buffer.push(value);
+            }
         }
     }
 
@@ -87,6 +90,10 @@ impl ProtocolsReceiver {
 
 impl Actor for ProtocolsReceiver {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Self::Context) {
+        self.register(ctx.address().recipient());
+    }
 }
 
 impl Supervised for ProtocolsReceiver {}

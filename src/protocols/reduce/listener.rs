@@ -7,10 +7,11 @@ use std::collections::{HashSet, HashMap};
 use serde::{Serialize, Deserialize};
 
 use std::sync::{Arc, Mutex};
+use ndarray::Array1;
 use crate::prelude::*;
-use crate::{ClusterListener, ClusterLog, RemoteAddr};
+use crate::{ClusterListener, ClusterLog, CustomSystemService, RemoteAddr};
 use crate::protocols::cluster_nodes::ClusterNodes;
-use crate::protocols::{ProtocolDataType, ProtocolFinished};
+use crate::protocols::{ProtocolDataType, ProtocolFinished, ProtocolsReceiver};
 use crate::protocols::reduce::{Reduce, ReduceMessage, ReduceOperation};
 
 
@@ -29,12 +30,14 @@ pub struct TestClusterMemberListener {
     pub(crate) sorted_nodes: HashMap<usize, RemoteAddr>,
     pub(crate) cluster_nodes: Option<ClusterNodes>,
     sorted_addr_buffer: Vec<SocketAddr>,
-    value: ProtocolDataType
+    value: ProtocolDataType,
+    own_addr: Option<Addr<Self>>,
+    pub(crate) expected: Option<Arc<Mutex<Option<Array1<f32>>>>>
 }
 
 
 impl TestClusterMemberListener {
-    pub fn new(is_main: bool, main_socket_addr: SocketAddr, n_cluster_nodes: usize, local_host: SocketAddr, value: ProtocolDataType) -> Self {
+    pub fn new(is_main: bool, main_socket_addr: SocketAddr, n_cluster_nodes: usize, local_host: SocketAddr, value: ProtocolDataType, expected: Option<Arc<Mutex<Option<Array1<f32>>>>>) -> Self {
         Self {
             is_main,
             main_socket_addr,
@@ -45,7 +48,9 @@ impl TestClusterMemberListener {
             sorted_nodes: HashMap::new(),
             cluster_nodes: None,
             sorted_addr_buffer: vec![],
-            value
+            value,
+            own_addr: None,
+            expected
         }
     }
 
@@ -72,6 +77,9 @@ impl TestClusterMemberListener {
 
     fn finish_intro(&mut self) {
         self.cluster_nodes = Some(ClusterNodes::from(self.sorted_nodes.clone()));
+        let recipient = self.own_addr.as_ref().unwrap().clone().recipient();
+        let cluster_nodes = self.cluster_nodes.as_ref().unwrap().clone();
+        let _protocol_receiver = ProtocolsReceiver::start_service_with(move || ProtocolsReceiver::new(recipient.clone(), cluster_nodes.clone()));
         self.cluster_nodes.as_ref().unwrap().reduce_to_main(self.value.clone(), ReduceOperation::Sum, "test_reduce_sum");
     }
 }
@@ -81,9 +89,9 @@ impl Actor for TestClusterMemberListener {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Self::Context) {
-        println!("listener started");
         self.subscribe_system_async::<ClusterLog>(ctx);
         self.register(ctx.address().recipient());
+        self.own_addr = Some(ctx.address());
     }
 
     fn stopped(&mut self, _ctx: &mut Self::Context) {
