@@ -56,12 +56,14 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         }
     }
 
+    let name_str = name.to_string();
+
     // Build the output, possibly using quasi-quotation
     let expanded = quote! {
         use log::*;
 
         impl #impl_generics RemoteActor for #name #ty_generics #where_clause {
-            const ACTOR_ID: &'static str = "#name";
+            const ACTOR_ID: &'static str = #name_str;
         }
 
         impl #impl_generics Handler<RemoteWrapper> for #name #ty_generics #where_clause {

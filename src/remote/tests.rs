@@ -1,7 +1,6 @@
+use std::marker::PhantomData;
 use actix::prelude::*;
-use actix_rt::time::sleep;
 use serde::{Serialize, Deserialize};
-use tokio::time::Duration;
 use crate::prelude::*;
 
 
@@ -17,7 +16,7 @@ type MyFloatMessage = MyRemoteMessage<f32>;
 #[derive(RemoteActor)]
 #[remote_messages(MyFloatMessage)]
 struct MyRemoteActor<T: Send + Unpin + 'static + Sized> {
-    value: T
+    phantom: PhantomData<T>
 }
 
 
@@ -37,6 +36,6 @@ impl<T: Send + Unpin + 'static> Handler<MyFloatMessage> for MyRemoteActor<T> {
 
 #[actix_rt::test]
 async fn generic_remote_messages() {
-    let addr = MyRemoteActor { value: 10 }.start();
+    let addr: Addr<MyRemoteActor<f32>> = MyRemoteActor { phantom: PhantomData }.start();
     addr.do_send(MyRemoteMessage { value: 4.2 });
 }
