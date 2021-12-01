@@ -19,7 +19,7 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 ```toml
 [dependencies]
 actix = "0.10"
-actix-telepathy = "0.3.0"
+actix-telepathy = "0.4.0"
 ```
 
 ### main.rs
