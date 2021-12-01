@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use actix::dev::ToEnvelope;
-use crate::NetworkInterface;
+use crate::{NetworkInterface};
 
 pub mod resolver;
 #[cfg(test)]
@@ -101,6 +101,13 @@ impl<A: Actor> AnyAddr<A> {
         match self {
             AnyAddr::Local(addr) => addr.do_send(msg),
             AnyAddr::Remote(addr) => addr.do_send(msg)
+        }
+    }
+
+    pub fn change_id(&mut self, id: &str) {
+        match self {
+            AnyAddr::Remote(addr) => addr.change_id(id.to_string()),
+            _ => ()
         }
     }
 }

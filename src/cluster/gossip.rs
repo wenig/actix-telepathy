@@ -11,8 +11,7 @@ use std::net::SocketAddr;
 use std::fmt::Debug;
 use std::str::FromStr;
 
-#[derive(Message, Serialize, Deserialize, Debug, RemoteMessage)]
-#[rtype(result = "()")]
+#[derive(RemoteMessage, Serialize, Deserialize, Debug)]
 pub struct GossipEvent {
     members: Vec<SocketAddr>
 }
