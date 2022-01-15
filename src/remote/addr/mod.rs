@@ -83,6 +83,7 @@ impl Hash for RemoteAddr {
 }
 
 
+/// A helper Enum that can either be an [Addr](https://github.com/actix/actix/blob/master/actix/src/address/mod.rs) or a [RemoteAddr](https://github.com/wenig/actix-telepathy/blob/main/src/remote/addr/mod.rs).
 #[derive(Deserialize, Serialize)]
 pub enum AnyAddr<A: Actor> {
     #[serde(skip_serializing, skip_deserializing)]

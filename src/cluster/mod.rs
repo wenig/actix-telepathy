@@ -55,6 +55,11 @@ pub enum NodeEvents{
 #[rtype(result = "()")]
 pub struct GossipResponse(pub(crate) SocketAddr);
 
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct ConnectToNode(pub(crate) SocketAddr);
+
+
 /// Central Actor for cluster handling
 pub struct Cluster {
     ip_address: SocketAddr,
@@ -180,6 +185,14 @@ impl Handler<NodeEvents> for Cluster {
                 self.nodes.remove(&host);
             }
         }
+    }
+}
+
+impl Handler<ConnectToNode> for Cluster {
+    type Result = ();
+
+    fn handle(&mut self, msg: ConnectToNode, _ctx: &mut Self::Context) -> Self::Result {
+        self.add_node(msg.0, false);
     }
 }
 
