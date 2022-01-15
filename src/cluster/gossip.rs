@@ -4,11 +4,12 @@ use std::collections::{HashMap, HashSet};
 use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
 use crate::remote::{RemoteWrapper, RemoteMessage, RemoteActor};
-use crate::{RemoteAddr, Cluster, CustomSystemService, GossipResponse};
+use crate::{RemoteAddr, Cluster, CustomSystemService, ConnectToNode};
 use crate::{DefaultSerialization, CustomSerialization};
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use std::net::SocketAddr;
 use std::fmt::Debug;
+use std::iter::FromIterator;
 use std::str::FromStr;
 use rand::prelude::{IteratorRandom, ThreadRng};
 
@@ -20,17 +21,17 @@ pub enum GossipIgniting {
     MemberDown(SocketAddr)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum GossipEvent {
     Join,
     Leave
 }
 
-#[derive(RemoteMessage, Serialize, Deserialize, Debug)]
+#[derive(RemoteMessage, Serialize, Deserialize, Debug, Clone)]
 pub struct GossipMessage {
     pub event: GossipEvent,
     addr: SocketAddr,
-    counter: usize
+    seen: HashSet<SocketAddr>
 }
 
 #[derive(Message)]
@@ -47,19 +48,19 @@ pub struct NodeResolving{
 }
 
 #[derive(RemoteActor)]
-#[remote_messages(GossipEvent)]
+#[remote_messages(GossipMessage)]
 pub struct Gossip {
     own_addr: SocketAddr,
-    cluster: Addr<Cluster>,
     members: HashMap<SocketAddr, Addr<NetworkInterface>>,
+    waiting_to_add: Vec<SocketAddr>
 }
 
 impl Default for Gossip {
     fn default() -> Self {
         Self {
             own_addr: SocketAddr::from_str("127.0.0.1:8000").unwrap(),
-            cluster: Cluster::from_custom_registry(),
             members: HashMap::new(),
+            waiting_to_add: vec![]
         }
     }
 }
@@ -80,43 +81,24 @@ impl Gossip {
     }
 
     fn ignite_member_up(&self, new_addr: SocketAddr) {
-        self.gossip_member_event(new_addr, GossipEvent::Join, 1);
+        self.gossip_member_event(new_addr, GossipEvent::Join, HashSet::from_iter([self.own_addr.clone()]));
     }
 
     fn ignite_member_down(&self, leaving_addr: SocketAddr) {
-        self.gossip_member_event(leaving_addr, GossipEvent::Leave, 1);
+        self.gossip_member_event(leaving_addr, GossipEvent::Leave, HashSet::from_iter([self.own_addr.clone()]));
     }
 
-    fn gossip_member_event(&self, addr: SocketAddr, event: GossipEvent, counter: usize) {
+    fn gossip_member_event(&self, addr: SocketAddr, event: GossipEvent, seen: HashSet<SocketAddr>) {
         let random_members = self.choose_random_members(3);
 
         let gossip_message = GossipMessage {
             event,
             addr,
-            counter
+            seen
         };
 
         for member in random_members {
             member.do_send(gossip_message.clone())
-        }
-    }
-
-    fn gossip_members(&mut self, member_addr: SocketAddr) {
-        let members: Vec<SocketAddr> = self.members.keys().into_iter().filter_map(|x| {
-            if x.eq(&member_addr) {
-                None
-            } else {
-                Some(x.clone())
-            }
-        }).collect();
-
-        if members.len() > 0 {
-            match self.members.get(&member_addr) {
-                Some(node) =>
-                    RemoteAddr::new_gossip(member_addr, Some(node.clone()))
-                        .do_send(GossipEvent { members }),
-                None => error!("Should be known by now")
-            }
         }
     }
 
@@ -127,6 +109,16 @@ impl Gossip {
             .map(|(socket_addr, network_interface)| RemoteAddr::new_gossip(socket_addr.clone(), Some(network_interface.clone())))
             .collect()
     }
+
+    fn connect_to_node(&mut self, addr: &SocketAddr) {
+        self.waiting_to_add.push(addr.clone());
+        Cluster::from_custom_registry().do_send(ConnectToNode(addr.clone()))
+    }
+
+    fn all_seen(&self, seen: &HashSet<SocketAddr>) -> bool {
+        let members: HashSet<SocketAddr> = self.members.keys().cloned().collect();
+        members.difference(seen).into_iter().collect::<HashSet<&SocketAddr>>().is_empty()
+    }
 }
 
 impl Actor for Gossip {
@@ -135,16 +127,6 @@ impl Actor for Gossip {
     fn started(&mut self, ctx: &mut Self::Context) {
         self.register(ctx.address().recipient());
         debug!("{} actor started", Self::ACTOR_ID);
-    }
-}
-
-impl Handler<GossipEvent> for Gossip {
-    type Result = ();
-
-    fn handle(&mut self, msg: GossipEvent, _ctx: &mut Context<Self>) -> Self::Result {
-        for addr in msg.members {
-            self.cluster.do_send(GossipResponse(addr))
-        }
     }
 }
 
@@ -169,28 +151,37 @@ impl Handler<GossipMessage> for Gossip {
     type Result = ();
 
     fn handle(&mut self, msg: GossipMessage, _ctx: &mut Self::Context) -> Self::Result {
+        let all_seen = self.all_seen(&msg.seen);
+        let mut seen = msg.seen;
+
         match &msg.event {
             GossipEvent::Join => {
-                if self.members.contains_key(&msg.addr) {
-                    if msg.counter != self.members.len() { // todo: check if own addr is part of it
-                        self.gossip_member_event(msg.addr, msg.event, msg.counter + 1);
-                    }
-                } else {
-                    self.gossip_member_event(msg.addr.clone(), msg.event.clone(), msg.counter + 1);
-                    // member is added after node connects
+                let already_knows = self.members.contains_key(&msg.addr);
+
+                if already_knows & all_seen {
+                    return
                 }
-            }
+
+                if !already_knows {
+                    seen.insert(self.own_addr);
+                    self.connect_to_node(&msg.addr);
+                }
+            },
             GossipEvent::Leave => {
-                if !self.members.contains_key(&msg.addr) {
-                    if msg.counter != self.members.len() { // todo: check if own addr is part of it
-                        self.gossip_member_event(msg.addr, msg.event, msg.counter + 1);
-                    }
-                } else {
-                    self.gossip_member_event(msg.addr.clone(), msg.event, msg.counter + 1);
-                    self.remove_member(msg.addr)
+                let already_knows = !self.members.contains_key(&msg.addr);
+
+                if already_knows & all_seen {
+                    return
+                }
+
+                if !already_knows {
+                    seen.insert(self.own_addr);
+                    self.members.remove(&msg.addr);
                 }
             }
         }
+
+        self.gossip_member_event(msg.addr, msg.event, seen);
     }
 }
 

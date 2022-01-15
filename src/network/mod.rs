@@ -131,7 +131,7 @@ impl NetworkInterface {
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
-        &self.writer.as_ref().unwrap().do_send(msg);
+        self.writer.as_ref().unwrap().do_send(msg);
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {
