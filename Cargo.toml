@@ -52,7 +52,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 flexbuffers = "2.0.0"
 
-ndarray = { version = "*", optional = true, features = ["serde"]}
+ndarray = { version = "0.15.4", optional = true, features = ["serde"]}
 
 # dns resolver
 trust-dns-proto = { version = "0.20.3", default-features = false, features = ["tokio-runtime"] }
