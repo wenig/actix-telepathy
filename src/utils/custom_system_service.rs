@@ -11,6 +11,7 @@ static SREG: Lazy<Mutex<HashMap<usize, PatchedSystemRegistry>>> =
 
 #[derive(Debug)]
 struct PatchedSystemRegistry {
+    #[allow(dead_code)]
     system: ArbiterHandle,
     registry: HashMap<TypeId, Box<dyn Any + Send>>,
 }
@@ -70,6 +71,3 @@ pub trait CustomSystemService: Actor<Context = Context<Self>> + SystemService {
         panic!("Please start Actor before asking for it in registry!");
     }
 }
-
-
-
