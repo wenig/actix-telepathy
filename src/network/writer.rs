@@ -18,7 +18,7 @@ impl Writer {
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
-        &self.framed[0].write(msg);
+        self.framed[0].write(msg);
     }
 }
 
