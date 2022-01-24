@@ -131,7 +131,7 @@ impl NetworkInterface {
     }
 
     fn transmit_message(&mut self, msg: ClusterMessage) {
-        &self.writer.as_ref().unwrap().do_send(msg);
+        self.writer.as_ref().unwrap().do_send(msg);
     }
 
     fn received_message(&mut self, mut msg: RemoteWrapper) {
@@ -186,6 +186,18 @@ impl Handler<ClusterMessage> for NetworkInterface {
 
     fn handle(&mut self, msg: ClusterMessage, _ctx: &mut Context<Self>) -> Self::Result {
         self.transmit_message(msg);
+    }
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), MailboxError>")]
+pub struct WrappedClusterMessage(pub(crate) ClusterMessage);
+
+impl Handler<WrappedClusterMessage> for NetworkInterface {
+    type Result = ResponseFuture<Result<(), MailboxError>>;
+
+    fn handle(&mut self, msg: WrappedClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(self.writer.as_ref().unwrap().send(msg.0))
     }
 }
 

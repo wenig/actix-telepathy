@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use actix::dev::ToEnvelope;
-use crate::{NetworkInterface};
+use crate::{NetworkInterface, WrappedClusterMessage};
 
 pub mod resolver;
 #[cfg(test)]
@@ -56,8 +56,19 @@ impl RemoteAddr {
         ));
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: Box<T>) -> RecipientRequest<ClusterMessage> {
+    pub fn try_send<T: RemoteMessage + Serialize>(&self, _msg: Box<T>) -> RecipientRequest<ClusterMessage> {
+        unimplemented!("So far, it is not possible to use this method!")
+    }
+
+    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: Box<T>) -> () {
         unimplemented!("So far, it is not possible to receive responses from remote destinations as futures!")
+    }
+
+    pub fn wait_send<T: RemoteMessage + Serialize>(&self, msg: T) -> Request<NetworkInterface, WrappedClusterMessage> {
+        self.network_interface.as_ref().expect("Network interface must be set!")
+            .send(WrappedClusterMessage(ClusterMessage::Message(
+            RemoteWrapper::new(self.clone(), msg, None)
+        )))
     }
 }
 
