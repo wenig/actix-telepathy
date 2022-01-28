@@ -14,7 +14,8 @@ const ENDIAN_LENGTH: usize = 4;
 #[derive(Message, Deserialize, Serialize)]
 #[rtype(result = "()")]
 pub enum ClusterMessage {
-    Request(u16, bool), // bool = is_seed?
+    /// bool = is_seed?
+    Request(u16, bool),
     Response,
     Message(RemoteWrapper),
     Decline

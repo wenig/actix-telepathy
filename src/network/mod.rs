@@ -189,6 +189,18 @@ impl Handler<ClusterMessage> for NetworkInterface {
     }
 }
 
+#[derive(Message)]
+#[rtype(result = "Result<(), MailboxError>")]
+pub struct WrappedClusterMessage(pub(crate) ClusterMessage);
+
+impl Handler<WrappedClusterMessage> for NetworkInterface {
+    type Result = ResponseFuture<Result<(), MailboxError>>;
+
+    fn handle(&mut self, msg: WrappedClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
+        Box::pin(self.writer.as_ref().unwrap().send(msg.0))
+    }
+}
+
 impl WriteHandler<Error> for NetworkInterface {}
 impl Supervised for NetworkInterface {}
 
