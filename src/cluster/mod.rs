@@ -1,28 +1,30 @@
 mod listener;
-mod gossip;
 #[cfg(test)]
 mod tests;
+mod connector;
 
-pub use self::gossip::{Gossip, NodeResolving};
+pub use connector::gossip::{Gossip};
+pub use connector::NodeResolving;
 pub use self::listener::{ClusterListener, ClusterLog};
 
 
 use actix::prelude::*;
 use std::net;
-use std::io::{Result as IoResult};
+use std::io::Result as IoResult;
 use tokio::net::{TcpListener, TcpStream};
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use log::*;
 use crate::network::NetworkInterface;
 use std::str::FromStr;
 use futures::executor::block_on;
-use std::net::{SocketAddr};
-use crate::cluster::gossip::{GossipIgniting, MemberMgmt};
-use crate::remote::{RemoteAddr};
-use crate::{CustomSystemService};
-use actix_broker::{BrokerIssue};
-use futures::{StreamExt};
+use std::net::SocketAddr;
+use crate::remote::RemoteAddr;
+use crate::CustomSystemService;
+use actix_broker::BrokerIssue;
+use futures::StreamExt;
 use tokio_stream::wrappers::TcpListenerStream;
+pub use crate::cluster::connector::ConnectionProtocol;
+pub use crate::cluster::connector::Connector;
 
 
 #[derive(MessageResponse)]
@@ -47,13 +49,10 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents{
+    /// SocketAddr of Remote Member, Actix Addr of Interface, Remote Addr of Remote Member, Remote Member is a seed node
     MemberUp(SocketAddr, Addr<NetworkInterface>, RemoteAddr, bool),
     MemberDown(SocketAddr)
 }
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct GossipResponse(pub(crate) SocketAddr);
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -65,7 +64,7 @@ pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
     own_addr: Option<Addr<Cluster>>,
-    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
+    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>
 }
 
 
@@ -96,15 +95,19 @@ impl Actor for Cluster {
 
 impl Cluster {
     pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>) -> Addr<Cluster> {
+        Self::new_with_connection_protocol(ip_address, seed_nodes, ConnectionProtocol::SingleSeed)
+    }
+
+    pub fn new_with_connection_protocol(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, connection_protocol: ConnectionProtocol) -> Addr<Cluster> {
         debug!("Cluster created");
-        Gossip::start_service_with(move || { Gossip::new(ip_address.clone()) });
+        Connector::start_service_from(connection_protocol, ip_address.clone());
 
         Cluster::start_service_with(move ||
             Cluster {
                 ip_address: ip_address.clone(),
                 addrs: seed_nodes.clone(),
                 own_addr: None,
-                nodes: Default::default(),
+                nodes: Default::default()
             }
         )
     }
@@ -166,28 +169,6 @@ impl Handler<TcpConnect> for Cluster {
     }
 }
 
-impl Handler<NodeEvents> for Cluster {
-    type Result = ();
-
-    fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            NodeEvents::MemberUp(host, node, remote_addr, seed) => {
-                if seed {
-                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(host.clone(), node));
-                } else {
-                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(host.clone(), node));
-                }
-                self.issue_system_async(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
-            },
-            NodeEvents::MemberDown(host) => {
-                Gossip::from_custom_registry().do_send(GossipIgniting::MemberDown(host.clone()));
-                self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
-                self.nodes.remove(&host);
-            }
-        }
-    }
-}
-
 impl Handler<ConnectToNode> for Cluster {
     type Result = ();
 
@@ -196,11 +177,21 @@ impl Handler<ConnectToNode> for Cluster {
     }
 }
 
-impl Handler<GossipResponse> for Cluster {
+impl Handler<NodeEvents> for Cluster {
     type Result = ();
 
-    fn handle(&mut self, msg: GossipResponse, _ctx: &mut Context<Self>) -> Self::Result {
-        self.add_node(msg.0, false);
+    fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
+        match &msg {
+            NodeEvents::MemberUp(host, _node, remote_addr, _seed) => {
+                self.issue_system_async(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
+            },
+            NodeEvents::MemberDown(host) => {
+                self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
+                self.nodes.remove(host);
+            }
+        }
+
+        Connector::from_custom_registry().do_send(msg)
     }
 }
 

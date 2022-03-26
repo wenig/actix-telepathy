@@ -1,6 +1,6 @@
 use log::*;
 use actix_rt;
-use crate::{Cluster, ClusterListener, ClusterLog, NetworkInterface, Gossip, CustomSystemService, NodeResolving};
+use crate::{Cluster, ClusterListener, ClusterLog, NetworkInterface, CustomSystemService, NodeResolving, Connector};
 use port_scanner::{local_port_available, request_open_port};
 use std::net::SocketAddr;
 use actix::prelude::*;
@@ -59,7 +59,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(_addr, _remote_addr) => {
-                Gossip::from_custom_registry().send(NodeResolving {addrs: vec![self.asking.clone()]})
+                Connector::from_custom_registry().send(NodeResolving {addrs: vec![self.asking.clone()]})
                     .into_actor(self)
                     .map(|res: Result<Result<Vec<Addr<NetworkInterface>>, ()>, MailboxError>, act, _ctx| match res.unwrap() {
                         Ok(addrs) => (*(act.addrs.lock().unwrap())).push(addrs.get(0).unwrap().clone()),
@@ -67,7 +67,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
                     }).wait(ctx);
             },
             ClusterLog::MemberLeft(addr) => {
-                Gossip::from_custom_registry().send(NodeResolving {addrs: vec![addr]})
+                Connector::from_custom_registry().send(NodeResolving {addrs: vec![addr]})
                     .into_actor(self)
                     .map(|res: Result<Result<Vec<Addr<NetworkInterface>>, ()>, MailboxError>, _act, _ctx| match res.unwrap() {
                         Ok(addrs) => assert_eq!(addrs.len(), 0),

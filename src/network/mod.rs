@@ -7,13 +7,13 @@ use std::net::{SocketAddr};
 use tokio::net::TcpStream;
 use std::io::{Error};
 
-use crate::cluster::{Cluster, NodeEvents, Gossip};
+use crate::cluster::{Cluster, NodeEvents};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::remote::{RemoteAddr, RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::{WriteHandler};
 use std::thread::sleep;
 use std::fmt;
-use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
+use crate::{ConnectionApproval, ConnectionApprovalResponse, Connector, CustomSystemService};
 use crate::network::writer::Writer;
 use crate::network::resolver::{Resolver, Connect};
 use tokio::time::Duration;
@@ -138,7 +138,7 @@ impl NetworkInterface {
         msg.source = self.own_addr.clone();
         match msg.destination.id {
             AddrRepresentation::NetworkInterface => panic!("NetworkInterface does not interact as RemoteActor"),
-            AddrRepresentation::Gossip => Gossip::from_custom_registry().do_send(msg),
+            AddrRepresentation::Gossip => Connector::from_custom_registry().do_send(msg),
             AddrRepresentation::Key(_) => AddrResolver::from_registry().do_send(msg)
         }
     }
