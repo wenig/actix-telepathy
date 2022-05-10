@@ -24,5 +24,7 @@ pub mod prelude {
     pub use crate::cluster::{Cluster, ClusterListener, ClusterLog, NodeResolving};
     pub use crate::network::NetworkInterface;
     pub use crate::remote::{AnyAddr, RemoteActor, RemoteAddr, RemoteMessage, RemoteWrapper};
-    pub use crate::serialization::{CustomSerialization, DefaultSerialization, CustomSerializationError};
+    pub use crate::serialization::{
+        CustomSerialization, CustomSerializationError, DefaultSerialization,
+    };
 }
