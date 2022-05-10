@@ -1,9 +1,9 @@
 use log::*;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Result};
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
+use syn::{parse_macro_input, DeriveInput, Result};
 
 const TELEPATHY_CONFIG_FILE: &str = "telepathy.yaml";
 const WITH_SOURCE: &str = "with_source";
@@ -15,7 +15,9 @@ struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self { custom_serializer: "DefaultSerialization".to_string() }
+        Self {
+            custom_serializer: "DefaultSerialization".to_string(),
+        }
     }
 }
 
@@ -24,7 +26,7 @@ fn load_config_yaml() -> Config {
     match f {
         Ok(file_reader) => {
             serde_yaml::from_reader(file_reader).expect("Config file is no valid YAML")
-        },
+        }
         Err(e) => {
             error!("{}, using default Config", e.to_string());
             Config::default()
@@ -45,14 +47,15 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
             quote! {
                 self.#attr.network_interface = Some(addr);
             }
-        },
-        None => quote! {}
+        }
+        None => quote! {},
     };
 
-
     let config: Config = load_config_yaml();
-    let serializer = syn::parse_str::<syn::Type>(&config.custom_serializer)
-        .expect(&format!("custom_serializer {} could not be found", &config.custom_serializer));
+    let serializer = syn::parse_str::<syn::Type>(&config.custom_serializer).expect(&format!(
+        "custom_serializer {} could not be found",
+        &config.custom_serializer
+    ));
 
     let expanded = quote! {
         use log::*;
@@ -82,24 +85,20 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-
 fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
-    let attr = ast
-        .attrs
-        .iter()
-        .find_map(|a| {
-            let a = a.parse_meta();
-            match a {
-                Ok(meta) => {
-                    if meta.path().is_ident(WITH_SOURCE) {
-                        Some(meta)
-                    } else {
-                        None
-                    }
+    let attr = ast.attrs.iter().find_map(|a| {
+        let a = a.parse_meta();
+        match a {
+            Ok(meta) => {
+                if meta.path().is_ident(WITH_SOURCE) {
+                    Some(meta)
+                } else {
+                    None
                 }
-                _ => None,
             }
-        });
+            _ => None,
+        }
+    });
 
     match attr {
         Some(a) => {
@@ -112,11 +111,14 @@ fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
             } else {
                 Err(syn::Error::new_spanned(
                     a,
-                    format!("The correct syntax is #[{}(Message, Message, ...)]", WITH_SOURCE),
+                    format!(
+                        "The correct syntax is #[{}(Message, Message, ...)]",
+                        WITH_SOURCE
+                    ),
                 ))
             }
-        },
-        None => Ok(vec![])
+        }
+        None => Ok(vec![]),
     }
 }
 
@@ -127,10 +129,12 @@ fn meta_item_to_struct(meta_item: &syn::NestedMeta) -> syn::Result<syn::Type> {
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),
         },
-        syn::NestedMeta::Meta(syn::Meta::NameValue(val)) =>
-            Err(syn::Error::new_spanned(&val.lit, "Expect Message")),
-        syn::NestedMeta::Lit(syn::Lit::Str(ref s)) =>
-            Err(syn::Error::new_spanned(s, "Expect Message")),
+        syn::NestedMeta::Meta(syn::Meta::NameValue(val)) => {
+            Err(syn::Error::new_spanned(&val.lit, "Expect Message"))
+        }
+        syn::NestedMeta::Lit(syn::Lit::Str(ref s)) => {
+            Err(syn::Error::new_spanned(s, "Expect Message"))
+        }
         meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }

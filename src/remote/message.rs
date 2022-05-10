@@ -1,8 +1,7 @@
+use crate::{CustomSerialization, NetworkInterface, RemoteAddr};
 use actix::prelude::*;
-use serde::{Serialize, Deserialize};
-use crate::{RemoteAddr, CustomSerialization, NetworkInterface};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-
 
 /// Wrapper for messages to be sent to remote actor
 #[derive(Message, Serialize, Deserialize)]
@@ -16,22 +15,27 @@ pub struct RemoteWrapper {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub source: Option<Addr<NetworkInterface>>,
-    pub conversation_id: Option<Uuid>
+    pub conversation_id: Option<Uuid>,
 }
 
 impl RemoteWrapper {
-    pub fn new<T: RemoteMessage>(destination: RemoteAddr, message: T, conversation_id: Option<Uuid>) -> RemoteWrapper {
+    pub fn new<T: RemoteMessage>(
+        destination: RemoteAddr,
+        message: T,
+        conversation_id: Option<Uuid>,
+    ) -> RemoteWrapper {
         let serializer = message.get_serializer();
         RemoteWrapper {
             destination,
-            message_buffer: serializer.serialize(&message).expect("Cannot serialize message"),
+            message_buffer: serializer
+                .serialize(&message)
+                .expect("Cannot serialize message"),
             identifier: message.get_identifier().to_string(),
             source: None,
-            conversation_id
+            conversation_id,
         }
     }
 }
-
 
 impl Clone for RemoteWrapper {
     fn clone(&self) -> Self {
@@ -40,16 +44,15 @@ impl Clone for RemoteWrapper {
             message_buffer: self.message_buffer.clone(),
             identifier: self.identifier.clone(),
             source: self.source.clone(),
-            conversation_id: self.conversation_id.clone()
+            conversation_id: self.conversation_id.clone(),
         }
     }
 }
 
-
 /// Helper Trait to prepare messages to be sent over the network
 pub trait RemoteMessage
 where
-    Self: Message + Send + Serialize
+    Self: Message + Send + Serialize,
 {
     type Serializer: CustomSerialization;
     const IDENTIFIER: &'static str;

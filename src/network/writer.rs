@@ -1,10 +1,9 @@
-use actix::io::{WriteHandler, FramedWrite};
-use tokio::net::tcp::OwnedWriteHalf;
-use crate::ClusterMessage;
 use crate::codec::ConnectCodec;
+use crate::ClusterMessage;
+use actix::io::{FramedWrite, WriteHandler};
 use actix::prelude::*;
 use std::io::Error;
-
+use tokio::net::tcp::OwnedWriteHalf;
 
 pub struct Writer {
     framed: Vec<FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>>,
@@ -13,7 +12,7 @@ pub struct Writer {
 impl Writer {
     pub fn new(framed: FramedWrite<ClusterMessage, OwnedWriteHalf, ConnectCodec>) -> Self {
         Self {
-            framed: vec![framed]
+            framed: vec![framed],
         }
     }
 

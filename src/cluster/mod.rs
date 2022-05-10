@@ -1,44 +1,40 @@
-mod listener;
 mod gossip;
+mod listener;
 #[cfg(test)]
 mod tests;
 
 pub use self::gossip::{Gossip, NodeResolving};
 pub use self::listener::{ClusterListener, ClusterLog};
 
-
-use actix::prelude::*;
-use std::net;
-use std::io::{Result as IoResult};
-use tokio::net::{TcpListener, TcpStream};
-use std::collections::{HashMap};
-use log::*;
-use crate::network::NetworkInterface;
-use std::str::FromStr;
-use futures::executor::block_on;
-use std::net::{SocketAddr};
 use crate::cluster::gossip::{GossipIgniting, MemberMgmt};
-use crate::remote::{RemoteAddr};
-use crate::{CustomSystemService};
-use actix_broker::{BrokerIssue};
-use futures::{StreamExt};
+use crate::network::NetworkInterface;
+use crate::remote::RemoteAddr;
+use crate::CustomSystemService;
+use actix::prelude::*;
+use actix_broker::BrokerIssue;
+use futures::executor::block_on;
+use futures::StreamExt;
+use log::*;
+use std::collections::HashMap;
+use std::io::Result as IoResult;
+use std::net;
+use std::net::SocketAddr;
+use std::str::FromStr;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
-
 
 #[derive(MessageResponse)]
 pub enum ConnectionApprovalResponse {
     Approved,
-    Declined
+    Declined,
 }
-
 
 #[derive(Message)]
 #[rtype(result = "ConnectionApprovalResponse")]
 pub struct ConnectionApproval {
     pub addr: SocketAddr,
-    pub send_addr: SocketAddr
+    pub send_addr: SocketAddr,
 }
-
 
 #[derive(Message)]
 #[rtype(result = "()")]
@@ -46,9 +42,9 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 
 #[derive(Message)]
 #[rtype(result = "()")]
-pub enum NodeEvents{
+pub enum NodeEvents {
     MemberUp(SocketAddr, Addr<NetworkInterface>, RemoteAddr, bool),
-    MemberDown(SocketAddr)
+    MemberDown(SocketAddr),
 }
 
 #[derive(Message)]
@@ -62,7 +58,6 @@ pub struct Cluster {
     own_addr: Option<Addr<Cluster>>,
     nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
 }
-
 
 impl Actor for Cluster {
     type Context = Context<Self>;
@@ -88,29 +83,24 @@ impl Actor for Cluster {
     }
 }
 
-
 impl Cluster {
     pub fn new(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>) -> Addr<Cluster> {
         debug!("Cluster created");
-        Gossip::start_service_with(move || { Gossip::new(ip_address.clone()) });
+        Gossip::start_service_with(move || Gossip::new(ip_address.clone()));
 
-        Cluster::start_service_with(move ||
-            Cluster {
-                ip_address: ip_address.clone(),
-                addrs: seed_nodes.clone(),
-                own_addr: None,
-                nodes: Default::default(),
-            }
-        )
+        Cluster::start_service_with(move || Cluster {
+            ip_address: ip_address.clone(),
+            addrs: seed_nodes.clone(),
+            own_addr: None,
+            nodes: Default::default(),
+        })
     }
 
     fn bind(addr: String) -> IoResult<Box<TcpListenerStream>> {
         let addr = net::SocketAddr::from_str(&addr).unwrap();
-        let listener = Box::new(
-            TcpListenerStream::new(
-                block_on(TcpListener::bind(&addr)).unwrap()
-            )
-        );
+        let listener = Box::new(TcpListenerStream::new(
+            block_on(TcpListener::bind(&addr)).unwrap(),
+        ));
         debug!("Listening on {}", addr);
         Ok(listener)
     }
@@ -149,7 +139,6 @@ impl Supervised for Cluster {}
 impl SystemService for Cluster {}
 impl CustomSystemService for Cluster {}
 
-
 impl Handler<TcpConnect> for Cluster {
     type Result = ();
 
@@ -168,12 +157,14 @@ impl Handler<NodeEvents> for Cluster {
         match msg {
             NodeEvents::MemberUp(host, node, remote_addr, seed) => {
                 if seed {
-                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(host.clone(), node));
+                    Gossip::from_custom_registry()
+                        .do_send(GossipIgniting::MemberUp(host.clone(), node));
                 } else {
-                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(host.clone(), node));
+                    Gossip::from_custom_registry()
+                        .do_send(MemberMgmt::MemberUp(host.clone(), node));
                 }
                 self.issue_system_async(ClusterLog::NewMember(host.clone(), remote_addr.clone()));
-            },
+            }
             NodeEvents::MemberDown(host) => {
                 Gossip::from_custom_registry().do_send(GossipIgniting::MemberDown(host.clone()));
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
@@ -194,11 +185,19 @@ impl Handler<GossipResponse> for Cluster {
 impl Handler<ConnectionApproval> for Cluster {
     type Result = ConnectionApprovalResponse;
 
-    fn handle(&mut self, msg: ConnectionApproval, _ctx: &mut Self::Context) -> ConnectionApprovalResponse {
+    fn handle(
+        &mut self,
+        msg: ConnectionApproval,
+        _ctx: &mut Self::Context,
+    ) -> ConnectionApprovalResponse {
         if self.nodes.contains_key(&msg.addr) {
             ConnectionApprovalResponse::Declined
         } else {
-            let node = self.nodes.get(&msg.send_addr).expect("Should be filled").clone();
+            let node = self
+                .nodes
+                .get(&msg.send_addr)
+                .expect("Should be filled")
+                .clone();
             self.nodes.remove(&msg.send_addr);
             self.nodes.insert(msg.addr, node);
             ConnectionApprovalResponse::Approved

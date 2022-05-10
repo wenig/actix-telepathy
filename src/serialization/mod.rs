@@ -1,9 +1,8 @@
 #[cfg(test)]
 mod tests;
 
-use serde::{Deserialize, Serialize};
 use flexbuffers;
-
+use serde::{Deserialize, Serialize};
 
 /// Provides template for creating custom serializer
 ///
@@ -46,8 +45,12 @@ use flexbuffers;
 /// ```
 /// - import your custom struct whenever you are using the `RemoteMessage` derive macro.
 pub trait CustomSerialization {
-    fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, ()> where T: ?Sized + Serialize;
-    fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, ()> where T: ?Sized + Deserialize<'a>;
+    fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, ()>
+    where
+        T: ?Sized + Serialize;
+    fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, ()>
+    where
+        T: ?Sized + Deserialize<'a>;
 }
 
 /// The default serialization used for remote messages
@@ -62,7 +65,7 @@ impl CustomSerialization for DefaultSerialization {
     {
         match flexbuffers::to_vec(value) {
             Ok(vec) => Ok(vec),
-            Err(_) => Err(())
+            Err(_) => Err(()),
         }
     }
 
@@ -72,7 +75,7 @@ impl CustomSerialization for DefaultSerialization {
     {
         match flexbuffers::from_slice(s) {
             Ok(val) => Ok(val),
-            Err(_) => Err(())
+            Err(_) => Err(()),
         }
     }
 }
