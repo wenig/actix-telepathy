@@ -10,28 +10,28 @@ use serde::{Deserialize, Serialize};
 /// ```
 /// use serde::{Deserialize, Serialize};
 /// use flexbuffers;
-/// use actix_telepathy::CustomSerialization;
+/// use actix_telepathy::{ CustomSerialization, CustomSerializationError };
 ///
 /// pub struct DefaultSerialization {}
 ///
 /// impl CustomSerialization for DefaultSerialization {
-///     fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, ()>
+///     fn serialize<T>(&self, value: &T) -> Result<Vec<u8>, CustomSerializationError>
 ///     where
 ///         T: ?Sized + Serialize,
 ///     {
 ///         match flexbuffers::to_vec(value) {
 ///             Ok(vec) => Ok(vec),
-///             Err(_) => Err(())
+///             Err(_) => Err(CustomSerializationError)
 ///         }
 ///     }
 ///
-///     fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, ()>
+///     fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, CustomSerializationError>
 ///     where
 ///         T: ?Sized + Deserialize<'a>,
 ///     {
 ///         match flexbuffers::from_slice(s) {
 ///             Ok(val) => Ok(val),
-///             Err(_) => Err(())
+///             Err(_) => Err(CustomSerializationError)
 ///         }
 ///     }
 /// }
