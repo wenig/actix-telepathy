@@ -100,18 +100,11 @@ impl NetworkInterface {
             .into_actor(self)
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
-                    if stream.is_err() {
-                        debug!("Connection refused! Trying to reconnect!");
-                        act.counter += 1;
-                        sleep(Duration::from_secs(1));
-                        ctx.stop();
-                    } else {
+                    if let Ok(stream) = stream {
                         debug!(
                             "Connected to network node: {}",
                             act.addr.clone().to_string()
                         );
-
-                        let stream = stream.unwrap();
 
                         let (r, w) = stream.into_split();
 
@@ -122,6 +115,11 @@ impl NetworkInterface {
                         act.writer = Some(Writer::new(framed).start());
 
                         ctx.add_stream(FramedRead::new(r, ConnectCodec::new()));
+                    } else {
+                        debug!("Connection refused! Trying to reconnect!");
+                        act.counter += 1;
+                        sleep(Duration::from_secs(1));
+                        ctx.stop();
                     }
                 }
                 Err(err) => error!("{}", err.to_string()),
@@ -136,12 +134,12 @@ impl NetworkInterface {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
                 let remote_address = RemoteAddr::new(
-                    self.addr.clone(),
+                    self.addr,
                     Some(addr.clone()),
                     AddrRepresentation::NetworkInterface,
                 );
                 Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(
-                    self.addr.clone(),
+                    self.addr,
                     addr,
                     remote_address,
                     self.seed,
@@ -167,26 +165,27 @@ impl NetworkInterface {
     }
 
     fn set_reply_port(&mut self, port: u16, ctx: &mut Context<Self>, seed: bool) {
-        let send_addr = self.addr.clone();
+        let send_addr = self.addr;
         self.addr.set_port(port);
-        let addr = self.addr.clone();
+        let addr = self.addr;
         self.seed = seed;
 
         Cluster::from_custom_registry()
             .send(ConnectionApproval { addr, send_addr })
             .into_actor(self)
-            .map(|res, act, ctx| match res {
-                Ok(message_response) => match message_response {
-                    ConnectionApprovalResponse::Approved => {
-                        act.transmit_message(ClusterMessage::Response);
-                        act.finish_connecting()
+            .map(|res, act, ctx| {
+                if let Ok(message_response) = res {
+                    match message_response {
+                        ConnectionApprovalResponse::Approved => {
+                            act.transmit_message(ClusterMessage::Response);
+                            act.finish_connecting()
+                        }
+                        ConnectionApprovalResponse::Declined => {
+                            act.transmit_message(ClusterMessage::Decline);
+                            ctx.stop()
+                        }
                     }
-                    ConnectionApprovalResponse::Declined => {
-                        act.transmit_message(ClusterMessage::Decline);
-                        ctx.stop()
-                    }
-                },
-                Err(_) => {}
+                }
             })
             .wait(ctx);
     }
@@ -233,6 +232,6 @@ impl Supervised for NetworkInterface {}
 
 impl fmt::Debug for NetworkInterface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NetworkInterface({})", self.addr.clone().to_string())
+        write!(f, "NetworkInterface({})", self.addr)
     }
 }

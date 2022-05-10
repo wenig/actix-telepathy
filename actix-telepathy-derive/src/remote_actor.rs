@@ -7,8 +7,7 @@ const REMOTE_MESSAGES: &str = "remote_messages";
 
 pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     //let ask_remote = proc_macro2::TokenStream::from(remote_actor_remote_ask_messages_macro(input.clone()));
-    let remote = remote_actor_remote_messages_macro(input);
-    remote
+    remote_actor_remote_messages_macro(input)
 }
 
 pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {

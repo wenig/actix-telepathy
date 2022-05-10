@@ -66,7 +66,7 @@ impl Gossip {
 
     fn add_member(&mut self, new_addr: SocketAddr, node: Addr<NetworkInterface>) {
         self.requested_members.remove(&new_addr);
-        self.members.insert(new_addr.clone(), node);
+        self.members.insert(new_addr, node);
         debug!("Member {} added!", new_addr.to_string());
     }
 
@@ -86,16 +86,10 @@ impl Gossip {
             .members
             .keys()
             .into_iter()
-            .filter_map(|x| {
-                if x.eq(&member_addr) {
-                    None
-                } else {
-                    Some(x.clone())
-                }
-            })
+            .filter_map(|x| if x.eq(&member_addr) { None } else { Some(*x) })
             .collect();
 
-        if members.len() > 0 {
+        if !members.is_empty() {
             match self.members.get(&member_addr) {
                 Some(node) => RemoteAddr::new_gossip(member_addr, Some(node.clone()))
                     .do_send(GossipEvent { members }),
@@ -130,12 +124,12 @@ impl Handler<GossipIgniting> for Gossip {
     fn handle(&mut self, msg: GossipIgniting, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             GossipIgniting::MemberUp(new_addr, node) => {
-                self.add_member(new_addr.clone(), node);
+                self.add_member(new_addr, node);
                 self.member_up(new_addr)
             }
             GossipIgniting::MemberDown(addr) => {
-                self.remove_member(addr.clone());
-                self.member_down(addr, vec![self.own_addr.clone()])
+                self.remove_member(addr);
+                self.member_down(addr, vec![self.own_addr])
             }
         }
     }
@@ -160,13 +154,13 @@ impl Handler<NodeResolving> for Gossip {
             .addrs
             .into_iter()
             .filter_map(|x| {
-                if x.clone() == self.own_addr {
+                if x == self.own_addr {
                     None
                 } else {
                     Some(
                         self.members
                             .get(&x)
-                            .expect(&format!("Socket {} should be known!", &x))
+                            .unwrap_or_else(|| panic!("Socket {} should be known!", &x))
                             .clone(),
                     )
                 }

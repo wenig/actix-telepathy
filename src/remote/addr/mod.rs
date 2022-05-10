@@ -72,7 +72,7 @@ impl RemoteAddr {
         self.id = AddrRepresentation::Key(id);
     }
 
-    pub fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) -> () {
+    pub fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) {
         let _r = self
             .network_interface
             .as_ref()
@@ -86,12 +86,12 @@ impl RemoteAddr {
 
     pub fn try_send<T: RemoteMessage + Serialize>(
         &self,
-        _msg: Box<T>,
+        _msg: T,
     ) -> RecipientRequest<ClusterMessage> {
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: Box<T>) -> () {
+    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: T) {
         unimplemented!(
             "So far, it is not possible to receive responses from remote destinations as futures!"
         )
@@ -113,7 +113,7 @@ impl RemoteAddr {
 impl Clone for RemoteAddr {
     fn clone(&self) -> Self {
         RemoteAddr::new(
-            self.socket_addr.clone(),
+            self.socket_addr,
             self.network_interface.clone(),
             self.id.clone(),
         )
@@ -157,9 +157,8 @@ impl<A: Actor> AnyAddr<A> {
     }
 
     pub fn change_id(&mut self, id: &str) {
-        match self {
-            AnyAddr::Remote(addr) => addr.change_id(id.to_string()),
-            _ => (),
+        if let AnyAddr::Remote(addr) = self {
+            addr.change_id(id.to_string());
         }
     }
 }

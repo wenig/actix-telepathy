@@ -14,9 +14,9 @@ impl Clone for ClusterLog {
     fn clone(&self) -> Self {
         match self {
             ClusterLog::NewMember(addr, remote_addr) => {
-                ClusterLog::NewMember(addr.clone(), (*remote_addr).clone())
+                ClusterLog::NewMember(*addr, (*remote_addr).clone())
             }
-            ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(addr.clone()),
+            ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(*addr),
         }
     }
 }

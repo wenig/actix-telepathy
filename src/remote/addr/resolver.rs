@@ -4,12 +4,13 @@ use log::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
 const NETWORKINTERFACE: &str = "networkinterface";
 const GOSSIP: &str = "gossip";
 
-#[derive(Serialize, Deserialize, Hash, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,
@@ -61,6 +62,12 @@ impl PartialEq for AddrRepresentation {
 
 impl Eq for AddrRepresentation {}
 
+impl Hash for AddrRepresentation {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state);
+    }
+}
+
 #[derive(Message)]
 #[rtype(result = "Result<AddrResponse, ()>")]
 pub enum AddrRequest {
@@ -75,18 +82,10 @@ pub enum AddrResponse {
     ResolveRec(String),
 }
 
+#[derive(Default)]
 pub struct AddrResolver {
     str2rec: HashMap<String, Recipient<RemoteWrapper>>,
     rec2str: HashMap<Recipient<RemoteWrapper>, String>,
-}
-
-impl Default for AddrResolver {
-    fn default() -> Self {
-        Self {
-            str2rec: HashMap::new(),
-            rec2str: HashMap::new(),
-        }
-    }
 }
 
 pub struct NotAvailableError {}
@@ -149,7 +148,7 @@ impl Handler<RemoteWrapper> for AddrResolver {
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone())
-            .expect(&format!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
+            .unwrap_or_else(|_| panic!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
         let _r = recipient.do_send(msg);
     }
 }
@@ -160,10 +159,7 @@ impl Handler<AddrRequest> for AddrResolver {
     fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             AddrRequest::Register(rec, identifier) => {
-                let is_new = match self.rec2str.get(&rec) {
-                    Some(_) => false,
-                    None => true,
-                };
+                let is_new = self.rec2str.get(&rec).is_none();
 
                 if is_new {
                     self.str2rec.insert(identifier.clone(), rec.clone());

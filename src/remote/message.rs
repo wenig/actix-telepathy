@@ -44,7 +44,7 @@ impl Clone for RemoteWrapper {
             message_buffer: self.message_buffer.clone(),
             identifier: self.identifier.clone(),
             source: self.source.clone(),
-            conversation_id: self.conversation_id.clone(),
+            conversation_id: self.conversation_id,
         }
     }
 }

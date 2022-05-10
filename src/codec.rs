@@ -2,7 +2,6 @@ use crate::remote::RemoteWrapper;
 use actix::prelude::*;
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
-use flexbuffers;
 use futures::io::Error;
 use serde::{Deserialize, Serialize};
 use std::io;

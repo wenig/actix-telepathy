@@ -77,6 +77,7 @@ pub enum ResolverError {
     IoError(io::Error),
 }
 
+#[derive(Default)]
 pub struct Resolver {
     resolver: Option<AsyncResolver>,
     cfg: Option<(ResolverConfig, ResolverOpts)>,
@@ -125,16 +126,6 @@ impl Actor for Resolver {
 impl Supervised for Resolver {}
 
 impl SystemService for Resolver {}
-
-impl Default for Resolver {
-    fn default() -> Resolver {
-        Resolver {
-            resolver: None,
-            cfg: None,
-            err: None,
-        }
-    }
-}
 
 impl Handler<Resolve> for Resolver {
     type Result = ResponseActFuture<Self, Result<VecDeque<SocketAddr>, ResolverError>>;
@@ -357,7 +348,7 @@ impl<A: Actor> ActorFuture<A> for TcpConnector {
         let this = self.get_mut();
 
         // timeout
-        if let Poll::Ready(_) = Pin::new(&mut this.timeout).poll(cx) {
+        if Pin::new(&mut this.timeout).poll(cx).is_ready() {
             return Poll::Ready(Err(ResolverError::Timeout));
         }
 

@@ -52,10 +52,12 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     };
 
     let config: Config = load_config_yaml();
-    let serializer = syn::parse_str::<syn::Type>(&config.custom_serializer).expect(&format!(
-        "custom_serializer {} could not be found",
-        &config.custom_serializer
-    ));
+    let serializer = syn::parse_str::<syn::Type>(&config.custom_serializer).unwrap_or_else(|_| {
+        panic!(
+            "custom_serializer {} could not be found",
+            &config.custom_serializer
+        )
+    });
 
     let expanded = quote! {
         use log::*;
