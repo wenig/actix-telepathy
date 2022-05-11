@@ -55,7 +55,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
-    needs: [clippy, fmt, audit]
+    needs: [clippy, fmt]
 
     steps:
       - uses: actions/checkout@v3
