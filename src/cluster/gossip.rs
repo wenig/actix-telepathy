@@ -1,39 +1,39 @@
-use log::*;
-use actix::prelude::*;
-use std::collections::{HashMap, HashSet};
-use serde::{Serialize, Deserialize};
 use crate::network::NetworkInterface;
-use crate::remote::{RemoteWrapper, RemoteMessage, RemoteActor};
-use crate::{RemoteAddr, Cluster, CustomSystemService, GossipResponse};
-use crate::{DefaultSerialization, CustomSerialization};
+use crate::remote::{RemoteActor, RemoteMessage, RemoteWrapper};
+use crate::{Cluster, CustomSystemService, GossipResponse, RemoteAddr};
+use crate::{CustomSerialization, DefaultSerialization};
+use actix::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
-use std::net::SocketAddr;
+use log::*;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
+use std::net::SocketAddr;
 use std::str::FromStr;
 
 #[derive(RemoteMessage, Serialize, Deserialize, Debug)]
 pub struct GossipEvent {
-    members: Vec<SocketAddr>
+    members: Vec<SocketAddr>,
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum GossipIgniting {
     MemberUp(SocketAddr, Addr<NetworkInterface>),
-    MemberDown(SocketAddr)
+    MemberDown(SocketAddr),
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum MemberMgmt {
     MemberUp(SocketAddr, Addr<NetworkInterface>),
-    MemberDown(SocketAddr)
+    MemberDown(SocketAddr),
 }
 
 #[derive(Message)]
 #[rtype(result = "Result<Vec<Addr<NetworkInterface>>, ()>")]
-pub struct NodeResolving{
-    pub addrs: Vec<SocketAddr>
+pub struct NodeResolving {
+    pub addrs: Vec<SocketAddr>,
 }
 
 #[derive(RemoteActor)]
@@ -58,12 +58,15 @@ impl Default for Gossip {
 
 impl Gossip {
     pub fn new(own_addr: SocketAddr) -> Gossip {
-        Gossip {own_addr, ..Default::default()}
+        Gossip {
+            own_addr,
+            ..Default::default()
+        }
     }
 
     fn add_member(&mut self, new_addr: SocketAddr, node: Addr<NetworkInterface>) {
         self.requested_members.remove(&new_addr);
-        self.members.insert(new_addr.clone(), node);
+        self.members.insert(new_addr, node);
         debug!("Member {} added!", new_addr.to_string());
     }
 
@@ -79,20 +82,18 @@ impl Gossip {
     fn member_down(&mut self, _addr: SocketAddr, _seen_addrs: Vec<SocketAddr>) {}
 
     fn gossip_members(&mut self, member_addr: SocketAddr) {
-        let members: Vec<SocketAddr> = self.members.keys().into_iter().filter_map(|x| {
-            if x.eq(&member_addr) {
-                None
-            } else {
-                Some(x.clone())
-            }
-        }).collect();
+        let members: Vec<SocketAddr> = self
+            .members
+            .keys()
+            .into_iter()
+            .filter_map(|x| if x.eq(&member_addr) { None } else { Some(*x) })
+            .collect();
 
-        if members.len() > 0 {
+        if !members.is_empty() {
             match self.members.get(&member_addr) {
-                Some(node) =>
-                    RemoteAddr::new_gossip(member_addr, Some(node.clone()))
-                        .do_send(GossipEvent { members }),
-                None => error!("Should be known by now")
+                Some(node) => RemoteAddr::new_gossip(member_addr, Some(node.clone()))
+                    .do_send(GossipEvent { members }),
+                None => error!("Should be known by now"),
             }
         }
     }
@@ -123,13 +124,13 @@ impl Handler<GossipIgniting> for Gossip {
     fn handle(&mut self, msg: GossipIgniting, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             GossipIgniting::MemberUp(new_addr, node) => {
-                self.add_member(new_addr.clone(), node);
+                self.add_member(new_addr, node);
                 self.member_up(new_addr)
-            },
+            }
             GossipIgniting::MemberDown(addr) => {
-                self.remove_member(addr.clone());
-                self.member_down(addr, vec![self.own_addr.clone()])
-            },
+                self.remove_member(addr);
+                self.member_down(addr, vec![self.own_addr])
+            }
         }
     }
 }
@@ -149,13 +150,22 @@ impl Handler<NodeResolving> for Gossip {
     type Result = Result<Vec<Addr<NetworkInterface>>, ()>;
 
     fn handle(&mut self, msg: NodeResolving, _ctx: &mut Context<Self>) -> Self::Result {
-        Ok(msg.addrs.into_iter().filter_map(|x| {
-            if x.clone() == self.own_addr {
-                None
-            } else {
-                Some(self.members.get(&x).expect(&format!("Socket {} should be known!", &x)).clone())
-            }
-        }).collect())
+        Ok(msg
+            .addrs
+            .into_iter()
+            .filter_map(|x| {
+                if x == self.own_addr {
+                    None
+                } else {
+                    Some(
+                        self.members
+                            .get(&x)
+                            .unwrap_or_else(|| panic!("Socket {} should be known!", &x))
+                            .clone(),
+                    )
+                }
+            })
+            .collect())
     }
 }
 
