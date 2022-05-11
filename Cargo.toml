@@ -38,7 +38,7 @@ env_logger = "0.9"
 byteorder = "1.3"
 bytes = "1"
 actix = "=0.12.0"
-actix-broker = "=0.4.1"
+actix-broker = "=0.4.2"
 tokio = { version = "1.12", features = ["io-util", "sync"] }
 tokio-util = { version = "0.6", features = ["codec"] }
 tokio-stream = { version = "0.1.7", features = ["net"]}
