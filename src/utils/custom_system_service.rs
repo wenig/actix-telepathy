@@ -1,13 +1,11 @@
-use actix::{Actor, Context, Addr, Supervisor, System, SystemService, ArbiterHandle};
-use std::any::{TypeId, Any};
-use std::collections::HashMap;
+use actix::{Actor, Addr, ArbiterHandle, Context, Supervisor, System, SystemService};
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
-
+use std::any::{Any, TypeId};
+use std::collections::HashMap;
 
 static SREG: Lazy<Mutex<HashMap<usize, PatchedSystemRegistry>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-
 
 #[derive(Debug)]
 struct PatchedSystemRegistry {
@@ -15,7 +13,6 @@ struct PatchedSystemRegistry {
     system: ArbiterHandle,
     registry: HashMap<TypeId, Box<dyn Any + Send>>,
 }
-
 
 impl PatchedSystemRegistry {
     pub(crate) fn new(system: ArbiterHandle) -> Self {
@@ -26,11 +23,12 @@ impl PatchedSystemRegistry {
     }
 }
 
-
 /// Trait defines custom system's service.
 pub trait CustomSystemService: Actor<Context = Context<Self>> + SystemService {
     /// Construct and start system service with arguments
-    fn start_service_with(f: impl Fn() -> Self + std::marker::Sync + 'static + std::marker::Send) -> Addr<Self> {
+    fn start_service_with(
+        f: impl Fn() -> Self + std::marker::Sync + 'static + std::marker::Send,
+    ) -> Addr<Self> {
         let sys = System::current();
         let arbiter = sys.arbiter();
         let addr = Supervisor::start_in_arbiter(arbiter, move |ctx| {
@@ -50,7 +48,8 @@ pub trait CustomSystemService: Actor<Context = Context<Self>> + SystemService {
         let reg = sreg
             .entry(sys.id())
             .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
-        reg.registry.insert(TypeId::of::<Self>(), Box::new(addr.clone()));
+        reg.registry
+            .insert(TypeId::of::<Self>(), Box::new(addr.clone()));
         addr
     }
 

@@ -1,16 +1,14 @@
-use actix_rt;
 use crate::CustomSystemService;
-use actix::{Supervised, Actor, SystemService, Message, Handler, Context};
-use futures::{FutureExt};
-
+use actix::{Actor, Context, Handler, Message, Supervised, SystemService};
+use actix_rt;
+use futures::FutureExt;
 
 #[derive(Message)]
 #[rtype(result = "Result<usize, ()>")]
 struct TestMessage {}
 
-
 struct TestService {
-    value: usize
+    value: usize,
 }
 
 impl Actor for TestService {
@@ -35,25 +33,24 @@ impl Handler<TestMessage> for TestService {
     }
 }
 
-
 #[actix_rt::test]
 async fn system_service_created_and_retrieved() {
     let value: usize = 7;
-    let _test_service = TestService::start_service_with(move || {
-        TestService { value: value.clone() }
+    let _test_service = TestService::start_service_with(move || TestService {
+        value: value.clone(),
     });
 
     let test_service = TestService::from_custom_registry();
-    test_service.send(TestMessage {})
-        .map(|res| {
-            match res {
-                Ok(result) => match result {
-                    Ok(v) => assert_eq!(v, value),
-                    Err(_) => panic!("Received error")
-                },
-                Err(_) => panic!("Received MailboxError")
-            }
-        }).await;
+    test_service
+        .send(TestMessage {})
+        .map(|res| match res {
+            Ok(result) => match result {
+                Ok(v) => assert_eq!(v, value),
+                Err(_) => panic!("Received error"),
+            },
+            Err(_) => panic!("Received MailboxError"),
+        })
+        .await;
 }
 
 #[actix_rt::test]

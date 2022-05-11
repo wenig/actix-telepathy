@@ -1,5 +1,5 @@
-use actix::prelude::*;
 use crate::remote::RemoteAddr;
+use actix::prelude::*;
 use std::net::SocketAddr;
 
 /// Message sent to ClusterListeners if members join or leave the cluster
@@ -7,14 +7,16 @@ use std::net::SocketAddr;
 #[rtype(result = "()")]
 pub enum ClusterLog {
     NewMember(SocketAddr, RemoteAddr),
-    MemberLeft(SocketAddr)
+    MemberLeft(SocketAddr),
 }
 
 impl Clone for ClusterLog {
     fn clone(&self) -> Self {
         match self {
-            ClusterLog::NewMember(addr, remote_addr) => ClusterLog::NewMember(addr.clone(), (*remote_addr).clone()),
-            ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(addr.clone())
+            ClusterLog::NewMember(addr, remote_addr) => {
+                ClusterLog::NewMember(*addr, (*remote_addr).clone())
+            }
+            ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(*addr),
         }
     }
 }
