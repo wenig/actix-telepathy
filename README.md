@@ -1,7 +1,7 @@
 [![crates.io](https://img.shields.io/crates/v/actix-telepathy?label=latest)](https://crates.io/crates/actix-telepathy)
 ![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.4.1/status.svg)](https://deps.rs/crate/actix-telepathy/0.4.1)
+[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.0/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.0)
 ![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
 # Actix Telepathy
@@ -20,6 +20,7 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 | 0.11  | 0.2        | 0.1               |
 | 0.12  | 0.3        | 0.2               |
 | 0.12  | 0.4        | 0.3               |
+| 0.13  | 0.5        | 0.3               |
 
 ## Usage
 
@@ -27,8 +28,8 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 
 ```toml
 [dependencies]
-actix = "0.12"
-actix-telepathy = "0.4.1"
+actix = "0.13"
+actix-telepathy = "0.5.0"
 ```
 
 ### main.rs
