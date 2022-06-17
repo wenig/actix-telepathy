@@ -54,3 +54,14 @@ async fn main() {
 ```
 
 **Please consider citing this work when you are using it!**
+
+```bibtex
+@software{Wenig_Actix-Telepathy_2022,
+    author = {Wenig, Phillip},
+    month = {6},
+    title = {{Actix-Telepathy}},
+    url = {https://github.com/wenig/actix-telepathy},
+    version = {0.5.1},
+    year = {2022}
+}
+```
