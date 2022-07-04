@@ -180,7 +180,6 @@
 //! Therefore, we had to call `change_id` on the [RemoteAddr](./struct.RemoteAddr.html). A [RemoteAddr](./struct.RemoteAddr.html) points to a specific actor on a remote machine.
 //! Per default, this is the [NetworkInterface](./struct.NetworkInterface.html) actor.
 
-
 #[cfg(feature = "derive")]
 pub use actix_telepathy_derive::*;
 #[cfg(feature = "protocols")]
