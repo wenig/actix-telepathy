@@ -96,6 +96,8 @@ impl Debug for NotAvailableError {
     }
 }
 
+/// A system actor that can resolve `ACTOR_ID`s to [actix::Addr](https://docs.rs/actix/latest/actix/struct.Addr.html)s
+/// by sending an [AddrRequest](./enum.AddrRequest.html).
 impl AddrResolver {
     pub fn new() -> Self {
         AddrResolver::default()
