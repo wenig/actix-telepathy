@@ -40,6 +40,7 @@ pub(crate) struct TestClusterListener<T>
 where
     T: Unpin + Clone + 'static, Self: Actor
 {
+    #[allow(dead_code)]
     pub sink: Option<SinkWrite<T, TestSink<T>>>,
     pub content: Option<T>
 }
@@ -52,6 +53,7 @@ impl<T> TestClusterListener<T> where T: Unpin + 'static + Clone, Self: Actor<Con
         }
     }
 
+    #[allow(dead_code)]
     pub fn new_with_sink(sink: SinkWrite<T, TestSink<T>>) -> Self {
         Self::new(Some(sink), None)
     }
@@ -60,6 +62,7 @@ impl<T> TestClusterListener<T> where T: Unpin + 'static + Clone, Self: Actor<Con
         Self::new(None, Some(content))
     }
 
+    #[allow(dead_code)]
     pub fn create_from_sender(sender: UnboundedSender<T>) -> Addr<Self> {
         Self::create(move |ctx| {
             let sink = TestSink::new(sender);
@@ -81,6 +84,7 @@ pub(crate) struct TestSink<T> where T: Unpin {
 }
 
 impl<T> TestSink<T> where T: Unpin {
+    #[allow(dead_code)]
     pub fn new(sender: UnboundedSender<T>) -> Self {
         TestSink {
             sender,
