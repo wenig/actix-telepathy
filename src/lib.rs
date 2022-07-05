@@ -190,9 +190,9 @@ mod codec;
 mod network;
 mod remote;
 mod serialization;
-mod utils;
 #[cfg(test)]
 pub(crate) mod test_utils;
+mod utils;
 
 pub use crate::cluster::*;
 pub use crate::codec::ClusterMessage;

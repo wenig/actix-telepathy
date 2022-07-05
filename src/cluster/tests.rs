@@ -1,3 +1,4 @@
+use crate::test_utils::cluster_listener::TestClusterListener;
 use crate::{
     Cluster, ClusterListener, ClusterLog, CustomSystemService, Gossip, NetworkInterface,
     NodeResolving,
@@ -11,7 +12,6 @@ use rayon::prelude::*;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::time::{sleep, Duration};
-use crate::test_utils::cluster_listener::TestClusterListener;
 
 type SocketTestClusterListener = TestClusterListener<Arc<Mutex<Vec<SocketAddr>>>>;
 
@@ -232,8 +232,7 @@ async fn build_cluster(
     sleep(Duration::from_millis(start)).await;
     let _cluster = Cluster::new(own_ip, other_ip);
     let addrs = Arc::new(Mutex::new(vec![]));
-    let _cluster_listener = SocketTestClusterListener::new_with_content(Arc::clone(&addrs))
-    .start();
+    let _cluster_listener = SocketTestClusterListener::new_with_content(Arc::clone(&addrs)).start();
     sleep(Duration::from_millis(delay)).await;
     assert_eq!((*(addrs.lock().unwrap())).len(), expect);
     sleep(Duration::from_millis(end)).await;

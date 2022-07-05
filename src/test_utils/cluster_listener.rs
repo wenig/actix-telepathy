@@ -1,11 +1,10 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use actix::{Actor, Addr};
 use actix::io::SinkWrite;
+use actix::{Actor, Addr};
 use actix_rt::System;
 use futures_sink::Sink;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use tokio::sync::mpsc::UnboundedSender;
-
 
 /// When using the `TestClusterListener` make sure to implement the following Traits
 ///
@@ -38,19 +37,21 @@ use tokio::sync::mpsc::UnboundedSender;
 
 pub(crate) struct TestClusterListener<T>
 where
-    T: Unpin + Clone + 'static, Self: Actor
+    T: Unpin + Clone + 'static,
+    Self: Actor,
 {
     #[allow(dead_code)]
     pub sink: Option<SinkWrite<T, TestSink<T>>>,
-    pub content: Option<T>
+    pub content: Option<T>,
 }
 
-impl<T> TestClusterListener<T> where T: Unpin + 'static + Clone, Self: Actor<Context = actix::Context<Self>> {
+impl<T> TestClusterListener<T>
+where
+    T: Unpin + 'static + Clone,
+    Self: Actor<Context = actix::Context<Self>>,
+{
     pub fn new(sink: Option<SinkWrite<T, TestSink<T>>>, content: Option<T>) -> Self {
-        Self {
-            sink,
-            content
-        }
+        Self { sink, content }
     }
 
     #[allow(dead_code)]
@@ -71,29 +72,41 @@ impl<T> TestClusterListener<T> where T: Unpin + 'static + Clone, Self: Actor<Con
     }
 }
 
-impl<T> actix::io::WriteHandler<()> for TestClusterListener<T> where T: Unpin + 'static + Clone, Self: Actor {
+impl<T> actix::io::WriteHandler<()> for TestClusterListener<T>
+where
+    T: Unpin + 'static + Clone,
+    Self: Actor,
+{
     fn finished(&mut self, _ctx: &mut Self::Context) {
         System::current().stop();
     }
 }
 
-
-pub(crate) struct TestSink<T> where T: Unpin {
+pub(crate) struct TestSink<T>
+where
+    T: Unpin,
+{
     sender: UnboundedSender<T>,
-    content: Option<T>
+    content: Option<T>,
 }
 
-impl<T> TestSink<T> where T: Unpin {
+impl<T> TestSink<T>
+where
+    T: Unpin,
+{
     #[allow(dead_code)]
     pub fn new(sender: UnboundedSender<T>) -> Self {
         TestSink {
             sender,
-            content: None
+            content: None,
         }
     }
 }
 
-impl<T> Sink<T> for TestSink<T> where T: Unpin + Clone {
+impl<T> Sink<T> for TestSink<T>
+where
+    T: Unpin + Clone,
+{
     type Error = ();
 
     fn poll_ready(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -102,8 +115,8 @@ impl<T> Sink<T> for TestSink<T> where T: Unpin + Clone {
             Some(content) => {
                 let _r = this.sender.send(content.clone());
                 Poll::Ready(Ok(()))
-            },
-            None => Poll::Ready(Ok(()))
+            }
+            None => Poll::Ready(Ok(())),
         }
     }
 
