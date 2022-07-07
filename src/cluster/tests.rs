@@ -1,3 +1,4 @@
+use crate::test_utils::cluster_listener::TestClusterListener;
 use crate::{
     Cluster, ClusterListener, ClusterLog, CustomSystemService, Gossip, NetworkInterface,
     NodeResolving,
@@ -12,13 +13,9 @@ use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use tokio::time::{sleep, Duration};
 
-struct OwnListener {
-    pub connections: Arc<Mutex<Vec<SocketAddr>>>,
-}
-impl ClusterListener for OwnListener {}
-impl Supervised for OwnListener {}
+type SocketTestClusterListener = TestClusterListener<Arc<Mutex<Vec<SocketAddr>>>>;
 
-impl Actor for OwnListener {
+impl Actor for SocketTestClusterListener {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
@@ -26,14 +23,14 @@ impl Actor for OwnListener {
     }
 }
 
-impl Handler<ClusterLog> for OwnListener {
+impl Handler<ClusterLog> for SocketTestClusterListener {
     type Result = ();
 
     fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(addr, _remote_addr) => {
                 debug!("new member {}", addr.to_string());
-                (*(self.connections.lock().unwrap())).push(addr);
+                (*(self.content.as_ref().unwrap().lock().unwrap())).push(addr);
             }
             ClusterLog::MemberLeft(_addr) => {}
         }
@@ -96,33 +93,6 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
     }
 }
 
-struct OwnListenerGossipIntroduction {
-    pub addrs: Arc<Mutex<Vec<usize>>>,
-}
-impl ClusterListener for OwnListenerGossipIntroduction {}
-impl Supervised for OwnListenerGossipIntroduction {}
-
-impl Actor for OwnListenerGossipIntroduction {
-    type Context = Context<Self>;
-
-    fn started(&mut self, ctx: &mut Context<Self>) {
-        self.subscribe_system_async::<ClusterLog>(ctx);
-    }
-}
-
-impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
-    type Result = ();
-
-    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
-        match msg {
-            ClusterLog::NewMember(_addr, _remote_addr) => {
-                (*(self.addrs.lock().unwrap())).push(1);
-            }
-            ClusterLog::MemberLeft(_addr) => {}
-        }
-    }
-}
-
 // Cluster
 
 #[actix_rt::test]
@@ -137,9 +107,7 @@ async fn cluster_binds_port() {
 async fn cluster_adds_node_and_from_stream() {
     let _cluster = Cluster::new("127.0.0.1:1992".parse().unwrap(), vec![]);
     let connections = Arc::new(Mutex::new(vec![]));
-    let own_listener = OwnListener {
-        connections: Arc::clone(&connections),
-    };
+    let own_listener = SocketTestClusterListener::new_with_content(Arc::clone(&connections));
     let _addr = own_listener.start();
     let _network_interface = NetworkInterface::new(
         "127.0.0.1:1993".parse().unwrap(),
@@ -264,10 +232,7 @@ async fn build_cluster(
     sleep(Duration::from_millis(start)).await;
     let _cluster = Cluster::new(own_ip, other_ip);
     let addrs = Arc::new(Mutex::new(vec![]));
-    let _cluster_listener = OwnListenerGossipIntroduction {
-        addrs: Arc::clone(&addrs),
-    }
-    .start();
+    let _cluster_listener = SocketTestClusterListener::new_with_content(Arc::clone(&addrs)).start();
     sleep(Duration::from_millis(delay)).await;
     assert_eq!((*(addrs.lock().unwrap())).len(), expect);
     sleep(Duration::from_millis(end)).await;
