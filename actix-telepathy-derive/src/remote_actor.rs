@@ -18,40 +18,30 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     let messages =
         get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least on Message");
 
-    let mut chained_if = quote! {};
-    let mut first = true;
+    let mut match_statement = quote! {};
 
     for attr in messages.iter() {
         let name = attr.as_ref().unwrap();
-        let condition = quote! {
-            if #name::IDENTIFIER == msg.identifier {
+        let matching = quote! {
+            #name::IDENTIFIER => {
                 let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
                 if msg.source.clone().is_some() {
                     deserialized_msg.set_source(msg.source.unwrap());
                 }
                 ctx.address().do_send(deserialized_msg);
-            }
+            },
         };
-        if first {
-            chained_if = quote! {
-                #condition
-            };
-            first = false;
-        } else {
-            chained_if = quote! {
-                #chained_if
-                else #condition
-            };
-        }
+        match_statement = quote! {
+            #match_statement
+            #matching
+        };
     }
-    if !first {
-        chained_if = quote! {
-            #chained_if
-            else {
-                warn!("Message dropped because identifier {} is unknown", &(msg.identifier));
-            }
+    match_statement = quote! {
+        match msg.identifier.as_str() {
+            #match_statement
+            _ => warn!("Message dropped because identifier {} is unknown", &(msg.identifier))
         }
-    }
+    };
 
     let name_str = name.to_string();
 
@@ -67,7 +57,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
             type Result = ();
 
             fn handle(&mut self, mut msg: RemoteWrapper, ctx: &mut Self::Context) -> Self::Result {
-                #chained_if
+                #match_statement
             }
         }
     };
