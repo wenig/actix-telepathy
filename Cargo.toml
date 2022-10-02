@@ -56,8 +56,8 @@ flexbuffers = "2.0.0"
 ndarray = { version = "0.15.4", optional = true, features = ["serde"]}
 
 # dns resolver
-trust-dns-proto = { version = "0.21.2", default-features = false, features = ["tokio-runtime"] }
-trust-dns-resolver = { version = "0.21.2", default-features = false, features = ["tokio-runtime", "system-config"] }
+trust-dns-proto = { version = "0.22.0", default-features = false, features = ["tokio-runtime"] }
+trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["tokio-runtime", "system-config"] }
 derive_more = "0.99"
 
 [patch.crates-io]
