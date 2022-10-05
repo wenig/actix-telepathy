@@ -190,6 +190,8 @@ mod codec;
 mod network;
 mod remote;
 mod serialization;
+#[cfg(test)]
+pub(crate) mod test_utils;
 mod utils;
 
 pub use crate::cluster::*;
