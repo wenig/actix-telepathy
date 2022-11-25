@@ -1,6 +1,5 @@
 use crate::prelude::*;
 use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse, ResponseSubscribe};
-use oneshot::Sender;
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
@@ -15,6 +14,7 @@ use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 use std::any::{Any, TypeId};
 use tokio::time::sleep;
+use tokio::sync::oneshot::Sender;
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
 struct TestMessage {}

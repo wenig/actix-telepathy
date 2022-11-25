@@ -12,6 +12,8 @@ use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use crate::{NetworkInterface, WrappedClusterMessage};
 use actix::dev::ToEnvelope;
 
+use tokio::sync::oneshot::{self, Receiver};
+
 pub mod resolver;
 #[cfg(test)]
 mod tests;
@@ -97,7 +99,7 @@ impl RemoteAddr {
         &self,
         msg: T,
         c: &Addr<H>,
-    ) -> oneshot::Receiver<Box<dyn Any + Send>>
+    ) -> Receiver<Box<dyn Any + Send>>
     where T: RemoteMessage + Serialize,
           R: RemoteMessage + Send + 'static,
           H: Handler<R> + Handler<ResponseSubscribe>,
