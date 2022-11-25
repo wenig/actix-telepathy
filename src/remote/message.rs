@@ -2,6 +2,8 @@ use crate::{CustomSerialization, NetworkInterface, RemoteAddr};
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use oneshot::Sender;
+use std::any::{Any, TypeId};
 
 /// Wrapper for messages to be sent to remote actor
 #[derive(Message, Serialize, Deserialize)]
@@ -67,3 +69,7 @@ where
 
     fn set_source(&mut self, source: Addr<NetworkInterface>);
 }
+
+#[derive(Message)]
+#[rtype("()")]
+pub struct ResponseSubscribe(pub TypeId, pub Sender<Box<dyn Any + Send>>);

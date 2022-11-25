@@ -59,6 +59,7 @@ ndarray = { version = "0.15.4", optional = true, features = ["serde"]}
 trust-dns-proto = { version = "0.22.0", default-features = false, features = ["tokio-runtime"] }
 trust-dns-resolver = { version = "0.22.0", default-features = false, features = ["tokio-runtime", "system-config"] }
 derive_more = "0.99"
+oneshot = "0.1.5"
 
 [patch.crates-io]
 actix-telepathy = { path = "." }
