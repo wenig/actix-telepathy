@@ -1,7 +1,7 @@
+use std::any::{Any, TypeId};
 use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
-use std::any::{TypeId, Any};
 
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -95,15 +95,12 @@ impl RemoteAddr {
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T, R, H>(
-        &self,
-        msg: T,
-        c: &Addr<H>,
-    ) -> Receiver<Box<dyn Any + Send>>
-    where T: RemoteMessage + Serialize,
-          R: RemoteMessage + Send + 'static,
-          H: Handler<R> + Handler<ResponseSubscribe>,
-          <H as Actor>::Context: ToEnvelope<H, ResponseSubscribe>,
+    pub fn send<T, R, H>(&self, msg: T, c: &Addr<H>) -> Receiver<Box<dyn Any + Send>>
+    where
+        T: RemoteMessage + Serialize,
+        R: RemoteMessage + Send + 'static,
+        H: Handler<R> + Handler<ResponseSubscribe>,
+        <H as Actor>::Context: ToEnvelope<H, ResponseSubscribe>,
     {
         let (tx, rx) = oneshot::channel();
         c.do_send(ResponseSubscribe(TypeId::of::<R>(), tx));

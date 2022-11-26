@@ -4,17 +4,17 @@ use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use port_scanner::request_open_port;
+use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
-use rayon::iter::IndexedParallelIterator;
 use serde::{Deserialize, Serialize};
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
-use std::any::{Any, TypeId};
-use tokio::time::sleep;
 use tokio::sync::oneshot::Sender;
+use tokio::time::sleep;
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
 struct TestMessage {}
@@ -239,8 +239,11 @@ impl Handler<InternalTrigger> for SendTestActor {
         let members = self.members.clone();
         Box::pin(async move {
             for remote_addr in members.lock().unwrap().iter() {
-                let future = remote_addr.send::<_, ResponseTest, _>(ResponseTestMessage{}, &self_addr.clone());
-                let res = tokio::time::timeout(Duration::from_secs(2), future).await.unwrap();
+                let future = remote_addr
+                    .send::<_, ResponseTest, _>(ResponseTestMessage {}, &self_addr.clone());
+                let res = tokio::time::timeout(Duration::from_secs(2), future)
+                    .await
+                    .unwrap();
                 res.map_err(|_| InternalError::Timeout)?;
             }
             Ok(())
@@ -271,7 +274,9 @@ impl Handler<ResponseSubscribe> for SendTestActor {
 impl Handler<ResponseTest> for SendTestActor {
     type Result = ();
     fn handle(&mut self, msg: ResponseTest, _: &mut Context<Self>) {
-        let tx = self.subscription_senders.remove(&TypeId::of::<ResponseTest>());
+        let tx = self
+            .subscription_senders
+            .remove(&TypeId::of::<ResponseTest>());
         if let Some(tx) = tx {
             tx.send(Box::new(msg)).unwrap();
         }
@@ -289,7 +294,7 @@ impl Handler<ClusterLog> for SendTestActor {
                 ClusterLog::NewMember(_addr, mut remote_addr) => {
                     remote_addr.change_id(Self::ACTOR_ID.to_string());
                     members.lock().unwrap().push(remote_addr);
-                },
+                }
                 _ => (),
             }
         })
@@ -305,10 +310,7 @@ fn test_send_with_response() {
     let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
         .parse()
         .unwrap();
-    let arr = [
-        (ip1, vec![ip2]),
-        (ip2, vec![]),
-    ];
+    let arr = [(ip1, vec![ip2]), (ip2, vec![])];
     let (tx, rx) = mpsc::channel();
     let tx = Arc::new(Mutex::new(tx));
     arr.par_iter()
@@ -324,11 +326,18 @@ fn test_send_with_response() {
 }
 
 #[actix_rt::main]
-async fn test_send_trigger(addr: SocketAddr, seeds: Vec<SocketAddr>, r: Arc<Mutex<mpsc::Sender<Result<(), InternalError>>>>) {
+async fn test_send_trigger(
+    addr: SocketAddr,
+    seeds: Vec<SocketAddr>,
+    r: Arc<Mutex<mpsc::Sender<Result<(), InternalError>>>>,
+) {
     let _cluster = Cluster::new(addr, seeds);
     let actor = SendTestActor::new().start();
     sleep(Duration::from_millis(300)).await;
-    r.lock().unwrap().send(actor.send(InternalTrigger()).await.unwrap()).unwrap();
+    r.lock()
+        .unwrap()
+        .send(actor.send(InternalTrigger()).await.unwrap())
+        .unwrap();
 }
 
 #[actix_rt::main]

@@ -1,9 +1,9 @@
 use crate::{CustomSerialization, NetworkInterface, RemoteAddr};
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
-use tokio::sync::oneshot::Sender;
 use std::any::{Any, TypeId};
+use tokio::sync::oneshot::Sender;
+use uuid::Uuid;
 
 /// Wrapper for messages to be sent to remote actor
 #[derive(Message, Serialize, Deserialize)]
