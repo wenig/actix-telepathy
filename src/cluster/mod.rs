@@ -8,7 +8,7 @@ pub use self::listener::{ClusterListener, ClusterLog};
 
 use crate::cluster::gossip::{GossipIgniting, MemberMgmt};
 use crate::network::NetworkInterface;
-use crate::remote::RemoteAddr;
+use crate::remote::Node;
 use crate::CustomSystemService;
 use actix::prelude::*;
 use actix_broker::BrokerIssue;
@@ -43,7 +43,7 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents {
-    MemberUp(SocketAddr, Addr<NetworkInterface>, RemoteAddr, bool),
+    MemberUp(Node, bool),
     MemberDown(SocketAddr),
 }
 
@@ -154,13 +154,13 @@ impl Handler<NodeEvents> for Cluster {
 
     fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
         match msg {
-            NodeEvents::MemberUp(host, node, remote_addr, seed) => {
+            NodeEvents::MemberUp(node, seed) => {
                 if seed {
-                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(host, node));
+                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(node.socket_addr, node.network_interface.as_ref().expect("NetworkInterface should be filled here!").clone()));
                 } else {
-                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(host, node));
+                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(node.socket_addr, node.network_interface.as_ref().expect("NetworkInterface should be filled here!").clone()));
                 }
-                self.issue_system_async(ClusterLog::NewMember(host, remote_addr));
+                self.issue_system_async(ClusterLog::NewMember(node));
             }
             NodeEvents::MemberDown(host) => {
                 Gossip::from_custom_registry().do_send(GossipIgniting::MemberDown(host));

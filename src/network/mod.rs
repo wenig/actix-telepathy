@@ -11,8 +11,8 @@ use crate::cluster::{Cluster, Gossip, NodeEvents};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
-use crate::remote::{AddrRepresentation, AddrResolver, RemoteAddr, RemoteWrapper};
-use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
+use crate::remote::{AddrRepresentation, AddrResolver, RemoteWrapper};
+use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService, Node};
 use actix::io::WriteHandler;
 use std::fmt;
 use std::thread::sleep;
@@ -133,15 +133,12 @@ impl NetworkInterface {
         match self.own_addr.clone() {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
-                let remote_address = RemoteAddr::new(
+                let node = Node::new(
                     self.addr,
-                    Some(addr.clone()),
-                    AddrRepresentation::NetworkInterface,
+                    Some(addr.clone())
                 );
                 Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(
-                    self.addr,
-                    addr,
-                    remote_address,
+                    node,
                     self.seed,
                 ));
             }

@@ -10,7 +10,7 @@ use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use crate::{NetworkInterface, WrappedClusterMessage};
 use actix::dev::ToEnvelope;
 
-use self::node::Node;
+pub use self::node::Node;
 
 pub mod resolver;
 pub mod node;

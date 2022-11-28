@@ -25,7 +25,7 @@ impl Node {
         }
     }
 
-    pub fn into_addr(self) -> RemoteAddr {  // Maybe then we don't need this method
+    pub fn into_remote_addr(self) -> RemoteAddr {  // Maybe then we don't need this method
         RemoteAddr {
             node: self,
             id: AddrRepresentation::NetworkInterface,

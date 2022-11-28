@@ -28,9 +28,9 @@ impl Handler<ClusterLog> for SocketTestClusterListener {
 
     fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            ClusterLog::NewMember(addr, _remote_addr) => {
-                debug!("new member {}", addr.to_string());
-                (*(self.content.as_ref().unwrap().lock().unwrap())).push(addr);
+            ClusterLog::NewMember(node) => {
+                debug!("new member {}", node.socket_addr.to_string());
+                (*(self.content.as_ref().unwrap().lock().unwrap())).push(node.socket_addr);
             }
             ClusterLog::MemberLeft(_addr) => {}
         }
@@ -57,7 +57,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
 
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            ClusterLog::NewMember(_addr, _remote_addr) => {
+            ClusterLog::NewMember(_node) => {
                 Gossip::from_custom_registry()
                     .send(NodeResolving {
                         addrs: vec![self.asking.clone()],
