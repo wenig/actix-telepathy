@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, Node};
 use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
@@ -152,7 +152,7 @@ async fn build_cluster(own_ip: SocketAddr, other_ip: Vec<SocketAddr>, last: bool
 }
 
 struct OwnListenerGossipIntroduction {
-    pub addrs: Vec<RemoteAddr>,
+    pub addrs: Vec<Node>,
     pub returned: Arc<Mutex<Option<usize>>>,
 }
 impl ClusterListener for OwnListenerGossipIntroduction {}
@@ -171,17 +171,17 @@ impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
 
     fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
-            ClusterLog::NewMember(_addr, remote_addr) => {
-                self.addrs.push(remote_addr);
+            ClusterLog::NewMember(node) => {
+                self.addrs.push(node);
                 if self.addrs.len() >= 2 {
-                    let remote_addr = self.addrs.get(0).unwrap().clone();
-                    let mut remote_addr2 = remote_addr.clone();
-                    remote_addr2.network_interface = None;
+                    let node = self.addrs.get(0).unwrap().clone();
+                    let mut node2 = node.clone();
+                    node2.network_interface = None;
                     //let remote_addr3 = self.addrs.get(1).unwrap().clone();
 
-                    let mut map = HashMap::<RemoteAddr, usize>::new();
-                    map.insert(remote_addr, 0);
-                    (*(self.returned.lock().unwrap())) = map.remove(&remote_addr2);
+                    let mut map = HashMap::<Node, usize>::new();
+                    map.insert(node, 0);
+                    (*(self.returned.lock().unwrap())) = map.remove(&node2);
                 }
             }
             _ => (),
