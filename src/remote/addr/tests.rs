@@ -291,8 +291,8 @@ impl Handler<ClusterLog> for SendTestActor {
         let members = self.members.clone();
         Box::pin(async move {
             match msg {
-                ClusterLog::NewMember(_addr, mut remote_addr) => {
-                    remote_addr.change_id(Self::ACTOR_ID.to_string());
+                ClusterLog::NewMember(node) => {
+                    let remote_addr = node.get_remote_addr(Self::ACTOR_ID.to_string());
                     members.lock().unwrap().push(remote_addr);
                 }
                 _ => (),
