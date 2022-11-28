@@ -23,14 +23,6 @@ impl Node {
         }
     }
 
-    pub fn into_remote_addr(self) -> RemoteAddr {
-        // Maybe then we don't need this method
-        RemoteAddr {
-            node: self,
-            id: AddrRepresentation::NetworkInterface,
-        }
-    }
-
     pub fn get_remote_addr(&self, id: String) -> RemoteAddr {
         RemoteAddr {
             node: self.clone(),
@@ -41,7 +33,7 @@ impl Node {
 
 impl Clone for Node {
     fn clone(&self) -> Self {
-        Node::new(self.socket_addr.clone(), self.network_interface.clone())
+        Node::new(self.socket_addr, self.network_interface.clone())
     }
 }
 

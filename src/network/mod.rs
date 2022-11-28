@@ -133,7 +133,7 @@ impl NetworkInterface {
         match self.own_addr.clone() {
             Some(addr) => {
                 debug!("finish connecting to {}", self.addr.to_string());
-                let node = Node::new(self.addr, Some(addr.clone()));
+                let node = Node::new(self.addr, Some(addr));
                 Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(node, self.seed));
             }
             None => error!("NetworkInterface might not have been started already!"),
