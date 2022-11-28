@@ -12,7 +12,7 @@ use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
 use crate::remote::{AddrRepresentation, AddrResolver, RemoteWrapper};
-use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService, Node};
+use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService, Node, ResponseDispatcher};
 use actix::io::WriteHandler;
 use std::fmt;
 use std::thread::sleep;
@@ -152,6 +152,7 @@ impl NetworkInterface {
             }
             AddrRepresentation::Gossip => Gossip::from_custom_registry().do_send(msg),
             AddrRepresentation::Key(_) => AddrResolver::from_registry().do_send(msg),
+            AddrRepresentation::ResponseDispatcher => ResponseDispatcher::from_registry().do_send(msg)
         }
     }
 

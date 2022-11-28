@@ -1,5 +1,5 @@
-use crate::{prelude::*, Node};
-use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse, ResponseSubscribe};
+use crate::{prelude::*, Node, ResponseSubscribe};
+use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
@@ -233,21 +233,19 @@ impl Actor for SendTestActor {
 }
 
 impl Handler<InternalTrigger> for SendTestActor {
-    type Result = ResponseFuture<Result<(), InternalError>>;
+    type Result = Result<(), InternalError>;
     fn handle(&mut self, _: InternalTrigger, ctx: &mut Context<Self>) -> Self::Result {
-        let self_addr = ctx.address();
         let members = self.members.clone();
-        Box::pin(async move {
-            for remote_addr in members.lock().unwrap().iter() {
-                let future = remote_addr
-                    .send::<_, ResponseTest, _>(ResponseTestMessage {}, &self_addr.clone());
-                let res = tokio::time::timeout(Duration::from_secs(2), future)
-                    .await
-                    .unwrap();
-                res.map_err(|_| InternalError::Timeout)?;
-            }
-            Ok(())
-        })
+        members.lock().unwrap()[0].send::<_, ResponseTest>(ResponseTestMessage {})
+            .into_actor(self)
+            .map(|res, act, ctx| match res {
+                Ok(_msg) => {
+                    println!("Response received")
+                },
+                Err(_) => panic!("Error when receiving response."),
+            })
+            .wait(ctx);
+        Ok(())
     }
 }
 
@@ -261,13 +259,6 @@ impl Handler<ResponseTestMessage> for SendTestActor {
                 remote_addr.do_send(ResponseTest("Hello from the other side".to_string()));
             }
         })
-    }
-}
-
-impl Handler<ResponseSubscribe> for SendTestActor {
-    type Result = ();
-    fn handle(&mut self, ResponseSubscribe(id, tx): ResponseSubscribe, _: &mut Context<Self>) {
-        self.subscription_senders.insert(id, tx);
     }
 }
 

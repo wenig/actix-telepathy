@@ -1,7 +1,7 @@
 use crate::network::NetworkInterface;
 use crate::remote::{RemoteActor, RemoteMessage, RemoteWrapper};
 use crate::{Cluster, CustomSystemService, GossipResponse, RemoteAddr};
-use crate::{CustomSerialization, DefaultSerialization};
+use crate::{CustomSerialization, DefaultSerialization, ClusterMessage, Node, AddrRepresentation};
 use actix::prelude::*;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use log::*;

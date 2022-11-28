@@ -22,6 +22,13 @@ impl Node {
         }
     }
 
+    pub fn from_network_interface(network_interface: Addr<NetworkInterface>) -> Self {
+        Self {
+            socket_addr: "0.0.0.0:8000".parse().unwrap(),
+            network_interface: Some(network_interface)
+        }
+    }
+
     pub fn get_remote_addr(&self, id: String) -> RemoteAddr {
         RemoteAddr {
             node: self.clone(),

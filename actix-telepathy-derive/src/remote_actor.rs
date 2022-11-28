@@ -25,10 +25,26 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         let matching = quote! {
             #name::IDENTIFIER => {
                 let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
-                if msg.source.clone().is_some() {
-                    deserialized_msg.set_source(msg.source.unwrap());
+                if let Some(source) = msg.source.clone() {
+                    deserialized_msg.set_source(source);
                 }
-                ctx.address().do_send(deserialized_msg);
+
+                if let Some(conversation_id) = msg.conversation_id.as_ref().clone() {
+                    let sender = msg.source.as_ref().clone().expect("The source should be set here.");
+                    ctx.address().send(deserialized_msg).into_actor(self)
+                        .map(|res, act, ctx| match res {
+                            Ok(res) => sender.do_send(
+                                ClusterMessage::Message(RemoteWrapper::new(
+                                    RemoteAddr::new(Node::from_network_interface(*sender), AddrRepresentation::ResponseDispatcher),
+                                    res,
+                                    Some(*conversation_id),
+                            ))),
+                            Err(_) => panic!("Remote Response failed."),
+                        })
+                        .wait(ctx);
+                } else {
+                    ctx.address().do_send(deserialized_msg);
+                }
             },
         };
         match_statement = quote! {

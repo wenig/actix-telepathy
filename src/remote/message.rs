@@ -17,6 +17,7 @@ pub struct RemoteWrapper {
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
     pub source: Option<Addr<NetworkInterface>>,
+    /// Used for Remote Responses
     pub conversation_id: Option<Uuid>,
 }
 
@@ -69,7 +70,3 @@ where
 
     fn set_source(&mut self, source: Addr<NetworkInterface>);
 }
-
-#[derive(Message)]
-#[rtype("()")]
-pub struct ResponseSubscribe(pub TypeId, pub Sender<Box<dyn Any + Send>>);

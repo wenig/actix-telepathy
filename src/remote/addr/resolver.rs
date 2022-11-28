@@ -9,12 +9,14 @@ use std::str::FromStr;
 
 const NETWORKINTERFACE: &str = "networkinterface";
 const GOSSIP: &str = "gossip";
+const RESPONSEDISPATCHER: &str = "responsedispatcher";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,
     Key(String),
+    ResponseDispatcher
 }
 
 impl ToString for AddrRepresentation {
@@ -23,6 +25,7 @@ impl ToString for AddrRepresentation {
             AddrRepresentation::NetworkInterface => String::from(NETWORKINTERFACE),
             AddrRepresentation::Gossip => String::from(GOSSIP),
             AddrRepresentation::Key(id) => id.clone(),
+            AddrRepresentation::ResponseDispatcher => String::from(RESPONSEDISPATCHER),
         }
     }
 }
@@ -148,7 +151,7 @@ impl Actor for AddrResolver {
 impl Handler<RemoteWrapper> for AddrResolver {
     type Result = ();
 
-    fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
+    fn handle(&mut self, msg: RemoteWrapper, ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone())
             .unwrap_or_else(|_| panic!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
         let _r = recipient.do_send(msg);

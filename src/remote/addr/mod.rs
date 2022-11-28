@@ -5,18 +5,20 @@ use std::str::FromStr;
 
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::codec::ClusterMessage;
-use crate::remote::ResponseSubscribe;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use crate::{NetworkInterface, WrappedClusterMessage};
 use actix::dev::ToEnvelope;
 
 pub use self::node::Node;
+pub use self::response_dispatcher::{ResponseDispatcher, ResponseSubscribe};
 
 pub mod node;
 use tokio::sync::oneshot::{self, Receiver};
 pub mod resolver;
+pub mod response_dispatcher;
 #[cfg(test)]
 mod tests;
 
@@ -69,16 +71,7 @@ impl RemoteAddr {
     }
 
     pub fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) {
-        let _r = self
-            .node
-            .network_interface
-            .as_ref()
-            .expect("Network interface must be set!")
-            .do_send(ClusterMessage::Message(RemoteWrapper::new(
-                self.clone(),
-                msg,
-                None,
-            )));
+        self.do_send_with_id(msg, None);
     }
 
     pub fn try_send<T: RemoteMessage + Serialize>(
@@ -88,16 +81,15 @@ impl RemoteAddr {
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T, R, H>(&self, msg: T, c: &Addr<H>) -> Receiver<Box<dyn Any + Send>>
+    pub fn send<T, R>(&self, msg: T) -> Receiver<Box<dyn Any + Send>>
     where
         T: RemoteMessage + Serialize,
-        R: RemoteMessage + Send + 'static,
-        H: Handler<R> + Handler<ResponseSubscribe>,
-        <H as Actor>::Context: ToEnvelope<H, ResponseSubscribe>,
+        R: RemoteMessage + Send + 'static
     {
+        let conversation_id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
-        c.do_send(ResponseSubscribe(TypeId::of::<R>(), tx));
-        self.do_send(msg);
+        ResponseDispatcher::from_registry().do_send(ResponseSubscribe(conversation_id, tx));
+        self.do_send_with_id(msg, Some(conversation_id));
         rx
     }
 
@@ -112,6 +104,19 @@ impl RemoteAddr {
             .send(WrappedClusterMessage(ClusterMessage::Message(
                 RemoteWrapper::new(self.clone(), msg, None),
             )))
+    }
+
+    fn do_send_with_id<T: RemoteMessage + Serialize>(&self, msg: T, conversation_id: Option<Uuid>) {
+        let _r = self
+            .node
+            .network_interface
+            .as_ref()
+            .expect("Network interface must be set!")
+            .do_send(ClusterMessage::Message(RemoteWrapper::new(
+                self.clone(),
+                msg,
+                conversation_id,
+            )));
     }
 }
 
