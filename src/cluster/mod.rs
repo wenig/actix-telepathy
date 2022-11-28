@@ -120,7 +120,6 @@ impl Cluster {
 }
 
 // Singleton
-
 impl Default for Cluster {
     fn default() -> Self {
         let ip_addr = "127.0.0.1:8000";

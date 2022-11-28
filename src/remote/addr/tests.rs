@@ -1,16 +1,19 @@
 use crate::{prelude::*, Node};
-use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
+use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse, ResponseSubscribe};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
 use port_scanner::request_open_port;
+use rayon::iter::IndexedParallelIterator;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
+use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
+use tokio::sync::oneshot::Sender;
 use tokio::time::sleep;
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
@@ -187,4 +190,159 @@ impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
             _ => (),
         }
     }
+}
+
+#[derive(RemoteMessage, Serialize, Deserialize)]
+struct ResponseTestMessage {}
+
+#[derive(RemoteMessage, Serialize, Deserialize)]
+struct ResponseTest(pub String);
+
+#[derive(Debug)]
+enum InternalError {
+    Timeout,
+}
+
+#[derive(Message)]
+#[rtype(result = "Result<(), InternalError>")]
+struct InternalTrigger();
+
+#[derive(RemoteActor)]
+#[remote_messages(ResponseTestMessage, ResponseTest)]
+struct SendTestActor {
+    members: Arc<Mutex<Vec<RemoteAddr>>>,
+    subscription_senders: HashMap<TypeId, Sender<Box<dyn Any + Send + 'static>>>,
+}
+
+impl SendTestActor {
+    pub fn new() -> Self {
+        Self {
+            members: Arc::new(Mutex::new(vec![])),
+            subscription_senders: HashMap::new(),
+        }
+    }
+}
+
+impl Actor for SendTestActor {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient());
+        self.subscribe_system_async::<ClusterLog>(ctx);
+    }
+}
+
+impl Handler<InternalTrigger> for SendTestActor {
+    type Result = ResponseFuture<Result<(), InternalError>>;
+    fn handle(&mut self, _: InternalTrigger, ctx: &mut Context<Self>) -> Self::Result {
+        let self_addr = ctx.address();
+        let members = self.members.clone();
+        Box::pin(async move {
+            for remote_addr in members.lock().unwrap().iter() {
+                let future = remote_addr
+                    .send::<_, ResponseTest, _>(ResponseTestMessage {}, &self_addr.clone());
+                let res = tokio::time::timeout(Duration::from_secs(2), future)
+                    .await
+                    .unwrap();
+                res.map_err(|_| InternalError::Timeout)?;
+            }
+            Ok(())
+        })
+    }
+}
+
+impl Handler<ResponseTestMessage> for SendTestActor {
+    type Result = ResponseFuture<()>;
+    fn handle(&mut self, _: ResponseTestMessage, _: &mut Context<Self>) -> Self::Result {
+        let members = self.members.clone();
+        Box::pin(async move {
+            let members = members.lock().unwrap();
+            for remote_addr in members.iter() {
+                remote_addr.do_send(ResponseTest("Hello from the other side".to_string()));
+            }
+        })
+    }
+}
+
+impl Handler<ResponseSubscribe> for SendTestActor {
+    type Result = ();
+    fn handle(&mut self, ResponseSubscribe(id, tx): ResponseSubscribe, _: &mut Context<Self>) {
+        self.subscription_senders.insert(id, tx);
+    }
+}
+
+impl Handler<ResponseTest> for SendTestActor {
+    type Result = ();
+    fn handle(&mut self, msg: ResponseTest, _: &mut Context<Self>) {
+        let tx = self
+            .subscription_senders
+            .remove(&TypeId::of::<ResponseTest>());
+        if let Some(tx) = tx {
+            tx.send(Box::new(msg)).unwrap();
+        }
+    }
+}
+
+impl ClusterListener for SendTestActor {}
+
+impl Handler<ClusterLog> for SendTestActor {
+    type Result = ResponseFuture<()>;
+    fn handle(&mut self, msg: ClusterLog, _: &mut Context<Self>) -> Self::Result {
+        let members = self.members.clone();
+        Box::pin(async move {
+            match msg {
+                ClusterLog::NewMember(_addr, mut remote_addr) => {
+                    remote_addr.change_id(Self::ACTOR_ID.to_string());
+                    members.lock().unwrap().push(remote_addr);
+                }
+                _ => (),
+            }
+        })
+    }
+}
+
+#[test]
+fn test_send_with_response() {
+    let _ = env_logger::builder().is_test(true).try_init();
+    let ip1: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let arr = [(ip1, vec![ip2]), (ip2, vec![])];
+    let (tx, rx) = mpsc::channel();
+    let tx = Arc::new(Mutex::new(tx));
+    arr.par_iter()
+        .enumerate()
+        .for_each(|(i, (ip, vec))| match i {
+            0 => test_start_actor(*ip, vec.clone()),
+            1 => test_send_trigger(*ip, vec.clone(), tx.clone()),
+            _ => (),
+        });
+    if let Err(err) = rx.try_recv().unwrap() {
+        panic!("Error occured: {:?}", err);
+    }
+}
+
+#[actix_rt::main]
+async fn test_send_trigger(
+    addr: SocketAddr,
+    seeds: Vec<SocketAddr>,
+    r: Arc<Mutex<mpsc::Sender<Result<(), InternalError>>>>,
+) {
+    let _cluster = Cluster::new(addr, seeds);
+    let actor = SendTestActor::new().start();
+    sleep(Duration::from_millis(300)).await;
+    r.lock()
+        .unwrap()
+        .send(actor.send(InternalTrigger()).await.unwrap())
+        .unwrap();
+}
+
+#[actix_rt::main]
+async fn test_start_actor(addr: SocketAddr, seeds: Vec<SocketAddr>) {
+    let _cluster = Cluster::new(addr, seeds);
+    let _actor = SendTestActor::new().start();
+    sleep(Duration::from_millis(500)).await;
 }

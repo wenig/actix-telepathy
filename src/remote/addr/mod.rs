@@ -1,3 +1,4 @@
+use std::any::{Any, TypeId};
 use std::hash::{Hash, Hasher};
 use std::net::SocketAddr;
 use std::str::FromStr;
@@ -6,6 +7,7 @@ use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::codec::ClusterMessage;
+use crate::remote::ResponseSubscribe;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
 use crate::{NetworkInterface, WrappedClusterMessage};
 use actix::dev::ToEnvelope;
@@ -13,6 +15,7 @@ use actix::dev::ToEnvelope;
 pub use self::node::Node;
 
 pub mod node;
+use tokio::sync::oneshot::{self, Receiver};
 pub mod resolver;
 #[cfg(test)]
 mod tests;
@@ -85,10 +88,17 @@ impl RemoteAddr {
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: T) {
-        unimplemented!(
-            "So far, it is not possible to receive responses from remote destinations as futures!"
-        )
+    pub fn send<T, R, H>(&self, msg: T, c: &Addr<H>) -> Receiver<Box<dyn Any + Send>>
+    where
+        T: RemoteMessage + Serialize,
+        R: RemoteMessage + Send + 'static,
+        H: Handler<R> + Handler<ResponseSubscribe>,
+        <H as Actor>::Context: ToEnvelope<H, ResponseSubscribe>,
+    {
+        let (tx, rx) = oneshot::channel();
+        c.do_send(ResponseSubscribe(TypeId::of::<R>(), tx));
+        self.do_send(msg);
+        rx
     }
 
     pub fn wait_send<T: RemoteMessage + Serialize>(

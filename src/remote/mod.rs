@@ -6,5 +6,5 @@ mod tests;
 
 pub use self::actor::RemoteActor;
 pub use self::addr::{AnyAddr, Node, RemoteAddr};
-pub use self::message::{RemoteMessage, RemoteWrapper};
+pub use self::message::{RemoteMessage, RemoteWrapper, ResponseSubscribe};
 pub use addr::resolver::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
