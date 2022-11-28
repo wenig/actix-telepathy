@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, AddrRepresentation, ClusterMessage, Node};
 use actix::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;

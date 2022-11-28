@@ -1,4 +1,4 @@
-use crate::{prelude::*, Node, ResponseSubscribe};
+use crate::{prelude::*, Node, ClusterMessage};
 use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
@@ -238,11 +238,8 @@ impl Handler<InternalTrigger> for SendTestActor {
         let members = self.members.clone();
         members.lock().unwrap()[0].send::<_, ResponseTest>(ResponseTestMessage {})
             .into_actor(self)
-            .map(|res, act, ctx| match res {
-                Ok(_msg) => {
-                    println!("Response received")
-                },
-                Err(_) => panic!("Error when receiving response."),
+            .map(|res, act, ctx| {
+                println!("Response received.");
             })
             .wait(ctx);
         Ok(())
