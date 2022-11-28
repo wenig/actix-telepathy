@@ -156,9 +156,21 @@ impl Handler<NodeEvents> for Cluster {
         match msg {
             NodeEvents::MemberUp(node, seed) => {
                 if seed {
-                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(node.socket_addr, node.network_interface.as_ref().expect("NetworkInterface should be filled here!").clone()));
+                    Gossip::from_custom_registry().do_send(GossipIgniting::MemberUp(
+                        node.socket_addr,
+                        node.network_interface
+                            .as_ref()
+                            .expect("NetworkInterface should be filled here!")
+                            .clone(),
+                    ));
                 } else {
-                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(node.socket_addr, node.network_interface.as_ref().expect("NetworkInterface should be filled here!").clone()));
+                    Gossip::from_custom_registry().do_send(MemberMgmt::MemberUp(
+                        node.socket_addr,
+                        node.network_interface
+                            .as_ref()
+                            .expect("NetworkInterface should be filled here!")
+                            .clone(),
+                    ));
                 }
                 self.issue_system_async(ClusterLog::NewMember(node));
             }

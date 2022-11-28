@@ -1,13 +1,14 @@
-use std::net::SocketAddr;
 use std::hash::{Hash, Hasher};
+use std::net::SocketAddr;
 
 use actix::Addr;
 use serde::{Deserialize, Serialize};
 
-use crate::{NetworkInterface, RemoteAddr, AddrRepresentation};
+use crate::{AddrRepresentation, NetworkInterface, RemoteAddr};
 
 #[derive(Deserialize, Serialize, Debug)]
-pub struct Node {  // or ClusterNode?
+pub struct Node {
+    // or ClusterNode?
     pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
@@ -15,17 +16,15 @@ pub struct Node {  // or ClusterNode?
 }
 
 impl Node {
-    pub fn new(
-        socket_addr: SocketAddr,
-        network_interface: Option<Addr<NetworkInterface>>
-    ) -> Self {
+    pub fn new(socket_addr: SocketAddr, network_interface: Option<Addr<NetworkInterface>>) -> Self {
         Self {
             socket_addr,
             network_interface,
         }
     }
 
-    pub fn into_remote_addr(self) -> RemoteAddr {  // Maybe then we don't need this method
+    pub fn into_remote_addr(self) -> RemoteAddr {
+        // Maybe then we don't need this method
         RemoteAddr {
             node: self,
             id: AddrRepresentation::NetworkInterface,
@@ -38,16 +37,11 @@ impl Node {
             id: AddrRepresentation::Key(id),
         }
     }
-
 }
-
 
 impl Clone for Node {
     fn clone(&self) -> Self {
-        Node::new(
-            self.socket_addr.clone(),
-            self.network_interface.clone(),
-        )
+        Node::new(self.socket_addr.clone(), self.network_interface.clone())
     }
 }
 

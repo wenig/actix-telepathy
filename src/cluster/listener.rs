@@ -13,9 +13,7 @@ pub enum ClusterLog {
 impl Clone for ClusterLog {
     fn clone(&self) -> Self {
         match self {
-            ClusterLog::NewMember(node) => {
-                ClusterLog::NewMember(node.clone())
-            }
+            ClusterLog::NewMember(node) => ClusterLog::NewMember(node.clone()),
             ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(*addr),
         }
     }

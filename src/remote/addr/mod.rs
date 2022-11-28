@@ -12,8 +12,8 @@ use actix::dev::ToEnvelope;
 
 pub use self::node::Node;
 
-pub mod resolver;
 pub mod node;
+pub mod resolver;
 #[cfg(test)]
 mod tests;
 
@@ -25,14 +25,8 @@ pub struct RemoteAddr {
 }
 
 impl RemoteAddr {
-    pub fn new(
-        node: Node,
-        id: AddrRepresentation,
-    ) -> Self {
-        RemoteAddr {
-            node,
-            id,
-        }
+    pub fn new(node: Node, id: AddrRepresentation) -> Self {
+        RemoteAddr { node, id }
     }
 
     pub fn new_from_id(socket_addr: SocketAddr, id: &str) -> Self {
@@ -47,8 +41,6 @@ impl RemoteAddr {
         network_interface: Addr<NetworkInterface>,
         id: &str,
     ) -> Self {
-
-
         RemoteAddr {
             node: Node::new(socket_addr, Some(network_interface)),
             id: AddrRepresentation::from_str(id).unwrap(),
@@ -59,7 +51,10 @@ impl RemoteAddr {
         socket_addr: SocketAddr,
         network_interface: Option<Addr<NetworkInterface>>,
     ) -> Self {
-        RemoteAddr::new(Node::new(socket_addr, network_interface), AddrRepresentation::Gossip)
+        RemoteAddr::new(
+            Node::new(socket_addr, network_interface),
+            AddrRepresentation::Gossip,
+        )
     }
 
     pub fn set_network_interface(&mut self, network_interface: Addr<NetworkInterface>) {
@@ -112,10 +107,7 @@ impl RemoteAddr {
 
 impl Clone for RemoteAddr {
     fn clone(&self) -> Self {
-        RemoteAddr::new(
-            self.node.clone(),
-            self.id.clone(),
-        )
+        RemoteAddr::new(self.node.clone(), self.id.clone())
     }
 }
 
