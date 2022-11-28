@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
-use crate::{NetworkInterface, WrappedClusterMessage};
+use crate::{NetworkInterface, WrappedClusterMessage, CustomSerialization};
 use actix::dev::ToEnvelope;
 
 pub use self::node::Node;
@@ -81,16 +81,19 @@ impl RemoteAddr {
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T, R>(&self, msg: T) -> Receiver<Box<dyn Any + Send>>
+    pub fn send<T, R>(&self, msg: T) -> ResponseFuture<R>
     where
         T: RemoteMessage + Serialize,
-        R: RemoteMessage + Send + 'static
+        R: RemoteMessage + Send + Deserialize<'static> + 'static
     {
         let conversation_id = Uuid::new_v4();
         let (tx, rx) = oneshot::channel();
         ResponseDispatcher::from_registry().do_send(ResponseSubscribe(conversation_id, tx));
         self.do_send_with_id(msg, Some(conversation_id));
-        rx
+        Box::pin(async move {
+            let message_buffer = rx.blocking_recv().expect("Could not receive response.");
+            R::generate_serializer().deserialize(&(message_buffer)[..]).expect("Cannot deserialized #name message")
+        })
     }
 
     pub fn wait_send<T: RemoteMessage + Serialize>(

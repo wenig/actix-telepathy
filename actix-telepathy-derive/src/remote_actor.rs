@@ -24,7 +24,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         let name = attr.as_ref().unwrap();
         let matching = quote! {
             #name::IDENTIFIER => {
-                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialize #name message");
                 if let Some(source) = msg.source.clone() {
                     deserialized_msg.set_source(source);
                 }

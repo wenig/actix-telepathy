@@ -9,11 +9,11 @@ use crate::RemoteWrapper;
 
 #[derive(Message)]
 #[rtype("()")]
-pub struct ResponseSubscribe(pub Uuid, pub Sender<Box<dyn Any + Send>>);
+pub struct ResponseSubscribe(pub Uuid, pub Sender<Vec<u8>>);
 
 #[derive(Default)]
 pub struct ResponseDispatcher {
-    subscribed_responses: HashMap<Uuid, Sender<Box<dyn Any + Send + 'static>>>
+    subscribed_responses: HashMap<Uuid, Sender<Vec<u8>>>
 }
 
 impl Supervised for ResponseDispatcher {}
@@ -41,8 +41,7 @@ impl Handler<RemoteWrapper> for ResponseDispatcher {
     fn handle(&mut self, msg: RemoteWrapper, ctx: &mut Self::Context) -> Self::Result {
         let sender = self.subscribed_responses.remove(
             &msg.conversation_id.as_ref().clone().expect("Conversation ID must be set by now.")).unwrap();
-        sender.send(Box::new(msg.message_buffer)).unwrap();
-        //let mut deserialized_msg = ::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
+        sender.send(msg.message_buffer).unwrap();
     }
 }
 
