@@ -8,7 +8,6 @@ use crate::{AddrRepresentation, NetworkInterface, RemoteAddr};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct Node {
-    // or ClusterNode?
     pub socket_addr: SocketAddr,
     #[serde(skip_serializing)]
     #[serde(skip_deserializing)]
