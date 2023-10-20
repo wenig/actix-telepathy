@@ -1,4 +1,4 @@
-use crate::remote::RemoteAddr;
+use crate::Node;
 use actix::prelude::*;
 use std::net::SocketAddr;
 
@@ -6,16 +6,14 @@ use std::net::SocketAddr;
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum ClusterLog {
-    NewMember(SocketAddr, RemoteAddr),
+    NewMember(Node),
     MemberLeft(SocketAddr),
 }
 
 impl Clone for ClusterLog {
     fn clone(&self) -> Self {
         match self {
-            ClusterLog::NewMember(addr, remote_addr) => {
-                ClusterLog::NewMember(*addr, (*remote_addr).clone())
-            }
+            ClusterLog::NewMember(node) => ClusterLog::NewMember(node.clone()),
             ClusterLog::MemberLeft(addr) => ClusterLog::MemberLeft(*addr),
         }
     }
