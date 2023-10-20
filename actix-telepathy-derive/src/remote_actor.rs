@@ -2,6 +2,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::__private::Span;
 use syn::{parse_macro_input, DeriveInput, Result};
+use syn::parse::Parser;
+type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
 
@@ -16,7 +18,7 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let messages =
-        get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least on Message");
+        get_message_types_attr(&input, REMOTE_MESSAGES).expect("Expected at least one Message");
 
     let mut match_statement = quote! {};
 
@@ -70,53 +72,56 @@ fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<s
     let attr = ast
         .attrs
         .iter()
-        .find_map(|a| {
-            let a = a.parse_meta();
-            match a {
-                Ok(meta) => {
-                    if meta.path().is_ident(ident) {
-                        Some(meta)
-                    } else {
-                        None
-                    }
-                }
-                _ => None,
+        .find_map(|attr| {
+            if attr.path().is_ident(ident) {
+                attr.parse_args().ok()
+            } else {
+                None
             }
         })
         .ok_or_else(|| {
-            syn::Error::new(
-                Span::call_site(),
-                format!("Expect an attribute `{}`", ident),
-            )
+            syn::Error::new(Span::call_site(), format!("Expect an attribute `{ident}`"))
         })?;
 
-    if let syn::Meta::List(ref list) = attr {
-        Ok(list
-            .nested
-            .iter()
-            .map(|m| meta_item_to_struct(m).ok())
-            .collect())
-    } else {
-        Err(syn::Error::new_spanned(
-            attr,
-            format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
-        ))
+    match attr {
+        syn::Meta::List(ref list) => {
+            let parser = AttributeArgs::parse_terminated;
+            let args = match parser.parse2(list.tokens.clone()) {
+                Ok(args) => args,
+                Err(_) => {
+                    return Err(syn::Error::new_spanned(
+                        attr,
+                        format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
+                    ))
+                }
+            };
+            Ok(args.iter().map(|m| meta_item_to_struct(m).ok()).collect())
+        },
+        syn::Meta::Path(path) => match path.get_ident() {
+            Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
+                .map(|ty| vec![Some(ty)])
+                .map_err(|_| syn::Error::new_spanned(ident, "Expect type")),
+            None => Err(syn::Error::new_spanned(path, "Expect type")),
+        },
+        _ => {
+            Err(syn::Error::new_spanned(
+                attr,
+                format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
+            ))
+        }
     }
 }
 
-fn meta_item_to_struct(meta_item: &syn::NestedMeta) -> syn::Result<syn::Type> {
+fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
     match meta_item {
-        syn::NestedMeta::Meta(syn::Meta::Path(ref path)) => match path.get_ident() {
+        syn::Meta::Path(ref path) => match path.get_ident() {
             Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),
         },
-        syn::NestedMeta::Meta(syn::Meta::NameValue(val)) => {
-            Err(syn::Error::new_spanned(&val.lit, "Expect Message"))
-        }
-        syn::NestedMeta::Lit(syn::Lit::Str(ref s)) => {
-            Err(syn::Error::new_spanned(s, "Expect Message"))
-        }
+        syn::Meta::NameValue(val) => {
+            Err(syn::Error::new_spanned(&val, "Expect Message"))
+        },
         meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }
