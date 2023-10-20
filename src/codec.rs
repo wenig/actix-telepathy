@@ -27,7 +27,7 @@ impl ClusterMessage {
                 Self::Message(wrapper) => wrapper.message_buffer.clone(),
                 _ => panic!("split should not be used if not ClusterMessage::Message"),
             },
-            flexbuffers::to_vec(&self).unwrap(),
+            flexbuffers::to_vec(self).unwrap(),
         )
     }
 

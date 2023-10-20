@@ -90,7 +90,7 @@
 //!
 //!     fn handle(&mut self, msg: ClusterLog, ctx: &mut Self::Context) -> Self::Result {
 //!         match msg {
-//!             ClusterLog::NewMember(_ip_addr, _remote_addr) => {
+//!             ClusterLog::NewMember(_node) => {
 //!                 println!("New member joined the cluster.")
 //!             },
 //!             ClusterLog::MemberLeft(_ip_addr) => {
@@ -152,9 +152,9 @@
 //!
 //!     fn handle(&mut self, msg: ClusterLog, ctx: &mut Self::Context) -> Self::Result {
 //!         match msg {
-//!             ClusterLog::NewMember(_ip_addr, mut remote_addr) => {
+//!             ClusterLog::NewMember(node) => {
 //!                 println!("New member joined the cluster.");
-//!                 remote_addr.change_id(Self::ACTOR_ID.to_string());
+//!                 let remote_addr = node.get_remote_addr(Self::ACTOR_ID.to_string());
 //!                 remote_addr.do_send(MyMessage {})
 //!             },
 //!             ClusterLog::MemberLeft(_ip_addr) => {
