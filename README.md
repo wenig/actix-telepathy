@@ -1,7 +1,7 @@
 [![crates.io](https://img.shields.io/crates/v/actix-telepathy?label=latest)](https://crates.io/crates/actix-telepathy)
 ![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.3/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.3)
+[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.4/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.4)
 ![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
 # Actix Telepathy
