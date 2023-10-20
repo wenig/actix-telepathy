@@ -101,7 +101,7 @@ impl Actor for Resolver {
                         Box::pin(
                             async {
                                 match AsyncResolver::tokio_from_system_conf() {
-                                    Ok(resolver) => Ok(resolver),
+                                    Ok(resolver) => resolver,
                                     Err(err) => {
                                         warn!("Can not create system dns resolver: {}", err);
                                         AsyncResolver::tokio(
@@ -117,7 +117,7 @@ impl Actor for Resolver {
                 )
                 .map(|resolver_res, this, _| {
                     // Keep the resolver itself.
-                    this.resolver = Some(resolver_res.unwrap());
+                    this.resolver = Some(resolver_res);
                 }),
         );
     }

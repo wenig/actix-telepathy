@@ -3,7 +3,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
+use syn::parse::Parser;
 use syn::{parse_macro_input, DeriveInput, Result};
+type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 const TELEPATHY_CONFIG_FILE: &str = "telepathy.yaml";
 const WITH_SOURCE: &str = "with_source";
@@ -88,28 +90,31 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
 }
 
 fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
-    let attr = ast.attrs.iter().find_map(|a| {
-        let a = a.parse_meta();
-        match a {
-            Ok(meta) => {
-                if meta.path().is_ident(WITH_SOURCE) {
-                    Some(meta)
-                } else {
-                    None
-                }
-            }
-            _ => None,
+    let attr = ast.attrs.iter().find_map(|attr| {
+        if attr.path().is_ident(WITH_SOURCE) {
+            attr.parse_args().ok()
+        } else {
+            None
         }
     });
 
     match attr {
         Some(a) => {
             if let syn::Meta::List(ref list) = a {
-                Ok(list
-                    .nested
-                    .iter()
-                    .map(|m| meta_item_to_struct(m).ok())
-                    .collect())
+                let parser = AttributeArgs::parse_terminated;
+                let args = match parser.parse2(list.tokens.clone()) {
+                    Ok(args) => args,
+                    Err(_) => {
+                        return Err(syn::Error::new_spanned(
+                            a,
+                            format!(
+                                "The correct syntax is #[{}(Message, Message, ...)]",
+                                WITH_SOURCE
+                            ),
+                        ))
+                    }
+                };
+                Ok(args.iter().map(|m| meta_item_to_struct(m).ok()).collect())
             } else {
                 Err(syn::Error::new_spanned(
                     a,
@@ -124,19 +129,14 @@ fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
     }
 }
 
-fn meta_item_to_struct(meta_item: &syn::NestedMeta) -> syn::Result<syn::Type> {
+fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
     match meta_item {
-        syn::NestedMeta::Meta(syn::Meta::Path(ref path)) => match path.get_ident() {
+        syn::Meta::Path(ref path) => match path.get_ident() {
             Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),
         },
-        syn::NestedMeta::Meta(syn::Meta::NameValue(val)) => {
-            Err(syn::Error::new_spanned(&val.lit, "Expect Message"))
-        }
-        syn::NestedMeta::Lit(syn::Lit::Str(ref s)) => {
-            Err(syn::Error::new_spanned(s, "Expect Message"))
-        }
+        syn::Meta::NameValue(val) => Err(syn::Error::new_spanned(val, "Expect Message")),
         meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }
