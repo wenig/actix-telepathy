@@ -1,8 +1,8 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::__private::Span;
-use syn::{parse_macro_input, DeriveInput, Result};
 use syn::parse::Parser;
+use syn::{parse_macro_input, DeriveInput, Result};
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
@@ -96,19 +96,17 @@ fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<s
                 }
             };
             Ok(args.iter().map(|m| meta_item_to_struct(m).ok()).collect())
-        },
+        }
         syn::Meta::Path(path) => match path.get_ident() {
             Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
                 .map(|ty| vec![Some(ty)])
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect type")),
             None => Err(syn::Error::new_spanned(path, "Expect type")),
         },
-        _ => {
-            Err(syn::Error::new_spanned(
-                attr,
-                format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
-            ))
-        }
+        _ => Err(syn::Error::new_spanned(
+            attr,
+            format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
+        )),
     }
 }
 
@@ -119,9 +117,7 @@ fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),
         },
-        syn::Meta::NameValue(val) => {
-            Err(syn::Error::new_spanned(&val, "Expect Message"))
-        },
+        syn::Meta::NameValue(val) => Err(syn::Error::new_spanned(val, "Expect Message")),
         meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }

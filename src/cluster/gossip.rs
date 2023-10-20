@@ -85,7 +85,6 @@ impl Gossip {
         let members: Vec<SocketAddr> = self
             .members
             .keys()
-            .into_iter()
             .filter_map(|x| if x.eq(&member_addr) { None } else { Some(*x) })
             .collect();
 

@@ -66,7 +66,7 @@ impl RemoteAddr {
     }
 
     pub fn do_send<T: RemoteMessage + Serialize>(&self, msg: T) {
-        let _r = self
+        self
             .node
             .network_interface
             .as_ref()

@@ -3,10 +3,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
-use syn::{parse_macro_input, DeriveInput, Result};
 use syn::parse::Parser;
+use syn::{parse_macro_input, DeriveInput, Result};
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
-
 
 const TELEPATHY_CONFIG_FILE: &str = "telepathy.yaml";
 const WITH_SOURCE: &str = "with_source";
@@ -108,8 +107,10 @@ fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
                     Err(_) => {
                         return Err(syn::Error::new_spanned(
                             a,
-                            format!("The correct syntax is #[{}(Message, Message, ...)]",
-                                    WITH_SOURCE),
+                            format!(
+                                "The correct syntax is #[{}(Message, Message, ...)]",
+                                WITH_SOURCE
+                            ),
                         ))
                     }
                 };
@@ -135,9 +136,7 @@ fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),
         },
-        syn::Meta::NameValue(val) => {
-            Err(syn::Error::new_spanned(&val, "Expect Message"))
-        },
+        syn::Meta::NameValue(val) => Err(syn::Error::new_spanned(val, "Expect Message")),
         meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }
