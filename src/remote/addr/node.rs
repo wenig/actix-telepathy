@@ -30,6 +30,15 @@ impl Node {
     }
 }
 
+impl Default for Node {
+    fn default() -> Self {
+        Node {
+            socket_addr: "0.1.2.3:8080".parse().unwrap(),
+            network_interface: None,
+        }
+    }
+}
+
 impl Clone for Node {
     fn clone(&self) -> Self {
         Node::new(self.socket_addr, self.network_interface.clone())

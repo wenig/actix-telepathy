@@ -177,8 +177,7 @@
 //! Now, every new member receives a `MyMessage` from every [ClusterListener](./trait.ClusterListener.html) in the cluster.
 //!
 //! Before we could use the [RemoteAddr](./struct.RemoteAddr.html), we had to make sure, that it is pointing to the correct [RemoteActor](./trait.RemoteActor.html), which is `MyActor` in that case.
-//! Therefore, we had to call `change_id` on the [RemoteAddr](./struct.RemoteAddr.html). A [RemoteAddr](./struct.RemoteAddr.html) points to a specific actor on a remote machine.
-//! Per default, this is the [NetworkInterface](./struct.NetworkInterface.html) actor.
+//! Therefore, we had to call `get_remote_addr` on the [Node](./struct.Node.html). A [RemoteAddr](./struct.RemoteAddr.html) points to a specific actor on a remote machine.
 
 #[cfg(feature = "derive")]
 pub use actix_telepathy_derive::*;

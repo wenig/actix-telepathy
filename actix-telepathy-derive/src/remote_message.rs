@@ -3,9 +3,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
-use syn::parse::Parser;
 use syn::{parse_macro_input, DeriveInput, Result};
-type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 const TELEPATHY_CONFIG_FILE: &str = "telepathy.yaml";
 const WITH_SOURCE: &str = "with_source";
@@ -42,12 +40,12 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let s = name.to_string();
     let sources = get_with_source_attr(&input).expect("Expected correct syntax");
-
+    
     let set_source = match sources.first() {
         Some(source) => {
             let attr = source.clone().unwrap();
             quote! {
-                self.#attr.network_interface = Some(addr);
+                self.#attr.node.network_interface = Some(addr);
             }
         }
         None => quote! {},
@@ -90,53 +88,35 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
 }
 
 fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
-    let attr = ast.attrs.iter().find_map(|attr| {
-        if attr.path().is_ident(WITH_SOURCE) {
-            attr.parse_args().ok()
-        } else {
-            None
-        }
-    });
+    let attr = ast
+        .attrs
+        .iter()
+        .find_map(|attr| {
+            if attr.path().is_ident(WITH_SOURCE) {
+                attr.parse_args().ok()
+            } else {
+                None
+            }
+        });
 
     match attr {
         Some(a) => {
-            if let syn::Meta::List(ref list) = a {
-                let parser = AttributeArgs::parse_terminated;
-                let args = match parser.parse2(list.tokens.clone()) {
-                    Ok(args) => args,
-                    Err(_) => {
-                        return Err(syn::Error::new_spanned(
-                            a,
-                            format!(
-                                "The correct syntax is #[{}(Message, Message, ...)]",
-                                WITH_SOURCE
-                            ),
-                        ))
-                    }
-                };
-                Ok(args.iter().map(|m| meta_item_to_struct(m).ok()).collect())
-            } else {
-                Err(syn::Error::new_spanned(
+            match a {
+                syn::Meta::Path(path) => match path.get_ident() {
+                    Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
+                        .map(|ty| vec![Some(ty)])
+                        .map_err(|_| syn::Error::new_spanned(ident, "Expect type")),
+                    None => Err(syn::Error::new_spanned(path, "Expect type")),
+                },
+                _ => Err(syn::Error::new_spanned(
                     a,
                     format!(
-                        "The correct syntax is #[{}(Message, Message, ...)]",
+                        "The correct syntax is #[{}(<RemoteAddr>)]",
                         WITH_SOURCE
                     ),
-                ))
+                )),
             }
         }
         None => Ok(vec![]),
-    }
-}
-
-fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
-    match meta_item {
-        syn::Meta::Path(ref path) => match path.get_ident() {
-            Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
-                .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
-            None => Err(syn::Error::new_spanned(path, "Expect Message")),
-        },
-        syn::Meta::NameValue(val) => Err(syn::Error::new_spanned(val, "Expect Message")),
-        meta => Err(syn::Error::new_spanned(meta, "Expect type")),
     }
 }

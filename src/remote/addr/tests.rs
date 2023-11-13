@@ -7,6 +7,7 @@ use port_scanner::request_open_port;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
+use core::panic;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -14,7 +15,10 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
-struct TestMessage {}
+#[with_source(source)]
+struct TestMessage {
+    source: RemoteAddr
+}
 
 #[derive(RemoteActor)]
 #[remote_messages(TestMessage)]
@@ -61,7 +65,7 @@ async fn addr_resolver_registers_and_resolves_addr() {
         ta.clone().recipient(),
         identifier.clone(),
     ));
-    ta.do_send(TestMessage {});
+    ta.do_send(TestMessage { source: RemoteAddr::default()});
     sleep(Duration::from_secs(1)).await;
     assert_eq!(
         (*(identifiers.lock().unwrap())).get(0).unwrap(),
@@ -187,4 +191,107 @@ impl Handler<ClusterLog> for OwnListenerGossipIntroduction {
             _ => (),
         }
     }
+}
+
+// ----------------------------------------------
+
+struct OwnListenerGossipIntroduction2 {
+    pub returned: Arc<Mutex<Option<RemoteAddr>>>,
+}
+impl ClusterListener for OwnListenerGossipIntroduction2 {}
+impl Supervised for OwnListenerGossipIntroduction2 {}
+
+impl Actor for OwnListenerGossipIntroduction2 {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.subscribe_system_async::<ClusterLog>(ctx);
+    }
+}
+
+impl Handler<ClusterLog> for OwnListenerGossipIntroduction2 {
+    type Result = ();
+
+    fn handle(&mut self, msg: ClusterLog, _ctx: &mut Context<Self>) -> Self::Result {
+        match msg {
+            ClusterLog::NewMember(node) => {
+                let remote_addr = node.get_remote_addr(TestActor2::ACTOR_ID.to_string());
+                (*(self.returned.lock().unwrap())) = Some(remote_addr);
+            }
+            _ => (),
+        }
+    }
+}
+
+#[derive(RemoteActor)]
+#[remote_messages(TestMessage)]
+struct TestActor2 {
+    pub returned: Arc<Mutex<Option<RemoteAddr>>>
+}
+
+impl Actor for TestActor2 {
+    type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        self.register(ctx.address().recipient());
+    }
+}
+
+impl Handler<TestMessage> for TestActor2 {
+    type Result = ();
+
+    fn handle(&mut self, msg: TestMessage, _ctx: &mut Context<Self>) -> Self::Result {
+        self.returned.lock().unwrap().replace(msg.source);
+    }
+}
+
+
+struct TestParams2 {
+    ip: SocketAddr,
+    seeds: Vec<SocketAddr>,
+}
+
+
+#[test]
+#[ignore] //github workflows don't get the timing right
+fn remote_addr_filled_in_with_source() {
+    let ip1: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+
+    let arr = [
+        TestParams2 {
+            ip: ip1.clone(),
+            seeds: vec![],
+        },
+        TestParams2 {
+            ip: ip2.clone(),
+            seeds: vec![ip1.clone()],
+        },
+    ];
+    arr.par_iter()
+        .for_each(|p| build_cluster_2(p.ip, p.seeds.clone()));
+}
+
+#[actix_rt::main]
+async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
+    let _cluster = Cluster::new(own_ip, other_ip);
+    let returned_received: Arc<Mutex<Option<RemoteAddr>>> = Arc::new(Mutex::new(None));
+    let _test_actor_addr = TestActor2 {returned: returned_received.clone()}.start();
+    let returned: Arc<Mutex<Option<RemoteAddr>>> = Arc::new(Mutex::new(None));
+    let _listener = OwnListenerGossipIntroduction2 {
+        returned: returned.clone(),
+    }
+    .start();
+    sleep(Duration::from_millis(200)).await;
+    let guard = returned.lock().unwrap();
+    let remote_addr = guard.as_ref().expect("Something should be returned");
+    let mut own_remote_addr = remote_addr.clone();
+    own_remote_addr.node.socket_addr = own_ip;
+    remote_addr.do_send(TestMessage { source: own_remote_addr});
+    sleep(Duration::from_millis(200)).await;
+    assert_eq!((returned_received.lock().unwrap()).as_ref().unwrap().node.socket_addr, remote_addr.node.socket_addr);
 }
