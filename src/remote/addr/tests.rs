@@ -3,11 +3,11 @@ use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};
+use core::panic;
 use port_scanner::request_open_port;
 use rayon::iter::IntoParallelRefIterator;
 use rayon::iter::ParallelIterator;
 use serde::{Deserialize, Serialize};
-use core::panic;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
@@ -17,7 +17,7 @@ use tokio::time::sleep;
 #[derive(RemoteMessage, Serialize, Deserialize)]
 #[with_source(source)]
 struct TestMessage {
-    source: RemoteAddr
+    source: RemoteAddr,
 }
 
 #[derive(RemoteActor)]
@@ -65,7 +65,9 @@ async fn addr_resolver_registers_and_resolves_addr() {
         ta.clone().recipient(),
         identifier.clone(),
     ));
-    ta.do_send(TestMessage { source: RemoteAddr::default()});
+    ta.do_send(TestMessage {
+        source: RemoteAddr::default(),
+    });
     sleep(Duration::from_secs(1)).await;
     assert_eq!(
         (*(identifiers.lock().unwrap())).get(0).unwrap(),
@@ -226,7 +228,7 @@ impl Handler<ClusterLog> for OwnListenerGossipIntroduction2 {
 #[derive(RemoteActor)]
 #[remote_messages(TestMessage)]
 struct TestActor2 {
-    pub returned: Arc<Mutex<Option<RemoteAddr>>>
+    pub returned: Arc<Mutex<Option<RemoteAddr>>>,
 }
 
 impl Actor for TestActor2 {
@@ -245,12 +247,10 @@ impl Handler<TestMessage> for TestActor2 {
     }
 }
 
-
 struct TestParams2 {
     ip: SocketAddr,
     seeds: Vec<SocketAddr>,
 }
-
 
 #[test]
 #[ignore] //github workflows don't get the timing right
@@ -280,7 +280,10 @@ fn remote_addr_filled_in_with_source() {
 async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
     let _cluster = Cluster::new(own_ip, other_ip);
     let returned_received: Arc<Mutex<Option<RemoteAddr>>> = Arc::new(Mutex::new(None));
-    let _test_actor_addr = TestActor2 {returned: returned_received.clone()}.start();
+    let _test_actor_addr = TestActor2 {
+        returned: returned_received.clone(),
+    }
+    .start();
     let returned: Arc<Mutex<Option<RemoteAddr>>> = Arc::new(Mutex::new(None));
     let _listener = OwnListenerGossipIntroduction2 {
         returned: returned.clone(),
@@ -291,7 +294,16 @@ async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
     let remote_addr = guard.as_ref().expect("Something should be returned");
     let mut own_remote_addr = remote_addr.clone();
     own_remote_addr.node.socket_addr = own_ip;
-    remote_addr.do_send(TestMessage { source: own_remote_addr});
+    remote_addr.do_send(TestMessage {
+        source: own_remote_addr,
+    });
     sleep(Duration::from_millis(200)).await;
-    assert_eq!((returned_received.lock().unwrap()).as_ref().unwrap().node.socket_addr, remote_addr.node.socket_addr);
+    assert_eq!(
+        (returned_received.lock().unwrap())
+            .as_ref()
+            .unwrap()
+            .node
+            .socket_addr,
+        remote_addr.node.socket_addr
+    );
 }

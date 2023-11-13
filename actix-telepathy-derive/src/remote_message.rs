@@ -40,7 +40,7 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = &input.generics.split_for_impl();
     let s = name.to_string();
     let sources = get_with_source_attr(&input).expect("Expected correct syntax");
-    
+
     let set_source = match sources.first() {
         Some(source) => {
             let attr = source.clone().unwrap();
@@ -88,35 +88,27 @@ pub fn remote_message_macro(input: TokenStream) -> TokenStream {
 }
 
 fn get_with_source_attr(ast: &DeriveInput) -> Result<Vec<Option<syn::Type>>> {
-    let attr = ast
-        .attrs
-        .iter()
-        .find_map(|attr| {
-            if attr.path().is_ident(WITH_SOURCE) {
-                attr.parse_args().ok()
-            } else {
-                None
-            }
-        });
+    let attr = ast.attrs.iter().find_map(|attr| {
+        if attr.path().is_ident(WITH_SOURCE) {
+            attr.parse_args().ok()
+        } else {
+            None
+        }
+    });
 
     match attr {
-        Some(a) => {
-            match a {
-                syn::Meta::Path(path) => match path.get_ident() {
-                    Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
-                        .map(|ty| vec![Some(ty)])
-                        .map_err(|_| syn::Error::new_spanned(ident, "Expect type")),
-                    None => Err(syn::Error::new_spanned(path, "Expect type")),
-                },
-                _ => Err(syn::Error::new_spanned(
-                    a,
-                    format!(
-                        "The correct syntax is #[{}(<RemoteAddr>)]",
-                        WITH_SOURCE
-                    ),
-                )),
-            }
-        }
+        Some(a) => match a {
+            syn::Meta::Path(path) => match path.get_ident() {
+                Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
+                    .map(|ty| vec![Some(ty)])
+                    .map_err(|_| syn::Error::new_spanned(ident, "Expect type")),
+                None => Err(syn::Error::new_spanned(path, "Expect type")),
+            },
+            _ => Err(syn::Error::new_spanned(
+                a,
+                format!("The correct syntax is #[{}(<RemoteAddr>)]", WITH_SOURCE),
+            )),
+        },
         None => Ok(vec![]),
     }
 }
