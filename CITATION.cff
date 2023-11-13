@@ -4,8 +4,11 @@ authors:
   - family-names: Wenig
     given-names: Phillip
     orcid: https://orcid.org/0000-0002-8942-4322
-title: "Actix-Telepathy"
-version: 0.5.3
-# doi: ...
-date-released: 2022-08-09
-url: "https://github.com/wenig/actix-telepathy"
+  - family-names: Papenbrock
+    given-names: Thorsten
+    orcid: https://orcid.org/0000-0002-4019-8221
+title: Actix-Telepathy
+doi: 10.1145/3623506.3623575
+booktitle: Proceedings of the 10th ACM SIGPLAN International Workshop on Reactive and Event-Based Languages and Systems
+year: 2023
+url: https://github.com/wenig/actix-telepathy
