@@ -104,6 +104,15 @@ impl RemoteAddr {
     }
 }
 
+impl Default for RemoteAddr {
+    fn default() -> Self {
+        RemoteAddr {
+            node: Node::default(),
+            id: AddrRepresentation::Key("Default".to_string()),
+        }
+    }
+}
+
 impl Clone for RemoteAddr {
     fn clone(&self) -> Self {
         RemoteAddr::new(self.node.clone(), self.id.clone())
