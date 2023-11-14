@@ -13,8 +13,7 @@ use crate::remote::{RemoteWrapper, AddrRepresentation, AddrResolver};
 use actix::io::WriteHandler;
 use std::thread::sleep;
 use std::fmt;
-use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService};
-use crate::cluster::Gossip;
+use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService, Connector};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
 use crate::Node;
@@ -152,7 +151,7 @@ impl NetworkInterface {
             AddrRepresentation::NetworkInterface => {
                 panic!("NetworkInterface does not interact as RemoteActor")
             }
-            AddrRepresentation::Gossip => Gossip::from_custom_registry().do_send(msg),
+            AddrRepresentation::Connector => Connector::from_custom_registry().do_send(msg),
             AddrRepresentation::Key(_) => AddrResolver::from_registry().do_send(msg),
         }
     }

@@ -47,13 +47,13 @@ impl RemoteAddr {
         }
     }
 
-    pub fn new_gossip(
+    pub fn new_connector(
         socket_addr: SocketAddr,
         network_interface: Option<Addr<NetworkInterface>>,
     ) -> Self {
         RemoteAddr::new(
             Node::new(socket_addr, network_interface),
-            AddrRepresentation::Gossip,
+            AddrRepresentation::Connector,
         )
     }
 

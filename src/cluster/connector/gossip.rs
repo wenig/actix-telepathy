@@ -2,13 +2,16 @@ use log::*;
 use actix::prelude::*;
 use std::collections::{HashMap, HashSet};
 use crate::network::NetworkInterface;
-use crate::{RemoteAddr, Cluster, CustomSystemService, ConnectToNode, NodeEvents};
+use crate::{RemoteAddr, Cluster, CustomSystemService, ConnectToNode, NodeEvents, Node};
 use std::net::SocketAddr;
 use std::iter::FromIterator;
 use std::str::FromStr;
 use rand::prelude::{IteratorRandom, ThreadRng};
 use crate::cluster::connector::{Connector, ConnectorVariant};
 use crate::cluster::connector::messages::{GossipEvent, GossipJoining, GossipMessage, NodeResolving};
+
+
+const CONNECTOR: &str = "Connector";
 
 enum GossipState {
     Lonely,
@@ -43,9 +46,9 @@ impl Gossip {
         Self {own_addr, ..Default::default()}
     }
 
-    fn add_member(&mut self, new_addr: SocketAddr, node: Addr<NetworkInterface>) {
-        self.members.insert(new_addr.clone(), node);
-        debug!("Member {} added!", new_addr.to_string());
+    fn add_member(&mut self, node: Node) {
+        self.members.insert(node.socket_addr.clone(), node.network_interface.expect("Empty network interface"));
+        debug!("Member {} added!", node.socket_addr.to_string());
     }
 
     fn remove_member(&mut self, addr: SocketAddr) {
@@ -79,7 +82,7 @@ impl Gossip {
         let mut rng = ThreadRng::default();
         self.members.iter()
             .choose_multiple(&mut rng, amount).into_iter()
-            .map(|(socket_addr, network_interface)| RemoteAddr::new_gossip(socket_addr.clone(), Some(network_interface.clone())))
+            .map(|(socket_addr, network_interface)| RemoteAddr::new_connector(socket_addr.clone(), Some(network_interface.clone())))
             .collect()
     }
 
@@ -93,7 +96,7 @@ impl Gossip {
         members.difference(seen).into_iter().collect::<HashSet<&SocketAddr>>().is_empty()
     }
 
-    fn handle_gossip_message(&mut self, msg: GossipMessage) {
+    pub(crate) fn handle_gossip_message(&mut self, msg: GossipMessage) {
         let all_seen = self.all_seen(&msg.seen);
         let mut seen = msg.seen;
         let member_contains = self.members.contains_key(&msg.addr);
@@ -123,43 +126,22 @@ impl Gossip {
 
         self.gossip_member_event(msg.addr, msg.event, seen);
     }
-}
 
-
-impl Handler<GossipMessage> for Connector {
-    type Result = ();
-
-    fn handle(&mut self, msg: GossipMessage, _ctx: &mut Self::Context) -> Self::Result {
-        match self {
-            Connector::Gossip(gossip) => {
-                gossip.handle_gossip_message(msg)
-            },
-            //_ => warn!("Connector can only handle GossipMessage if it is Connector::Gossip")
+    pub(crate) fn handle_gossip_joining(&mut self, msg: GossipJoining) {
+        self.about_to_join = msg.about_to_join;
+        if self.about_to_join == self.members.len() {
+            self.state = GossipState::Joined;
         }
     }
 }
 
-impl Handler<GossipJoining> for Connector {
-    type Result = ();
-
-    fn handle(&mut self, msg: GossipJoining, _ctx: &mut Self::Context) -> Self::Result {
-        match self {
-            Connector::Gossip(gossip) => {
-                gossip.about_to_join = msg.about_to_join;
-                if gossip.about_to_join == gossip.members.len() {
-                    gossip.state = GossipState::Joined;
-                }
-            }
-        }
-    }
-}
 
 impl ConnectorVariant for Gossip {
     fn handle_node_event(&mut self, msg: NodeEvents, ctx: &mut Context<Connector>) {
         match msg {
-            NodeEvents::MemberUp(host, node, mut remote_addr, seed) => {
-                self.add_member(host.clone(), node);
-                if !self.waiting_to_add.remove(&host) {
+            NodeEvents::MemberUp(node, seed) => {
+                self.add_member(node.clone());
+                if !self.waiting_to_add.remove(&node.socket_addr) {
                     match &self.state {
                         GossipState::Lonely => {
                             if seed {
@@ -179,9 +161,9 @@ impl ConnectorVariant for Gossip {
                             }
                         },
                         GossipState::Joined => {
-                            remote_addr.change_id("Connector".to_string());
+                            let remote_addr = node.get_remote_addr(CONNECTOR.to_string());
                             remote_addr.do_send(GossipJoining { about_to_join: self.members.len() });
-                            self.ignite_member_up(host);
+                            self.ignite_member_up(node.socket_addr);
                         }
                     }
                 }

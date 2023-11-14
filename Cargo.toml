@@ -26,7 +26,7 @@ derive = ["actix_telepathy_derive"]
 protocols = []
 
 [dev-dependencies]
-actix-rt = "2.0.0"
+actix-rt = "2.9.0"
 port_scanner = "0.1.5"
 rayon = "1.5.0"
 futures-sink = "0.3.21"

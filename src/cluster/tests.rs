@@ -1,7 +1,7 @@
 use crate::test_utils::cluster_listener::TestClusterListener;
 use crate::{
-    Cluster, ClusterListener, ClusterLog, CustomSystemService, Gossip, NetworkInterface,
-    NodeResolving,
+    Cluster, ClusterListener, ClusterLog, CustomSystemService, NetworkInterface,
+    NodeResolving, Connector,
 };
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
@@ -58,7 +58,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(_node) => {
-                Gossip::from_custom_registry()
+                Connector::from_custom_registry()
                     .send(NodeResolving {
                         addrs: vec![self.asking.clone()],
                     })
@@ -76,7 +76,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
                     .wait(ctx);
             }
             ClusterLog::MemberLeft(addr) => {
-                Gossip::from_custom_registry()
+                Connector::from_custom_registry()
                     .send(NodeResolving { addrs: vec![addr] })
                     .into_actor(self)
                     .map(

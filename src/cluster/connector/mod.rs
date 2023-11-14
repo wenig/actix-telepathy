@@ -28,6 +28,7 @@ pub enum Connector {
     Gossip(Gossip)
 }
 
+
 impl Connector {
     pub fn from_connection_protocol(connection_protocol: ConnectionProtocol, own_address: SocketAddr) -> Self {
         match connection_protocol {
@@ -62,7 +63,7 @@ impl Supervised for Connector {}
 impl SystemService for Connector {}
 impl CustomSystemService for Connector {
     fn custom_service_started(&mut self, _ctx: &mut Context<Self>) {
-        debug!("Gossip Service started");
+        debug!("Connector Service started");
     }
 }
 
@@ -88,6 +89,35 @@ impl Handler<NodeResolving> for Connector {
     fn handle(&mut self, msg: NodeResolving, ctx: &mut Context<Self>) -> Self::Result {
         match self {
             Connector::Gossip(gossip) => gossip.handle_node_resolving(msg, ctx)
+        }
+    }
+}
+
+
+// --- Gossip impl ---
+
+impl Handler<GossipMessage> for Connector {
+    type Result = ();
+
+    fn handle(&mut self, msg: GossipMessage, _ctx: &mut Self::Context) -> Self::Result {
+        match self {
+            Connector::Gossip(gossip) => {
+                gossip.handle_gossip_message(msg)
+            },
+            _ => warn!("Connector can only handle GossipMessage if it is Connector::Gossip")
+        }
+    }
+}
+
+impl Handler<GossipJoining> for Connector {
+    type Result = ();
+
+    fn handle(&mut self, msg: GossipJoining, _ctx: &mut Self::Context) -> Self::Result {
+        match self {
+            Connector::Gossip(gossip) => {
+                gossip.handle_gossip_joining(msg)
+            },
+            _ => warn!("Connector can only handle GossipJoining if it is Connector::Gossip")
         }
     }
 }

@@ -1,4 +1,3 @@
-mod gossip;
 mod listener;
 #[cfg(test)]
 mod tests;

@@ -22,8 +22,8 @@ struct TestMessage {
 
 #[derive(RemoteActor)]
 #[remote_messages(TestMessage)]
-struct TestActor {
-    identifiers: Arc<Mutex<Vec<String>>>,
+enum TestActor {
+    Test(Arc<Mutex<Vec<String>>>),
 }
 
 impl Actor for TestActor {
@@ -41,7 +41,9 @@ impl Handler<TestMessage> for TestActor {
                 Ok(res) => match res {
                     Ok(addr_res) => match addr_res {
                         AddrResponse::ResolveRec(identifer) => {
-                            act.identifiers.lock().unwrap().push(identifer)
+                            match act {
+                                TestActor::Test(identifiers) => identifiers.lock().unwrap().push(identifer)
+                            }
                         }
                         _ => panic!("Wrong Response returned!"),
                     },
@@ -57,9 +59,7 @@ impl Handler<TestMessage> for TestActor {
 async fn addr_resolver_registers_and_resolves_addr() {
     let identifier = "testActor".to_string();
     let identifiers = Arc::new(Mutex::new(vec![]));
-    let ta = TestActor {
-        identifiers: identifiers.clone(),
-    }
+    let ta = TestActor::Test(identifiers.clone())
     .start();
     AddrResolver::from_registry().do_send(AddrRequest::Register(
         ta.clone().recipient(),
@@ -79,7 +79,7 @@ async fn addr_resolver_registers_and_resolves_addr() {
 fn addr_representation_eq_not_key() {
     let own = AddrRepresentation::NetworkInterface;
     let other1 = AddrRepresentation::NetworkInterface;
-    let other2 = AddrRepresentation::Gossip;
+    let other2 = AddrRepresentation::Connector;
     let other3 = AddrRepresentation::Key("test".to_string());
 
     assert!(own.eq(&other1));
