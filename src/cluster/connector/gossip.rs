@@ -144,9 +144,9 @@ impl ConnectorVariant for Gossip {
                 if !self.waiting_to_add.remove(&node.socket_addr) {
                     match &self.state {
                         GossipState::Lonely => {
-                            if seed {
+                            if seed { // if connecting node is seed, we are joining
                                 self.state = GossipState::Joining;
-                            } else {
+                            } else { // else we are the seed and therefore are already joined
                                 self.state = GossipState::Joined;
                             }
                         },

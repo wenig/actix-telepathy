@@ -9,6 +9,9 @@ use crate::{RemoteActor, RemoteWrapper, RemoteMessage, CustomSerialization};
 pub mod gossip;
 mod messages;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, Copy)]
 pub enum ConnectionProtocol {
     SingleSeed,

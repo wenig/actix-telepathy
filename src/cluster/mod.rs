@@ -45,6 +45,7 @@ pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 #[derive(Message)]
 #[rtype(result = "()")]
 pub enum NodeEvents {
+    /// (Node, and whether it is a seed node)
     MemberUp(Node, bool),
     MemberDown(SocketAddr),
 }

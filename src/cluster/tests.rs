@@ -136,7 +136,7 @@ async fn gossip_adds_member_and_resolves_it() {
     let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
         .parse()
         .unwrap();
-    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _cluster = Cluster::new_with_connection_protocol(local_ip.clone(), vec![], crate::ConnectionProtocol::Gossip);
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {
         asking: other_ip.clone(),
@@ -156,7 +156,7 @@ async fn gossip_removes_member() {
     let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
         .parse()
         .unwrap();
-    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _cluster = Cluster::new_with_connection_protocol(local_ip.clone(), vec![], crate::ConnectionProtocol::Gossip);
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {
         asking: other_ip.clone(),
