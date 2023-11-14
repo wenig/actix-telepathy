@@ -1,20 +1,20 @@
-use log::*;
-use actix::prelude::*;
-use std::collections::HashMap;
 use crate::remote::RemoteWrapper;
-use std::str::FromStr;
+use actix::prelude::*;
+use log::*;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
-
+use std::hash::{Hash, Hasher};
+use std::str::FromStr;
 
 const NETWORKINTERFACE: &str = "networkinterface";
 const GOSSIP: &str = "gossip";
 
-#[derive(Serialize, Deserialize, Hash, Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum AddrRepresentation {
     NetworkInterface,
     Gossip,
-    Key(String)
+    Key(String),
 }
 
 impl ToString for AddrRepresentation {
@@ -34,7 +34,7 @@ impl FromStr for AddrRepresentation {
         Ok(match s {
             NETWORKINTERFACE => AddrRepresentation::NetworkInterface,
             GOSSIP => AddrRepresentation::Gossip,
-            _ => AddrRepresentation::Key(String::from(s))
+            _ => AddrRepresentation::Key(String::from(s)),
         })
     }
 }
@@ -49,82 +49,90 @@ impl PartialEq for AddrRepresentation {
     fn eq(&self, other: &Self) -> bool {
         let self_key = self.to_string();
         (self_key == other.to_string() && self_key != "Key")
-        || (self_key == "Key" && match self {
-            AddrRepresentation::Key(key) => match other {
-                AddrRepresentation::Key(other_key) => key == other_key,
-                _ => false
-            } ,
-            _ => false
-        })
+            || (self_key == "Key"
+                && match self {
+                    AddrRepresentation::Key(key) => match other {
+                        AddrRepresentation::Key(other_key) => key == other_key,
+                        _ => false,
+                    },
+                    _ => false,
+                })
     }
 }
 
 impl Eq for AddrRepresentation {}
 
+impl Hash for AddrRepresentation {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.to_string().hash(state);
+    }
+}
 
 #[derive(Message)]
 #[rtype(result = "Result<AddrResponse, ()>")]
 pub enum AddrRequest {
     Register(Recipient<RemoteWrapper>, String),
     ResolveStr(String),
-    ResolveRec(Recipient<RemoteWrapper>)
+    ResolveRec(Recipient<RemoteWrapper>),
 }
 
 pub enum AddrResponse {
     Register,
     ResolveStr(Recipient<RemoteWrapper>),
-    ResolveRec(String)
+    ResolveRec(String),
 }
 
+#[derive(Default)]
 pub struct AddrResolver {
     str2rec: HashMap<String, Recipient<RemoteWrapper>>,
     rec2str: HashMap<Recipient<RemoteWrapper>, String>,
-}
-
-impl Default for AddrResolver {
-    fn default() -> Self {
-        Self {
-            str2rec: HashMap::new(),
-            rec2str: HashMap::new(),
-        }
-    }
 }
 
 pub struct NotAvailableError {}
 
 impl Debug for NotAvailableError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NotAvailableError")
-            .finish()
+        f.debug_struct("NotAvailableError").finish()
     }
 }
 
+/// A system actor that can resolve `ACTOR_ID`s to [actix::Addr](https://docs.rs/actix/latest/actix/struct.Addr.html)s
+/// by sending an [AddrRequest](./enum.AddrRequest.html).
 impl AddrResolver {
     pub fn new() -> Self {
         AddrResolver::default()
     }
 
-    pub fn resolve_str(&mut self, id: String) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
+    pub fn resolve_str(
+        &mut self,
+        id: String,
+    ) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         match self.str2rec.get(&id) {
             Some(rec) => Ok(rec),
             None => {
                 error!("ID {} is not registered", id);
                 Err(NotAvailableError {})
-            },
+            }
         }
     }
 
-    pub fn resolve_rec(&mut self, rec: &Recipient<RemoteWrapper>) -> Result<&String, NotAvailableError> {
+    pub fn resolve_rec(
+        &mut self,
+        rec: &Recipient<RemoteWrapper>,
+    ) -> Result<&String, NotAvailableError> {
         match self.rec2str.get(rec) {
             Some(str) => Ok(str),
             None => {
                 error!("Recipient is not registered");
                 Err(NotAvailableError {})
-            },
+            }
         }
     }
 
-    pub fn resolve_rec_from_addr_representation(&mut self, addr_representation: AddrRepresentation) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
+    pub fn resolve_rec_from_addr_representation(
+        &mut self,
+        addr_representation: AddrRepresentation,
+    ) -> Result<&Recipient<RemoteWrapper>, NotAvailableError> {
         self.resolve_str(addr_representation.to_string())
     }
 }
@@ -142,8 +150,8 @@ impl Handler<RemoteWrapper> for AddrResolver {
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
         let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone())
-            .expect(&format!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
-        let _r = recipient.do_send(msg);
+            .unwrap_or_else(|_| panic!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
+        recipient.do_send(msg);
     }
 }
 
@@ -153,10 +161,7 @@ impl Handler<AddrRequest> for AddrResolver {
     fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             AddrRequest::Register(rec, identifier) => {
-                let is_new = match self.rec2str.get(&rec) {
-                    Some(_) => false,
-                    None => true,
-                };
+                let is_new = self.rec2str.get(&rec).is_none();
 
                 if is_new {
                     self.str2rec.insert(identifier.clone(), rec.clone());
@@ -167,19 +172,19 @@ impl Handler<AddrRequest> for AddrResolver {
                     debug!("Recipient is already added");
                     Err(())
                 }
-            },
+            }
             AddrRequest::ResolveStr(id) => {
                 let rec = self.resolve_str(id);
                 match rec {
                     Ok(r) => Ok(AddrResponse::ResolveStr((*r).clone())),
-                    Err(_) => Err(())
+                    Err(_) => Err(()),
                 }
-            },
+            }
             AddrRequest::ResolveRec(rec) => {
                 let id = self.resolve_rec(&rec);
                 match id {
                     Ok(i) => Ok(AddrResponse::ResolveRec(i.clone())),
-                    Err(_) => Err(())
+                    Err(_) => Err(()),
                 }
             }
         }

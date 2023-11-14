@@ -1,29 +1,24 @@
-use std::marker::PhantomData;
-use actix::prelude::*;
-use serde::{Serialize, Deserialize};
 use crate::prelude::*;
-
+use actix::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize, RemoteMessage)]
 struct MyRemoteMessage<T: Serialize + Send> {
-    value: T
+    value: T,
 }
 
-
 type MyFloatMessage = MyRemoteMessage<f32>;
-
 
 #[derive(RemoteActor)]
 #[remote_messages(MyFloatMessage)]
 struct MyRemoteActor<T: Send + Unpin + 'static + Sized> {
-    phantom: PhantomData<T>
+    phantom: PhantomData<T>,
 }
-
 
 impl<T: Sized + Unpin + 'static + Send> Actor for MyRemoteActor<T> {
     type Context = Context<Self>;
 }
-
 
 impl<T: Send + Unpin + 'static> Handler<MyFloatMessage> for MyRemoteActor<T> {
     type Result = ();
@@ -33,9 +28,11 @@ impl<T: Send + Unpin + 'static> Handler<MyFloatMessage> for MyRemoteActor<T> {
     }
 }
 
-
 #[actix_rt::test]
 async fn generic_remote_messages() {
-    let addr: Addr<MyRemoteActor<f32>> = MyRemoteActor { phantom: PhantomData }.start();
+    let addr: Addr<MyRemoteActor<f32>> = MyRemoteActor {
+        phantom: PhantomData,
+    }
+    .start();
     addr.do_send(MyRemoteMessage { value: 4.2 });
 }

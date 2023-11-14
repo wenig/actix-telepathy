@@ -1,13 +1,12 @@
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 
-use actix::{Actor, Addr};
 use crate::{AnyAddr, RemoteAddr};
-
+use actix::{Actor, Addr};
 
 #[derive(Default, Clone, Debug)]
 pub struct ClusterNodes {
-    nodes: HashMap<usize, RemoteAddr>
+    nodes: HashMap<usize, RemoteAddr>,
 }
 
 impl ClusterNodes {
@@ -17,7 +16,7 @@ impl ClusterNodes {
     }
 
     pub fn change_ids(&mut self, id: &str) {
-        for (_, node) in self.nodes.iter_mut(){
+        for (_, node) in self.nodes.iter_mut() {
             node.change_id(id.to_string());
         }
     }
@@ -70,8 +69,8 @@ impl ClusterNodes {
                 let mut remote_addr = remote_addr.clone();
                 remote_addr.change_id(remote_actor_id.to_string());
                 Some(remote_addr)
-            },
-            None => None
+            }
+            None => None,
         }
     }
 
@@ -94,7 +93,7 @@ impl From<HashMap<usize, RemoteAddr>> for ClusterNodes {
 pub struct AnyClusterNodes<T: Actor> {
     pub nodes: ClusterNodes,
     pub local_addr: Addr<T>,
-    pub remote_actor_id: Option<String>
+    pub remote_actor_id: Option<String>,
 }
 
 impl<T: Actor> AnyClusterNodes<T> {
@@ -102,7 +101,7 @@ impl<T: Actor> AnyClusterNodes<T> {
         Self {
             nodes,
             local_addr: addr,
-            remote_actor_id
+            remote_actor_id,
         }
     }
 
@@ -122,7 +121,11 @@ impl<T: Actor> IntoIterator for AnyClusterNodes<T> {
 
 impl<T: Actor> Clone for AnyClusterNodes<T> {
     fn clone(&self) -> Self {
-        Self::new(self.nodes.clone(), self.local_addr.clone(), self.remote_actor_id.clone())
+        Self::new(
+            self.nodes.clone(),
+            self.local_addr.clone(),
+            self.remote_actor_id.clone(),
+        )
     }
 }
 
@@ -130,7 +133,7 @@ impl<T: Actor> Clone for AnyClusterNodes<T> {
 
 pub struct AnyClusterNodesIterator<T: Actor> {
     any_cluster_nodes: AnyClusterNodes<T>,
-    position: usize
+    position: usize,
 }
 
 impl<T: Actor> AnyClusterNodesIterator<T> {
@@ -155,14 +158,14 @@ impl<T: Actor> Iterator for AnyClusterNodesIterator<T> {
                     let mut remote_addr = remote_addr.clone();
                     match &self.any_cluster_nodes.remote_actor_id {
                         Some(id) => remote_addr.change_id(id.clone()),
-                        None => ()
+                        None => (),
                     }
                     AnyAddr::Remote(remote_addr)
-                },
-                None => AnyAddr::Local(self.any_cluster_nodes.local_addr.clone())
+                }
+                None => AnyAddr::Local(self.any_cluster_nodes.local_addr.clone()),
             };
             self.position += 1;
-            return Some(addr)
+            return Some(addr);
         }
     }
 }
@@ -171,7 +174,7 @@ impl<T: Actor> From<AnyClusterNodes<T>> for AnyClusterNodesIterator<T> {
     fn from(any_cluster_nodes: AnyClusterNodes<T>) -> Self {
         Self {
             any_cluster_nodes,
-            position: 0
+            position: 0,
         }
     }
 }

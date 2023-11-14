@@ -47,7 +47,6 @@ pub fn remote_actor_macro(input: TokenStream) -> TokenStream {
     remote_actor::remote_actor_macro(input)
 }
 
-
 /// Helper to make messages sendable over network
 /// # Example
 /// ```

@@ -13,12 +13,12 @@ use log::warn;
 use tokio::net::TcpStream;
 
 use actix::prelude::*;
-use trust_dns_resolver::{TokioAsyncResolver as AsyncResolver};
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
-use trust_dns_resolver::lookup_ip::LookupIp;
-use trust_dns_resolver::error::ResolveError;
 use futures::prelude::future::Either;
 use tokio::time::{sleep, Sleep};
+use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
+use trust_dns_resolver::error::ResolveError;
+use trust_dns_resolver::lookup_ip::LookupIp;
+use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Resolve {
@@ -77,12 +77,12 @@ pub enum ResolverError {
     IoError(io::Error),
 }
 
+#[derive(Default)]
 pub struct Resolver {
     resolver: Option<AsyncResolver>,
     cfg: Option<(ResolverConfig, ResolverOpts)>,
     err: Option<String>,
 }
-
 
 impl Actor for Resolver {
     type Context = Context<Self>;
@@ -94,20 +94,16 @@ impl Actor for Resolver {
                 .then(
                     |cfg, this, _| -> Pin<Box<dyn ActorFuture<Self, Output = _>>> {
                         if let Some(cfg) = cfg {
-                            return Box::pin( async {
-                                    AsyncResolver::tokio(cfg.0, cfg.1)
-                                }.into_actor(this)
+                            return Box::pin(
+                                async { AsyncResolver::tokio(cfg.0, cfg.1) }.into_actor(this),
                             );
                         }
                         Box::pin(
                             async {
                                 match AsyncResolver::tokio_from_system_conf() {
-                                    Ok(resolver) => Ok(resolver),
+                                    Ok(resolver) => resolver,
                                     Err(err) => {
-                                        warn!(
-                                            "Can not create system dns resolver: {}",
-                                            err
-                                        );
+                                        warn!("Can not create system dns resolver: {}", err);
                                         AsyncResolver::tokio(
                                             ResolverConfig::default(),
                                             ResolverOpts::default(),
@@ -121,7 +117,7 @@ impl Actor for Resolver {
                 )
                 .map(|resolver_res, this, _| {
                     // Keep the resolver itself.
-                    this.resolver = Some(resolver_res.unwrap());
+                    this.resolver = Some(resolver_res);
                 }),
         );
     }
@@ -130,16 +126,6 @@ impl Actor for Resolver {
 impl Supervised for Resolver {}
 
 impl SystemService for Resolver {}
-
-impl Default for Resolver {
-    fn default() -> Resolver {
-        Resolver {
-            resolver: None,
-            cfg: None,
-            err: None,
-        }
-    }
-}
 
 impl Handler<Resolve> for Resolver {
     type Result = ResponseActFuture<Self, Result<VecDeque<SocketAddr>, ResolverError>>;
@@ -198,11 +184,7 @@ struct ResolveFut {
 }
 
 impl ResolveFut {
-    pub fn new<S: AsRef<str>>(
-        addr: S,
-        port: u16,
-        resolver: &AsyncResolver,
-    ) -> ResolveFut {
+    pub fn new<S: AsRef<str>>(addr: S, port: u16, resolver: &AsyncResolver) -> ResolveFut {
         // try to parse as a regular SocketAddr first
         if let Ok(addr) = addr.as_ref().parse() {
             let mut addrs = VecDeque::new();
@@ -313,13 +295,13 @@ impl<A: Actor> ActorFuture<A> for ResolveFut {
 }
 
 struct HasSleep {
-    sleep: Pin<Box<Sleep>>
+    sleep: Pin<Box<Sleep>>,
 }
 
 impl HasSleep {
     pub fn new(duration: Duration) -> Self {
         Self {
-            sleep: Pin::from(Box::new(sleep(duration)))
+            sleep: Pin::from(Box::new(sleep(duration))),
         }
     }
 }
@@ -349,7 +331,7 @@ impl TcpConnector {
         TcpConnector {
             addrs,
             stream: None,
-            timeout: HasSleep::new(timeout)
+            timeout: HasSleep::new(timeout),
         }
     }
 }
@@ -366,7 +348,7 @@ impl<A: Actor> ActorFuture<A> for TcpConnector {
         let this = self.get_mut();
 
         // timeout
-        if let Poll::Ready(_) = Pin::new(&mut this.timeout).poll(cx) {
+        if Pin::new(&mut this.timeout).poll(cx).is_ready() {
             return Poll::Ready(Err(ResolverError::Timeout));
         }
 

@@ -1,11 +1,10 @@
-use actix::prelude::*;
-use std::io;
-use flexbuffers;
-use futures::io::Error;
-use bytes::{BytesMut, BufMut, Buf};
-use byteorder::{NetworkEndian, ByteOrder};
-use serde::{Serialize, Deserialize};
 use crate::remote::RemoteWrapper;
+use actix::prelude::*;
+use byteorder::{ByteOrder, NetworkEndian};
+use bytes::{Buf, BufMut, BytesMut};
+use futures::io::Error;
+use serde::{Deserialize, Serialize};
+use std::io;
 use tokio_util::codec::{Decoder, Encoder};
 
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
@@ -18,32 +17,35 @@ pub enum ClusterMessage {
     Request(u16, bool),
     Response,
     Message(RemoteWrapper),
-    Decline
+    Decline,
 }
 
 impl ClusterMessage {
     pub fn split(&self) -> (Vec<u8>, Vec<u8>) {
-        (match &self {
-            Self::Message(wrapper) => wrapper.message_buffer.clone(),
-            _ => panic!("split should not be used if not ClusterMessage::Message")
-        }, flexbuffers::to_vec(&self).unwrap())
+        (
+            match &self {
+                Self::Message(wrapper) => wrapper.message_buffer.clone(),
+                _ => panic!("split should not be used if not ClusterMessage::Message"),
+            },
+            flexbuffers::to_vec(self).unwrap(),
+        )
     }
 
     pub fn set_buffer(&mut self, bytes: Vec<u8>) {
         match self {
-            Self::Message(ref mut wrapper) => { wrapper.message_buffer = bytes },
-            _ => panic!("set_buffer should not be used if not ClusterMessage::Message")
+            Self::Message(ref mut wrapper) => wrapper.message_buffer = bytes,
+            _ => panic!("set_buffer should not be used if not ClusterMessage::Message"),
         }
     }
 }
 
 pub struct ConnectCodec {
-    prefix: bool
+    prefix: bool,
 }
 
 impl ConnectCodec {
     pub fn new() -> ConnectCodec {
-        ConnectCodec {prefix: false}
+        ConnectCodec { prefix: false }
     }
 }
 
@@ -54,19 +56,19 @@ impl Decoder for ConnectCodec {
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         if !self.prefix {
             if src.len() < 11 {
-                return Ok(None)
+                return Ok(None);
             }
             if &src[..11] == PREFIX {
                 let _s = src.split_to(11);
                 self.prefix = true;
             } else {
-                return Err(io::Error::new(io::ErrorKind::Other, "Prefix mismatch"))
+                return Err(io::Error::new(io::ErrorKind::Other, "Prefix mismatch"));
             }
         }
 
         let size = {
             if src.len() < ENDIAN_LENGTH {
-                return Ok(None)
+                return Ok(None);
             }
             NetworkEndian::read_u32(src.as_ref()) as usize
         };
@@ -79,12 +81,15 @@ impl Decoder for ConnectCodec {
             if size > header_size {
                 let header = src.split_to(header_size);
                 let buf = src.split_to(size - header_size);
-                let mut cluster_message = flexbuffers::from_slice::<ClusterMessage>(&header).unwrap();
+                let mut cluster_message =
+                    flexbuffers::from_slice::<ClusterMessage>(&header).unwrap();
                 cluster_message.set_buffer(buf.to_vec());
                 Ok(Some(cluster_message))
             } else {
                 let buf = src.split_to(size);
-                Ok(Some(flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap()))
+                Ok(Some(
+                    flexbuffers::from_slice::<ClusterMessage>(&buf).unwrap(),
+                ))
             }
         } else {
             Ok(None)
@@ -111,7 +116,7 @@ impl Encoder<ClusterMessage> for ConnectCodec {
                 dst.put(buffer_ref);
 
                 return Ok(());
-            },
+            }
             _ => {}
         }
 
