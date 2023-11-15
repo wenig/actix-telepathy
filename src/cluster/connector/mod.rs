@@ -1,10 +1,10 @@
-use std::net::SocketAddr;
+pub use crate::cluster::connector::messages::NodeResolving;
+use crate::cluster::connector::messages::{GossipJoining, GossipMessage};
+use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteWrapper};
+use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvent};
 use actix::prelude::*;
 use log::*;
-use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvents};
-pub use crate::cluster::connector::messages::NodeResolving;
-use crate::cluster::connector::messages::{GossipMessage, GossipJoining};
-use crate::{RemoteActor, RemoteWrapper, RemoteMessage, CustomSerialization};
+use std::net::SocketAddr;
 
 pub mod gossip;
 mod messages;
@@ -15,7 +15,7 @@ mod tests;
 #[derive(Debug, Clone, Copy)]
 pub enum ConnectionProtocol {
     SingleSeed,
-    Gossip
+    Gossip,
 }
 
 impl Default for ConnectionProtocol {
@@ -24,27 +24,29 @@ impl Default for ConnectionProtocol {
     }
 }
 
-
 #[derive(RemoteActor)]
 #[remote_messages(GossipMessage, GossipJoining)]
 pub enum Connector {
-    Gossip(Gossip)
+    Gossip(Gossip),
 }
 
-
 impl Connector {
-    pub fn from_connection_protocol(connection_protocol: ConnectionProtocol, own_address: SocketAddr) -> Self {
+    pub fn from_connection_protocol(
+        connection_protocol: ConnectionProtocol,
+        own_address: SocketAddr,
+    ) -> Self {
         match connection_protocol {
             ConnectionProtocol::Gossip => Self::Gossip(Gossip::new(own_address)),
-            ConnectionProtocol::SingleSeed => todo!("This must still be implemented.")
+            ConnectionProtocol::SingleSeed => todo!("This must still be implemented."),
         }
     }
 
     pub fn start_service_from(connection_protocol: ConnectionProtocol, own_address: SocketAddr) {
-        Self::start_service_with(move || { Connector::from_connection_protocol(connection_protocol, own_address) });
+        Self::start_service_with(move || {
+            Connector::from_connection_protocol(connection_protocol, own_address)
+        });
     }
 }
-
 
 impl Actor for Connector {
     type Context = Context<Self>;
@@ -61,7 +63,6 @@ impl Default for Connector {
     }
 }
 
-
 impl Supervised for Connector {}
 impl SystemService for Connector {}
 impl CustomSystemService for Connector {
@@ -71,17 +72,20 @@ impl CustomSystemService for Connector {
 }
 
 pub trait ConnectorVariant {
-    fn handle_node_event(&mut self, msg: NodeEvents, ctx: &mut Context<Connector>);
-    fn handle_node_resolving(&mut self, msg: NodeResolving, ctx: &mut Context<Connector>) -> Result<Vec<Addr<NetworkInterface>>, ()>;
+    fn handle_node_event(&mut self, msg: NodeEvent, ctx: &mut Context<Connector>);
+    fn handle_node_resolving(
+        &mut self,
+        msg: NodeResolving,
+        ctx: &mut Context<Connector>,
+    ) -> Result<Vec<Addr<NetworkInterface>>, ()>;
 }
 
-
-impl Handler<NodeEvents> for Connector {
+impl Handler<NodeEvent> for Connector {
     type Result = ();
 
-    fn handle(&mut self, msg: NodeEvents, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: NodeEvent, ctx: &mut Self::Context) -> Self::Result {
         match self {
-            Connector::Gossip(gossip) => gossip.handle_node_event(msg, ctx)
+            Connector::Gossip(gossip) => gossip.handle_node_event(msg, ctx),
         }
     }
 }
@@ -91,11 +95,10 @@ impl Handler<NodeResolving> for Connector {
 
     fn handle(&mut self, msg: NodeResolving, ctx: &mut Context<Self>) -> Self::Result {
         match self {
-            Connector::Gossip(gossip) => gossip.handle_node_resolving(msg, ctx)
+            Connector::Gossip(gossip) => gossip.handle_node_resolving(msg, ctx),
         }
     }
 }
-
 
 // --- Gossip impl ---
 
@@ -104,10 +107,8 @@ impl Handler<GossipMessage> for Connector {
 
     fn handle(&mut self, msg: GossipMessage, _ctx: &mut Self::Context) -> Self::Result {
         match self {
-            Connector::Gossip(gossip) => {
-                gossip.handle_gossip_message(msg)
-            },
-            _ => warn!("Connector can only handle GossipMessage if it is Connector::Gossip")
+            Connector::Gossip(gossip) => gossip.handle_gossip_message(msg),
+            _ => warn!("Connector can only handle GossipMessage if it is Connector::Gossip"),
         }
     }
 }
@@ -117,10 +118,8 @@ impl Handler<GossipJoining> for Connector {
 
     fn handle(&mut self, msg: GossipJoining, _ctx: &mut Self::Context) -> Self::Result {
         match self {
-            Connector::Gossip(gossip) => {
-                gossip.handle_gossip_joining(msg)
-            },
-            _ => warn!("Connector can only handle GossipJoining if it is Connector::Gossip")
+            Connector::Gossip(gossip) => gossip.handle_gossip_joining(msg),
+            _ => warn!("Connector can only handle GossipJoining if it is Connector::Gossip"),
         }
     }
 }

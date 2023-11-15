@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Wrapper for messages to be sent to remote actor
-#[derive(Message, Serialize, Deserialize)]
+#[derive(Message, Serialize, Deserialize, Debug)]
 #[rtype(result = "()")]
 pub struct RemoteWrapper {
     pub destination: RemoteAddr,

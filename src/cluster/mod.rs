@@ -1,29 +1,30 @@
+mod connector;
 mod listener;
 #[cfg(test)]
 mod tests;
-mod connector;
 
+pub use self::listener::{ClusterListener, ClusterLog};
 pub use connector::gossip::Gossip;
 pub use connector::NodeResolving;
-pub use self::listener::{ClusterListener, ClusterLog};
 
+pub use crate::cluster::connector::ConnectionProtocol;
+pub use crate::cluster::connector::Connector;
 use crate::network::NetworkInterface;
 use crate::remote::Node;
 use crate::CustomSystemService;
 use actix::prelude::*;
-use std::net;
-use std::io::Result as IoResult;
-use tokio::net::{TcpListener, TcpStream};
-use std::collections::HashMap;
 use actix_broker::BrokerIssue;
 use futures::executor::block_on;
 use futures::StreamExt;
 use log::*;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::io::Result as IoResult;
+use std::net;
 use std::net::SocketAddr;
 use std::str::FromStr;
+use tokio::net::{TcpListener, TcpStream};
 use tokio_stream::wrappers::TcpListenerStream;
-pub use crate::cluster::connector::ConnectionProtocol;
-pub use crate::cluster::connector::Connector;
 
 #[derive(MessageResponse)]
 pub enum ConnectionApprovalResponse {
@@ -42,25 +43,38 @@ pub struct ConnectionApproval {
 #[rtype(result = "()")]
 pub struct TcpConnect(pub TcpStream, pub SocketAddr);
 
-#[derive(Message)]
+#[derive(Message, Debug)]
 #[rtype(result = "()")]
-pub enum NodeEvents {
+pub enum NodeEvent {
     /// (Node, and whether it is a seed node)
     MemberUp(Node, bool),
     MemberDown(SocketAddr),
+}
+
+impl Display for NodeEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NodeEvent::MemberUp(node, seed) => write!(
+                f,
+                "MemberUp: {} (seed: {})",
+                node.socket_addr.to_string(),
+                seed
+            ),
+            NodeEvent::MemberDown(addr) => write!(f, "MemberDown: {}", addr.to_string()),
+        }
+    }
 }
 
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct ConnectToNode(pub(crate) SocketAddr);
 
-
 /// Central Actor for cluster handling
 pub struct Cluster {
     ip_address: SocketAddr,
     addrs: Vec<SocketAddr>,
     own_addr: Option<Addr<Cluster>>,
-    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>
+    nodes: HashMap<SocketAddr, Addr<NetworkInterface>>,
 }
 
 impl Actor for Cluster {
@@ -92,18 +106,20 @@ impl Cluster {
         Self::new_with_connection_protocol(ip_address, seed_nodes, ConnectionProtocol::SingleSeed)
     }
 
-    pub fn new_with_connection_protocol(ip_address: SocketAddr, seed_nodes: Vec<SocketAddr>, connection_protocol: ConnectionProtocol) -> Addr<Cluster> {
+    pub fn new_with_connection_protocol(
+        ip_address: SocketAddr,
+        seed_nodes: Vec<SocketAddr>,
+        connection_protocol: ConnectionProtocol,
+    ) -> Addr<Cluster> {
         debug!("Cluster created");
         Connector::start_service_from(connection_protocol, ip_address.clone());
 
-        Cluster::start_service_with(move ||
-            Cluster {
-                ip_address: ip_address.clone(),
-                addrs: seed_nodes.clone(),
-                own_addr: None,
-                nodes: Default::default()
-            }
-        )
+        Cluster::start_service_with(move || Cluster {
+            ip_address: ip_address.clone(),
+            addrs: seed_nodes.clone(),
+            own_addr: None,
+            nodes: Default::default(),
+        })
     }
 
     fn bind(addr: String) -> IoResult<Box<TcpListenerStream>> {
@@ -167,15 +183,15 @@ impl Handler<ConnectToNode> for Cluster {
     }
 }
 
-impl Handler<NodeEvents> for Cluster {
+impl Handler<NodeEvent> for Cluster {
     type Result = ();
 
-    fn handle(&mut self, msg: NodeEvents, _ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: NodeEvent, _ctx: &mut Self::Context) -> Self::Result {
         match &msg {
-            NodeEvents::MemberUp(node, _seed) => {
+            NodeEvent::MemberUp(node, _seed) => {
                 self.issue_system_async(ClusterLog::NewMember(node.clone()));
-            },
-            NodeEvents::MemberDown(host) => {
+            }
+            NodeEvent::MemberDown(host) => {
                 self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
                 self.nodes.remove(host);
             }

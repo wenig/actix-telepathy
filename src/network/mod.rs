@@ -7,16 +7,16 @@ use std::io::Error;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
-use crate::cluster::{Cluster, NodeEvents};
+use crate::cluster::{Cluster, NodeEvent};
 use crate::codec::{ClusterMessage, ConnectCodec};
-use crate::remote::{RemoteWrapper, AddrRepresentation, AddrResolver};
-use actix::io::WriteHandler;
-use std::thread::sleep;
-use std::fmt;
-use crate::{ConnectionApproval, ConnectionApprovalResponse, CustomSystemService, Connector};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
+use crate::remote::{AddrRepresentation, AddrResolver, RemoteWrapper};
 use crate::Node;
+use crate::{ConnectionApproval, ConnectionApprovalResponse, Connector, CustomSystemService};
+use actix::io::WriteHandler;
+use std::fmt;
+use std::thread::sleep;
 use tokio::time::Duration;
 use tokio_util::codec::FramedRead;
 
@@ -35,7 +35,7 @@ impl Actor for NetworkInterface {
     type Context = Context<Self>;
 
     fn started(&mut self, ctx: &mut Context<Self>) {
-        debug!("NetworkInterface started! {}", self.addr);
+        debug!(target: &self.own_ip.to_string(), "NetworkInterface started! {}", self.addr);
         self.own_addr = Some(ctx.address());
         self.counter = 0;
         if self.stream.is_empty() {
@@ -51,7 +51,7 @@ impl Actor for NetworkInterface {
             self.connect_to_stream(ctx);
             return Running::Continue;
         }
-        Cluster::from_custom_registry().do_send(NodeEvents::MemberDown(self.addr));
+        Cluster::from_custom_registry().do_send(NodeEvent::MemberDown(self.addr));
         Running::Stop
     }
 
@@ -128,14 +128,14 @@ impl NetworkInterface {
             .wait(ctx);
     }
 
-    fn finish_connecting(&mut self) {
+    fn finish_connecting(&mut self, self_is_seed: bool) {
         self.connected = true;
 
         match self.own_addr.clone() {
             Some(addr) => {
-                debug!("finish connecting to {}", self.addr.to_string());
+                debug!(target: &self.own_ip.to_string(), "finish connecting to {}", self.addr.to_string());
                 let node = Node::new(self.addr, Some(addr));
-                Cluster::from_custom_registry().do_send(NodeEvents::MemberUp(node, self.seed));
+                Cluster::from_custom_registry().do_send(NodeEvent::MemberUp(node, self_is_seed));
             }
             None => error!("NetworkInterface might not have been started already!"),
         };
@@ -160,17 +160,16 @@ impl NetworkInterface {
         let send_addr = self.addr;
         self.addr.set_port(port);
         let addr = self.addr;
-        self.seed = seed;
 
         Cluster::from_custom_registry()
             .send(ConnectionApproval { addr, send_addr })
             .into_actor(self)
-            .map(|res, act, ctx| {
+            .map(move |res, act, ctx| {
                 if let Ok(message_response) = res {
                     match message_response {
                         ConnectionApprovalResponse::Approved => {
                             act.transmit_message(ClusterMessage::Response);
-                            act.finish_connecting()
+                            act.finish_connecting(seed)
                         }
                         ConnectionApprovalResponse::Declined => {
                             act.transmit_message(ClusterMessage::Decline);
@@ -190,7 +189,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
                 ClusterMessage::Request(reply_port, seed) => {
                     self.set_reply_port(reply_port, ctx, seed)
                 }
-                ClusterMessage::Response => self.finish_connecting(),
+                ClusterMessage::Response => self.finish_connecting(false),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
                 ClusterMessage::Decline => ctx.stop(),
             },
