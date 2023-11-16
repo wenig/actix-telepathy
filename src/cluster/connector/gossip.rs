@@ -98,7 +98,11 @@ impl Gossip {
         }
     }
 
-    fn choose_random_members(&self, amount: usize, except: &HashSet<SocketAddr>) -> Vec<RemoteAddr> {
+    fn choose_random_members(
+        &self,
+        amount: usize,
+        except: &HashSet<SocketAddr>,
+    ) -> Vec<RemoteAddr> {
         let mut rng = ThreadRng::default();
         self.members
             .iter()
@@ -204,9 +208,10 @@ impl Gossip {
 
     fn share_info_with_joining_member(&self, node: Node) {
         debug!(target: &self.own_addr.to_string(), "Sharing info with joining member {}", node.socket_addr.to_string());
-        node.get_remote_addr(CONNECTOR.to_string()).do_send(GossipJoining {
-            about_to_join: self.members.len(),
-        });
+        node.get_remote_addr(CONNECTOR.to_string())
+            .do_send(GossipJoining {
+                about_to_join: self.members.len(),
+            });
         self.ignite_member_up(node.socket_addr);
     }
 

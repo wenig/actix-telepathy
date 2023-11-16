@@ -1,14 +1,14 @@
 pub use crate::cluster::connector::messages::NodeResolving;
 use crate::cluster::connector::messages::{GossipJoining, GossipMessage};
 use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteWrapper};
-use crate::{CustomSystemService, Gossip, SingleSeed, NetworkInterface, NodeEvent};
+use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvent, SingleSeed};
 use actix::prelude::*;
 use log::*;
 use std::net::SocketAddr;
 
 pub mod gossip;
-pub mod single_seed;
 mod messages;
+pub mod single_seed;
 
 #[cfg(test)]
 mod tests;
@@ -29,7 +29,7 @@ impl Default for ConnectionProtocol {
 #[remote_messages(GossipMessage, GossipJoining)]
 pub enum Connector {
     Gossip(Gossip),
-    SingleSeed(SingleSeed)
+    SingleSeed(SingleSeed),
 }
 
 impl Connector {
@@ -44,9 +44,17 @@ impl Connector {
         }
     }
 
-    pub fn start_service_from(connection_protocol: ConnectionProtocol, own_address: SocketAddr, seed_nodes: Vec<SocketAddr>) {
+    pub fn start_service_from(
+        connection_protocol: ConnectionProtocol,
+        own_address: SocketAddr,
+        seed_nodes: Vec<SocketAddr>,
+    ) {
         Self::start_service_with(move || {
-            Connector::from_connection_protocol(connection_protocol, own_address, seed_nodes.clone())
+            Connector::from_connection_protocol(
+                connection_protocol,
+                own_address,
+                seed_nodes.clone(),
+            )
         });
     }
 }

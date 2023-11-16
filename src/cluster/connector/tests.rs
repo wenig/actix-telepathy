@@ -1,8 +1,10 @@
-use std::{net::SocketAddr, env};
+use std::{env, net::SocketAddr};
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
-use crate::{Cluster, Connector, CustomSystemService, NodeResolving, test_utils::get_n_local_socket_addrs};
+use crate::{
+    test_utils::get_n_local_socket_addrs, Cluster, Connector, CustomSystemService, NodeResolving,
+};
 
 const FAILED_TO_RESOLVE_NODES: &str = "Failed to resolve nodes";
 
@@ -10,27 +12,31 @@ const FAILED_TO_RESOLVE_NODES: &str = "Failed to resolve nodes";
 fn test_gossip_connector_one_seed(n: usize) {
     let ips = get_n_local_socket_addrs(n);
 
-    let seed_nodes = ips.iter().enumerate().map(|(i, _)| {
-        if i == 0 {
-            vec![]
-        } else {
-            vec![ips[0].clone()]
-        }
-    }).collect::<Vec<Vec<SocketAddr>>>();
+    let seed_nodes = ips
+        .iter()
+        .enumerate()
+        .map(|(i, _)| if i == 0 { vec![] } else { vec![ips[0].clone()] })
+        .collect::<Vec<Vec<SocketAddr>>>();
 
-    let other_nodes = ips.iter().enumerate().map(|(i, _)| {
-        ips.iter().enumerate().filter_map(|(j, _)| {
-            if i == j {
-                None
-            } else {
-                Some(ips[j].clone())
-            }
-        }).collect::<Vec<SocketAddr>>()
-    }).collect::<Vec<Vec<SocketAddr>>>();
+    let other_nodes = ips
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            ips.iter()
+                .enumerate()
+                .filter_map(|(j, _)| if i == j { None } else { Some(ips[j].clone()) })
+                .collect::<Vec<SocketAddr>>()
+        })
+        .collect::<Vec<Vec<SocketAddr>>>();
 
-    let variables = ips.iter().zip(seed_nodes.iter()).zip(other_nodes.iter()).map(|((own_ip, seed_nodes), other_ips)| {
-        (own_ip.clone(), seed_nodes.clone(), other_ips.clone())
-    }).collect::<Vec<(SocketAddr, Vec<SocketAddr>, Vec<SocketAddr>)>>();
+    let variables = ips
+        .iter()
+        .zip(seed_nodes.iter())
+        .zip(other_nodes.iter())
+        .map(|((own_ip, seed_nodes), other_ips)| {
+            (own_ip.clone(), seed_nodes.clone(), other_ips.clone())
+        })
+        .collect::<Vec<(SocketAddr, Vec<SocketAddr>, Vec<SocketAddr>)>>();
 
     let results: Vec<Result<usize, ()>> = variables
         .into_par_iter()
@@ -38,7 +44,7 @@ fn test_gossip_connector_one_seed(n: usize) {
         .collect();
 
     for result in results {
-        assert_eq!(result.unwrap(), n-1);
+        assert_eq!(result.unwrap(), n - 1);
     }
 }
 
@@ -64,27 +70,37 @@ fn test_gossip_connector_one_seed_8() {
 fn test_gossip_connector_chain_seeds(n: usize) {
     let ips = get_n_local_socket_addrs(n);
 
-    let seed_nodes = ips.iter().enumerate().map(|(i, _)| {
-        if i == 0 {
-            vec![]
-        } else {
-            vec![ips[i-1].clone()]
-        }
-    }).collect::<Vec<Vec<SocketAddr>>>();
-
-    let other_nodes = ips.iter().enumerate().map(|(i, _)| {
-        ips.iter().enumerate().filter_map(|(j, _)| {
-            if i == j {
-                None
+    let seed_nodes = ips
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            if i == 0 {
+                vec![]
             } else {
-                Some(ips[j].clone())
+                vec![ips[i - 1].clone()]
             }
-        }).collect::<Vec<SocketAddr>>()
-    }).collect::<Vec<Vec<SocketAddr>>>();
+        })
+        .collect::<Vec<Vec<SocketAddr>>>();
 
-    let variables = ips.iter().zip(seed_nodes.iter()).zip(other_nodes.iter()).map(|((own_ip, seed_nodes), other_ips)| {
-        (own_ip.clone(), seed_nodes.clone(), other_ips.clone())
-    }).collect::<Vec<(SocketAddr, Vec<SocketAddr>, Vec<SocketAddr>)>>();
+    let other_nodes = ips
+        .iter()
+        .enumerate()
+        .map(|(i, _)| {
+            ips.iter()
+                .enumerate()
+                .filter_map(|(j, _)| if i == j { None } else { Some(ips[j].clone()) })
+                .collect::<Vec<SocketAddr>>()
+        })
+        .collect::<Vec<Vec<SocketAddr>>>();
+
+    let variables = ips
+        .iter()
+        .zip(seed_nodes.iter())
+        .zip(other_nodes.iter())
+        .map(|((own_ip, seed_nodes), other_ips)| {
+            (own_ip.clone(), seed_nodes.clone(), other_ips.clone())
+        })
+        .collect::<Vec<(SocketAddr, Vec<SocketAddr>, Vec<SocketAddr>)>>();
 
     let results: Vec<Result<usize, ()>> = variables
         .into_par_iter()
@@ -92,10 +108,9 @@ fn test_gossip_connector_chain_seeds(n: usize) {
         .collect();
 
     for result in results {
-        assert_eq!(result.unwrap(), n-1);
+        assert_eq!(result.unwrap(), n - 1);
     }
 }
-
 
 #[test]
 #[ignore]
@@ -129,5 +144,3 @@ async fn build_gossip_cluster(
         .expect(FAILED_TO_RESOLVE_NODES);
     Ok(addrs.len())
 }
-
-

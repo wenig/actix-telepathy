@@ -4,8 +4,8 @@ mod listener;
 mod tests;
 
 pub use self::listener::{ClusterListener, ClusterLog};
-pub use connector::{gossip::Gossip, single_seed::SingleSeed};
 pub use connector::NodeResolving;
+pub use connector::{gossip::Gossip, single_seed::SingleSeed};
 
 pub use crate::cluster::connector::ConnectionProtocol;
 pub use crate::cluster::connector::Connector;
