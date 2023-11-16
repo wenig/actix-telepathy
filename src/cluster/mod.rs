@@ -4,7 +4,7 @@ mod listener;
 mod tests;
 
 pub use self::listener::{ClusterListener, ClusterLog};
-pub use connector::gossip::Gossip;
+pub use connector::{gossip::Gossip, single_seed::SingleSeed};
 pub use connector::NodeResolving;
 
 pub use crate::cluster::connector::ConnectionProtocol;
@@ -112,7 +112,7 @@ impl Cluster {
         connection_protocol: ConnectionProtocol,
     ) -> Addr<Cluster> {
         debug!("Cluster created");
-        Connector::start_service_from(connection_protocol, ip_address.clone());
+        Connector::start_service_from(connection_protocol, ip_address.clone(), seed_nodes.clone());
 
         Cluster::start_service_with(move || Cluster {
             ip_address: ip_address.clone(),

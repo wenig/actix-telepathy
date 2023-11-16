@@ -1,12 +1,13 @@
 pub use crate::cluster::connector::messages::NodeResolving;
 use crate::cluster::connector::messages::{GossipJoining, GossipMessage};
 use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteWrapper};
-use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvent};
+use crate::{CustomSystemService, Gossip, SingleSeed, NetworkInterface, NodeEvent};
 use actix::prelude::*;
 use log::*;
 use std::net::SocketAddr;
 
 pub mod gossip;
+pub mod single_seed;
 mod messages;
 
 #[cfg(test)]
@@ -28,22 +29,24 @@ impl Default for ConnectionProtocol {
 #[remote_messages(GossipMessage, GossipJoining)]
 pub enum Connector {
     Gossip(Gossip),
+    SingleSeed(SingleSeed)
 }
 
 impl Connector {
     pub fn from_connection_protocol(
         connection_protocol: ConnectionProtocol,
         own_address: SocketAddr,
+        seed_nodes: Vec<SocketAddr>,
     ) -> Self {
         match connection_protocol {
-            ConnectionProtocol::Gossip => Self::Gossip(Gossip::new(own_address)),
+            ConnectionProtocol::Gossip => Self::Gossip(Gossip::new(own_address, seed_nodes)),
             ConnectionProtocol::SingleSeed => todo!("This must still be implemented."),
         }
     }
 
-    pub fn start_service_from(connection_protocol: ConnectionProtocol, own_address: SocketAddr) {
+    pub fn start_service_from(connection_protocol: ConnectionProtocol, own_address: SocketAddr, seed_nodes: Vec<SocketAddr>) {
         Self::start_service_with(move || {
-            Connector::from_connection_protocol(connection_protocol, own_address)
+            Connector::from_connection_protocol(connection_protocol, own_address, seed_nodes.clone())
         });
     }
 }
@@ -86,6 +89,7 @@ impl Handler<NodeEvent> for Connector {
     fn handle(&mut self, msg: NodeEvent, ctx: &mut Self::Context) -> Self::Result {
         match self {
             Connector::Gossip(gossip) => gossip.handle_node_event(msg, ctx),
+            Connector::SingleSeed(single_seed) => single_seed.handle_node_event(msg, ctx),
         }
     }
 }
@@ -96,6 +100,7 @@ impl Handler<NodeResolving> for Connector {
     fn handle(&mut self, msg: NodeResolving, ctx: &mut Context<Self>) -> Self::Result {
         match self {
             Connector::Gossip(gossip) => gossip.handle_node_resolving(msg, ctx),
+            Connector::SingleSeed(single_seed) => single_seed.handle_node_resolving(msg, ctx),
         }
     }
 }

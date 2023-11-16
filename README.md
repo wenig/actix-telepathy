@@ -22,6 +22,14 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 | 0.12  | 0.4        | 0.3               |
 | 0.13  | 0.5        | 0.3               |
 
+## Tests
+
+Run ignored tests sequentially, because these tests run multiple threads themselves. 
+
+```
+cargo test -- --ignored --test-threads=1
+```
+
 ## Usage
 
 ### Cargo.toml

@@ -26,8 +26,10 @@ pub struct Gossip {
     members: HashMap<SocketAddr, Addr<NetworkInterface>>,
     waiting_to_add: HashSet<SocketAddr>,
     state: GossipState,
-    about_to_join: usize,
+    about_to_join: Option<usize>,
     gossip_msgs: Vec<GossipMessage>,
+    info_msgs_to_send: Vec<Node>,
+    seed_nodes: Vec<SocketAddr>,
 }
 
 impl Default for Gossip {
@@ -37,16 +39,19 @@ impl Default for Gossip {
             members: HashMap::new(),
             waiting_to_add: HashSet::new(),
             state: GossipState::Lonely,
-            about_to_join: 0,
+            about_to_join: None,
             gossip_msgs: vec![],
+            info_msgs_to_send: vec![],
+            seed_nodes: vec![],
         }
     }
 }
 
 impl Gossip {
-    pub fn new(own_addr: SocketAddr) -> Self {
+    pub fn new(own_addr: SocketAddr, seed_nodes: Vec<SocketAddr>) -> Self {
         Self {
             own_addr,
+            seed_nodes,
             ..Default::default()
         }
     }
@@ -84,7 +89,7 @@ impl Gossip {
 
     fn gossip_member_event(&self, addr: SocketAddr, event: GossipEvent, seen: HashSet<SocketAddr>) {
         debug!(target: &self.own_addr.to_string(), "Gossiping member event {} {:?} {:?}", addr.to_string(), event, seen);
-        let random_members = self.choose_random_members(3, addr.clone());
+        let random_members = self.choose_random_members(3, &seen);
 
         let gossip_message = GossipMessage { event, addr, seen };
 
@@ -93,11 +98,11 @@ impl Gossip {
         }
     }
 
-    fn choose_random_members(&self, amount: usize, except: SocketAddr) -> Vec<RemoteAddr> {
+    fn choose_random_members(&self, amount: usize, except: &HashSet<SocketAddr>) -> Vec<RemoteAddr> {
         let mut rng = ThreadRng::default();
         self.members
             .iter()
-            .filter(|(addr, _)| !(*addr).eq(&except))
+            .filter(|(addr, _)| !except.contains(addr))
             .choose_multiple(&mut rng, amount)
             .into_iter()
             .map(|(socket_addr, network_interface)| {
@@ -143,6 +148,7 @@ impl Gossip {
         let all_seen = self.all_seen(&msg.seen);
         let mut seen = msg.seen;
         let member_contains = self.members.contains_key(&msg.addr);
+        seen.insert(self.own_addr);
 
         match &msg.event {
             GossipEvent::Join => {
@@ -151,7 +157,6 @@ impl Gossip {
                 }
 
                 if !member_contains {
-                    seen.insert(self.own_addr);
                     self.connect_to_node(&msg.addr);
                 }
             }
@@ -161,7 +166,6 @@ impl Gossip {
                 }
 
                 if member_contains {
-                    seen.insert(self.own_addr);
                     self.members.remove(&msg.addr);
                 }
             }
@@ -173,8 +177,9 @@ impl Gossip {
     pub(crate) fn handle_gossip_joining(&mut self, msg: GossipJoining) {
         match self.state {
             GossipState::Joining => {
-                self.about_to_join = msg.about_to_join;
-                if self.about_to_join == self.members.len() {
+                debug!(target: &self.own_addr.to_string(), "Received a GossipJoining message while in JOINING state! {} members", msg.about_to_join);
+                self.about_to_join = Some(msg.about_to_join);
+                if msg.about_to_join <= self.members.len() {
                     self.change_state(GossipState::Joined);
                 }
             }
@@ -191,9 +196,30 @@ impl Gossip {
             GossipState::Joining => (),
             GossipState::Joined => {
                 self.handle_gossip_queue();
+                self.share_info_with_joining_members();
             }
             GossipState::Lonely => (),
         }
+    }
+
+    fn share_info_with_joining_member(&self, node: Node) {
+        debug!(target: &self.own_addr.to_string(), "Sharing info with joining member {}", node.socket_addr.to_string());
+        node.get_remote_addr(CONNECTOR.to_string()).do_send(GossipJoining {
+            about_to_join: self.members.len(),
+        });
+        self.ignite_member_up(node.socket_addr);
+    }
+
+    fn share_info_with_joining_members(&mut self) {
+        while let Some(node) = self.info_msgs_to_send.pop() {
+            self.share_info_with_joining_member(node)
+        }
+    }
+
+    fn seed_nodes_already_members(&self) -> bool {
+        self.seed_nodes
+            .iter()
+            .all(|seed_node| self.members.contains_key(seed_node))
     }
 }
 
@@ -207,29 +233,36 @@ impl ConnectorVariant for Gossip {
                         GossipState::Lonely => {
                             if seed {
                                 // if current node is considered seed, we are the seed and therefore are already joined
-                                self.change_state(GossipState::Joined);
-
-                                let remote_addr = node.get_remote_addr(CONNECTOR.to_string());
-                                remote_addr.do_send(GossipJoining {
-                                    about_to_join: self.members.len(),
-                                });
-                                self.ignite_member_up(node.socket_addr);
+                                if self.seed_nodes_already_members() {
+                                    self.change_state(GossipState::Joined);
+                                    self.share_info_with_joining_member(node);
+                                } else {
+                                    self.change_state(GossipState::Joining);
+                                    self.info_msgs_to_send.push(node);
+                                }
                             } else {
                                 // else we are not the seed and therefore need to join
                                 self.change_state(GossipState::Joining);
                             }
                         }
                         GossipState::Joining => {
-                            if self.members.len() == self.about_to_join {
-                                self.change_state(GossipState::Joined);
+                            if seed {
+                                warn!(target: &self.own_addr.to_string(), "Received a NodeEvent::MemberUp while in JOINING state but seed is true!");
+                                self.info_msgs_to_send.push(node);
+                            }
+
+                            if let Some(about_to_join) = self.about_to_join {
+                                if about_to_join == self.members.len() {
+                                    self.change_state(GossipState::Joined);
+                                }
+                            } else {
+                                warn!(target: &self.own_addr.to_string(), "Received a NodeEvent::MemberUp while in JOINING state but about_to_join is None!")
                             }
                         }
                         GossipState::Joined => {
-                            let remote_addr = node.get_remote_addr(CONNECTOR.to_string());
-                            remote_addr.do_send(GossipJoining {
-                                about_to_join: self.members.len(),
-                            });
-                            self.ignite_member_up(node.socket_addr);
+                            if seed {
+                                self.share_info_with_joining_member(node);
+                            }
                         }
                     }
                 }
