@@ -46,11 +46,13 @@ impl Actor for NetworkInterface {
     }
 
     fn stopping(&mut self, ctx: &mut Context<Self>) -> Running {
+        warn!(target: &self.own_ip.to_string(), "NetworkInterface stopping! {}, counter: {}", self.addr, self.counter);
         if self.counter < 2 {
             self.stream = vec![];
             self.connect_to_stream(ctx);
             return Running::Continue;
         }
+
         Cluster::from_custom_registry().do_send(NodeEvent::MemberDown(self.addr));
         Running::Stop
     }
@@ -123,7 +125,12 @@ impl NetworkInterface {
                         ctx.stop();
                     }
                 }
-                Err(err) => error!("{}", err.to_string()),
+                Err(err) => {
+                    error!("{} | {}", err.to_string(), act.addr.to_string());
+                    act.counter += 1;
+                    sleep(Duration::from_secs(1));
+                    ctx.stop();
+                }
             })
             .wait(ctx);
     }
