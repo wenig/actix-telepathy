@@ -21,6 +21,13 @@ enum GossipState {
     Joined,
 }
 
+/// The Gossip connector variant can connect the nodes to each other. Each node can have a different seed node.
+/// When joining the cluster, the node will connect to its seed node and receives the number of nodes that are about to join.
+/// The seed node of that node will then send the joining node's information to the other nodes via the Gossip protocol.
+/// Thereby, the seed node randomly chooses 3 nodes and sends the information to them. These 3 nodes will connect to the joining node.
+/// Then the 3 nodes will send the information to 3 other nodes and so on.
+/// This variant is recommended if the seed node is not always available.
+/// This variant is not recommended if the cluster is very large, because the gossip protocol takes more time the larger the cluster is.
 pub struct Gossip {
     own_addr: SocketAddr,
     members: HashMap<SocketAddr, Addr<NetworkInterface>>,
@@ -58,7 +65,7 @@ impl Gossip {
 
     fn add_member(&mut self, node: Node) {
         self.members.insert(
-            node.socket_addr.clone(),
+            node.socket_addr,
             node.network_interface.expect("Empty network interface"),
         );
         debug!(target: &self.own_addr.to_string(), "Member {} added!", node.socket_addr.to_string());
@@ -74,7 +81,7 @@ impl Gossip {
         self.gossip_member_event(
             new_addr,
             GossipEvent::Join,
-            HashSet::from_iter([self.own_addr.clone(), new_addr.clone()]),
+            HashSet::from_iter([self.own_addr, new_addr]),
         );
     }
 
@@ -83,7 +90,7 @@ impl Gossip {
         self.gossip_member_event(
             leaving_addr,
             GossipEvent::Leave,
-            HashSet::from_iter([self.own_addr.clone()]),
+            HashSet::from_iter([self.own_addr]),
         );
     }
 
@@ -110,21 +117,20 @@ impl Gossip {
             .choose_multiple(&mut rng, amount)
             .into_iter()
             .map(|(socket_addr, network_interface)| {
-                RemoteAddr::new_connector(socket_addr.clone(), Some(network_interface.clone()))
+                RemoteAddr::new_connector(*socket_addr, Some(network_interface.clone()))
             })
             .collect()
     }
 
     fn connect_to_node(&mut self, addr: &SocketAddr) {
-        self.waiting_to_add.insert(addr.clone());
-        Cluster::from_custom_registry().do_send(ConnectToNode(addr.clone()))
+        self.waiting_to_add.insert(*addr);
+        Cluster::from_custom_registry().do_send(ConnectToNode(*addr))
     }
 
     fn all_seen(&self, seen: &HashSet<SocketAddr>) -> bool {
         let members: HashSet<SocketAddr> = self.members.keys().cloned().collect();
         members
             .difference(seen)
-            .into_iter()
             .collect::<HashSet<&SocketAddr>>()
             .is_empty()
     }
@@ -273,32 +279,21 @@ impl ConnectorVariant for Gossip {
                 }
             }
             NodeEvent::MemberDown(host) => {
-                self.remove_member(host.clone());
+                self.remove_member(host);
                 self.ignite_member_down(host);
             }
         }
     }
 
-    fn handle_node_resolving(
+    fn get_member_map(
         &mut self,
-        msg: NodeResolving,
+        _msg: NodeResolving,
         _ctx: &mut Context<Connector>,
-    ) -> Result<Vec<Addr<NetworkInterface>>, ()> {
-        Ok(msg
-            .addrs
-            .into_iter()
-            .filter_map(|x| {
-                if x.clone() == self.own_addr {
-                    None
-                } else {
-                    Some(
-                        self.members
-                            .get(&x)
-                            .expect(&format!("Socket {} should be known!", &x))
-                            .clone(),
-                    )
-                }
-            })
-            .collect())
+    ) -> &HashMap<SocketAddr, Addr<NetworkInterface>> {
+        &self.members
+    }
+
+    fn get_own_addr(&self) -> SocketAddr {
+        self.own_addr
     }
 }

@@ -57,10 +57,10 @@ impl Display for NodeEvent {
             NodeEvent::MemberUp(node, seed) => write!(
                 f,
                 "MemberUp: {} (seed: {})",
-                node.socket_addr.to_string(),
+                node.socket_addr,
                 seed
             ),
-            NodeEvent::MemberDown(addr) => write!(f, "MemberDown: {}", addr.to_string()),
+            NodeEvent::MemberDown(addr) => write!(f, "MemberDown: {}", addr),
         }
     }
 }
@@ -112,10 +112,10 @@ impl Cluster {
         connection_protocol: ConnectionProtocol,
     ) -> Addr<Cluster> {
         debug!("Cluster created");
-        Connector::start_service_from(connection_protocol, ip_address.clone(), seed_nodes.clone());
+        Connector::start_service_from(connection_protocol, ip_address, seed_nodes.clone());
 
         Cluster::start_service_with(move || Cluster {
-            ip_address: ip_address.clone(),
+            ip_address,
             addrs: seed_nodes.clone(),
             own_addr: None,
             nodes: Default::default(),
@@ -192,7 +192,7 @@ impl Handler<NodeEvent> for Cluster {
                 self.issue_system_async(ClusterLog::NewMember(node.clone()));
             }
             NodeEvent::MemberDown(host) => {
-                self.issue_system_async(ClusterLog::MemberLeft(host.clone()));
+                self.issue_system_async(ClusterLog::MemberLeft(*host));
                 self.nodes.remove(host);
             }
         }

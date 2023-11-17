@@ -4,7 +4,10 @@ use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteWrapper};
 use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvent, SingleSeed};
 use actix::prelude::*;
 use log::*;
+use std::collections::HashMap;
 use std::net::SocketAddr;
+
+use self::messages::SingleSeedMembers;
 
 pub mod gossip;
 mod messages;
@@ -26,7 +29,7 @@ impl Default for ConnectionProtocol {
 }
 
 #[derive(RemoteActor)]
-#[remote_messages(GossipMessage, GossipJoining)]
+#[remote_messages(GossipMessage, GossipJoining, SingleSeedMembers)]
 pub enum Connector {
     Gossip(Gossip),
     SingleSeed(SingleSeed),
@@ -40,7 +43,7 @@ impl Connector {
     ) -> Self {
         match connection_protocol {
             ConnectionProtocol::Gossip => Self::Gossip(Gossip::new(own_address, seed_nodes)),
-            ConnectionProtocol::SingleSeed => todo!("This must still be implemented."),
+            ConnectionProtocol::SingleSeed => Self::SingleSeed(SingleSeed::new(own_address)),
         }
     }
 
@@ -84,11 +87,12 @@ impl CustomSystemService for Connector {
 
 pub trait ConnectorVariant {
     fn handle_node_event(&mut self, msg: NodeEvent, ctx: &mut Context<Connector>);
-    fn handle_node_resolving(
+    fn get_member_map(
         &mut self,
         msg: NodeResolving,
         ctx: &mut Context<Connector>,
-    ) -> Result<Vec<Addr<NetworkInterface>>, ()>;
+    ) -> &HashMap<SocketAddr, Addr<NetworkInterface>>;
+    fn get_own_addr(&self) -> SocketAddr;
 }
 
 impl Handler<NodeEvent> for Connector {
@@ -106,10 +110,32 @@ impl Handler<NodeResolving> for Connector {
     type Result = Result<Vec<Addr<NetworkInterface>>, ()>;
 
     fn handle(&mut self, msg: NodeResolving, ctx: &mut Context<Self>) -> Self::Result {
-        match self {
-            Connector::Gossip(gossip) => gossip.handle_node_resolving(msg, ctx),
-            Connector::SingleSeed(single_seed) => single_seed.handle_node_resolving(msg, ctx),
-        }
+        let addrs = msg.addrs.clone();
+        let own_addr = match self {
+            Connector::Gossip(gossip) => gossip.get_own_addr(),
+            Connector::SingleSeed(single_seed) => single_seed.get_own_addr(),
+        };
+
+        let member_map = match self {
+            Connector::Gossip(gossip) => gossip.get_member_map(msg, ctx),
+            Connector::SingleSeed(single_seed) => single_seed.get_member_map(msg, ctx),
+        };
+
+        Ok(addrs
+            .into_iter()
+            .filter_map(|x| {
+                if x == own_addr {
+                    None
+                } else {
+                    Some(
+                        member_map
+                            .get(&x)
+                            .unwrap_or_else(|| panic!("Socket {} should be known!", &x))
+                            .clone(),
+                    )
+                }
+            })
+            .collect())
     }
 }
 
@@ -133,6 +159,21 @@ impl Handler<GossipJoining> for Connector {
         match self {
             Connector::Gossip(gossip) => gossip.handle_gossip_joining(msg),
             _ => warn!("Connector can only handle GossipJoining if it is Connector::Gossip"),
+        }
+    }
+}
+
+// --- SingleSeed impl ---
+
+impl Handler<SingleSeedMembers> for Connector {
+    type Result = ();
+
+    fn handle(&mut self, msg: SingleSeedMembers, _ctx: &mut Self::Context) -> Self::Result {
+        match self {
+            Connector::SingleSeed(single_seed) => single_seed.handle_single_seed_members(msg),
+            _ => {
+                warn!("Connector can only handle SingleSeedMembers if it is Connector::SingleSeed")
+            }
         }
     }
 }

@@ -28,3 +28,6 @@ pub struct GossipMessage {
 pub struct GossipJoining {
     pub about_to_join: usize,
 }
+
+#[derive(RemoteMessage, Serialize, Deserialize, Debug, Clone)]
+pub struct SingleSeedMembers(pub Vec<SocketAddr>);
