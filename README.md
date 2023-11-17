@@ -61,6 +61,10 @@ async fn main() {
 }
 ```
 
+## Paper
+
+We have written a [paper](https://doi.org/10.1145/3623506.3623575) about this project and conducted experiments to show its competitiveness with Akka and Orleans.
+
 **Please consider citing this work when you are using it!**
 
 ```bibtex
