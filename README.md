@@ -35,7 +35,7 @@ We support the following two connection variants. They define how a node joins a
 **SingleSeed** expects all nodes to have the same seed node (except the seed node itself, it has no seed node).
 If another node is added, it will be added to the cluster by the seed node.
 If a node has a different seed node, errors can occur.
-This variant is recommended for a fast connection setup, but it is not recommended if the seed node is not always available.
+This variant is recommended for a fast connection setup, but it is not recommended if the seed node is not always available. (This variant is the default.)
 
 **Gossip** can connect the nodes to each other. Each node can have a different seed node.
 When joining the cluster, the node will connect to its seed node and receives the number of nodes that are about to join.
@@ -44,6 +44,10 @@ Thereby, the seed node randomly chooses 3 nodes and sends the information to the
 Then the 3 nodes will send the information to 3 other nodes and so on.
 This variant is recommended if the seed node is not always available.
 This variant is not recommended if the cluster is very large, because the gossip protocol takes more time the larger the cluster is.
+
+```rust
+Cluster::new_with_connection_protocol("127.0.0.1:1992".parse().unwrap(), vec![/*...*/], ConnectionProtocol::Gossip)
+```
 
 ### Sending RemoteMessages
 
