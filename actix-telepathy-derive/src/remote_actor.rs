@@ -74,7 +74,7 @@ fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<s
         .iter()
         .find_map(|attr| {
             if attr.path().is_ident(ident) {
-                attr.parse_args().ok()
+                Some(attr.meta.clone())
             } else {
                 None
             }
