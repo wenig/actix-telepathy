@@ -54,12 +54,9 @@ pub enum NodeEvent {
 impl Display for NodeEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            NodeEvent::MemberUp(node, seed) => write!(
-                f,
-                "MemberUp: {} (seed: {})",
-                node.socket_addr,
-                seed
-            ),
+            NodeEvent::MemberUp(node, seed) => {
+                write!(f, "MemberUp: {} (seed: {})", node.socket_addr, seed)
+            }
             NodeEvent::MemberDown(addr) => write!(f, "MemberDown: {}", addr),
         }
     }
