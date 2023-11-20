@@ -306,3 +306,32 @@ async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
         remote_addr.node.socket_addr
     );
 }
+
+#[derive(RemoteMessage, Serialize, Deserialize)]
+struct FakeMessage {}
+
+#[actix_rt::test]
+async fn addr_resolver_does_not_panic_wrong_id() {
+    testing_logger::setup();
+    let listening_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let _cluster = Cluster::new(listening_ip.clone(), vec![]);
+    let fake_addr = RemoteAddr::new(
+        Node::new(listening_ip, None),
+        AddrRepresentation::Key("test".to_string()),
+    );
+    let fake_wrapper = RemoteWrapper::new(fake_addr, FakeMessage {}, None);
+    AddrResolver::from_registry()
+        .send(fake_wrapper)
+        .await
+        .unwrap();
+    testing_logger::validate(|captured_logs| {
+        let warnings_count = captured_logs
+            .iter()
+            .filter(|l| l.level == log::Level::Warn)
+            .filter(|l| l.body.contains("Message is abandoned."))
+            .count();
+        assert_eq!(warnings_count, 1);
+    });
+}
