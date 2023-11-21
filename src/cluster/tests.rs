@@ -257,16 +257,27 @@ fn cluster_reconnects_to_left_node() {
         .parse()
         .unwrap();
 
-    let variables = vec![(ip1, vec![], false), (ip2, vec![ip1], false), (ip2, vec![ip1], true)];
-    let results: Vec<bool> = variables.par_iter().map(|(own_ip, seed_node, delay)| {
-        build_cluster_and_maybe_leave(own_ip.clone(), seed_node.clone(), *delay)
-    }).collect();
+    let variables = vec![
+        (ip1, vec![], false),
+        (ip2, vec![ip1], false),
+        (ip2, vec![ip1], true),
+    ];
+    let results: Vec<bool> = variables
+        .par_iter()
+        .map(|(own_ip, seed_node, delay)| {
+            build_cluster_and_maybe_leave(own_ip.clone(), seed_node.clone(), *delay)
+        })
+        .collect();
 
     assert_eq!(results, vec![true, true, true]);
 }
 
 #[actix_rt::main]
-async fn build_cluster_and_maybe_leave(own_ip: SocketAddr, seed_nodes: Vec<SocketAddr>, delay: bool) -> bool {
+async fn build_cluster_and_maybe_leave(
+    own_ip: SocketAddr,
+    seed_nodes: Vec<SocketAddr>,
+    delay: bool,
+) -> bool {
     if delay {
         sleep(Duration::from_secs(2)).await;
     }
@@ -277,6 +288,6 @@ async fn build_cluster_and_maybe_leave(own_ip: SocketAddr, seed_nodes: Vec<Socke
         return true;
     }
     sleep(Duration::from_secs(2)).await;
-    
+
     true
 }
