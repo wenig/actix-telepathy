@@ -1,6 +1,6 @@
 [package]
 name = "actix-telepathy"
-version = "0.5.6"
+version = "0.6.0"
 authors = ["wenig <info@pwenig.de>"]
 edition = "2018"
 license = "Apache-2.0"

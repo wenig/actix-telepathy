@@ -1,7 +1,7 @@
 [![crates.io](https://img.shields.io/crates/v/actix-telepathy?label=latest)](https://crates.io/crates/actix-telepathy)
 ![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.6/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.6)
+[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.6.0/status.svg)](https://deps.rs/crate/actix-telepathy/0.6.0)
 ![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
 # Actix-Telepathy
@@ -17,6 +17,7 @@ Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Clus
 | 0.12  | 0.3        | 0.2               |
 | 0.12  | 0.4        | 0.3               |
 | 0.13  | 0.5        | 0.3               |
+| 0.13.1  | 0.6        | 0.3.4               |
 
 ## Tests
 
@@ -62,7 +63,7 @@ Ideas and discussion on how to implement a remote response and using the `send` 
 ```toml
 [dependencies]
 actix = "0.13.1"
-actix-telepathy = "0.5.6"
+actix-telepathy = "0.6.0"
 ```
 
 ### main.rs
