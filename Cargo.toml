@@ -23,7 +23,6 @@ members = [
 [features]
 default = ["derive"]
 derive = ["actix_telepathy_derive"]
-protocols = []
 
 [dev-dependencies]
 actix-rt = "2.9.0"
