@@ -4,9 +4,9 @@
 [![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.6/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.6)
 ![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
-# Actix Telepathy
+# Actix-Telepathy
 
-Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Cluster](https://github.com/akka/akka), Actix Telepathy is an extension to the Rust actor framework [Actix](https://github.com/actix/actix). It empowers Rust users to build distributed application within the actor framework.
+Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Cluster](https://github.com/akka/akka), Actix-Telepathy is an extension to the Rust actor framework [Actix](https://github.com/actix/actix). It empowers Rust users to build distributed applications within the actor framework.
 
 ## Version Matches
 
