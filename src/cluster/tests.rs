@@ -245,3 +245,49 @@ async fn build_cluster(
     assert_eq!((*(addrs.lock().unwrap())).len(), expect);
     sleep(Duration::from_millis(end)).await;
 }
+
+#[test]
+#[ignore] //github workflows don't get the timing right
+fn cluster_reconnects_to_left_node() {
+    env_logger::init();
+    let ip1: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+
+    let variables = vec![
+        (ip1, vec![], false),
+        (ip2, vec![ip1], false),
+        (ip2, vec![ip1], true),
+    ];
+    let results: Vec<bool> = variables
+        .par_iter()
+        .map(|(own_ip, seed_node, delay)| {
+            build_cluster_and_maybe_leave(own_ip.clone(), seed_node.clone(), *delay)
+        })
+        .collect();
+
+    assert_eq!(results, vec![true, true, true]);
+}
+
+#[actix_rt::main]
+async fn build_cluster_and_maybe_leave(
+    own_ip: SocketAddr,
+    seed_nodes: Vec<SocketAddr>,
+    delay: bool,
+) -> bool {
+    if delay {
+        sleep(Duration::from_secs(2)).await;
+    }
+    let _cluster = Cluster::new(own_ip, seed_nodes.clone());
+    sleep(Duration::from_secs(1)).await;
+    if seed_nodes.len() > 0 && !delay {
+        System::current().stop();
+        return true;
+    }
+    sleep(Duration::from_secs(2)).await;
+
+    true
+}
