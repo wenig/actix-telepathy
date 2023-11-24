@@ -10,7 +10,7 @@ use tokio_util::codec::{Decoder, Encoder};
 const PREFIX: &[u8] = b"ACTIX/1.0\r\n";
 const ENDIAN_LENGTH: usize = 4;
 
-#[derive(Message, Deserialize, Serialize)]
+#[derive(Message, Deserialize, Serialize, Debug)]
 #[rtype(result = "()")]
 pub enum ClusterMessage {
     /// bool = is_seed?

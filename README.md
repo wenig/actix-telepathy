@@ -1,16 +1,12 @@
 [![crates.io](https://img.shields.io/crates/v/actix-telepathy?label=latest)](https://crates.io/crates/actix-telepathy)
 ![Tests on main](https://github.com/wenig/actix-telepathy/workflows/Rust/badge.svg)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.5.6/status.svg)](https://deps.rs/crate/actix-telepathy/0.5.6)
+[![Dependency Status](https://deps.rs/crate/actix-telepathy/0.6.0/status.svg)](https://deps.rs/crate/actix-telepathy/0.6.0)
 ![Downloads](https://img.shields.io/crates/d/actix-telepathy.svg)
 
-# Actix Telepathy
+# Actix-Telepathy
 
-Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Cluster](https://github.com/akka/akka), Actix Telepathy is an extension to the Rust actor framework [Actix](https://github.com/actix/actix). It empowers Rust users to build distributed application within the actor framework.
-
-## Notes
-
-So far, we only support single seed nodes. Connecting to different seed nodes can result in unexpected behavior.
+Inspired by [actix-remote](https://github.com/actix/actix-remote) and [Akka Cluster](https://github.com/akka/akka), Actix-Telepathy is an extension to the Rust actor framework [Actix](https://github.com/actix/actix). It empowers Rust users to build distributed applications within the actor framework.
 
 ## Version Matches
 
@@ -21,15 +17,53 @@ So far, we only support single seed nodes. Connecting to different seed nodes ca
 | 0.12  | 0.3        | 0.2               |
 | 0.12  | 0.4        | 0.3               |
 | 0.13  | 0.5        | 0.3               |
+| 0.13.1  | 0.6        | 0.3.4               |
+
+## Tests
+
+Run ignored tests sequentially, because these tests run multiple threads themselves. 
+
+```
+cargo test -- --ignored --test-threads=1
+```
 
 ## Usage
+
+### Connection Variants
+
+We support the following two connection variants. They define how a node joins a cluster. Each comes with advantages and downsides. Choose carefully!
+
+**SingleSeed** expects all nodes to have the same seed node (except the seed node itself, it has no seed node).
+If another node is added, it will be added to the cluster by the seed node.
+If a node has a different seed node, errors can occur.
+This variant is recommended for a fast connection setup, but it is not recommended if the seed node is not always available. (This variant is the default.)
+
+**Gossip** can connect the nodes to each other. Each node can have a different seed node.
+When joining the cluster, the node will connect to its seed node and receives the number of nodes that are about to join.
+The seed node of that node will then send the joining node's information to the other nodes via the Gossip protocol.
+Thereby, the seed node randomly chooses 3 nodes and sends the information to them. These 3 nodes will connect to the joining node.
+Then the 3 nodes will send the information to 3 other nodes and so on.
+This variant is recommended if the seed node is not always available.
+This variant is not recommended if the cluster is very large, because the gossip protocol takes more time the larger the cluster is.
+
+```rust
+Cluster::new_with_connection_protocol("127.0.0.1:1992".parse().unwrap(), vec![/*...*/], ConnectionProtocol::Gossip)
+```
+
+### Sending RemoteMessages
+
+Actix supports `do_send`, `try_send`, and `send` for sending messages to an `Addr<impl Actor>`.
+
+For `RemoteMessage`s, this crate supports only `do_send` so far. Additionally, we introduce the `wait_send` method that returns a message response when the `NetworkInterface` has sent the `RemoteMessage`. This does not mean that the `RemoteMessage` arrived, only that it has been sent.
+
+Ideas and discussion on how to implement a remote response and using the `send` method on `RemoteAddr`, please refer to the [discussion page](https://github.com/wenig/actix-telepathy/discussions/82).
 
 ### Cargo.toml
 
 ```toml
 [dependencies]
 actix = "0.13.1"
-actix-telepathy = "0.5.6"
+actix-telepathy = "0.6.0"
 ```
 
 ### main.rs
@@ -52,6 +86,10 @@ async fn main() {
     System::current().stop();
 }
 ```
+
+## Paper
+
+We have written a [paper](https://doi.org/10.1145/3623506.3623575) about this project and conducted experiments to show its competitiveness with Akka and Orleans.
 
 **Please consider citing this work when you are using it!**
 

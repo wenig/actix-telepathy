@@ -22,8 +22,8 @@ struct TestMessage {
 
 #[derive(RemoteActor)]
 #[remote_messages(TestMessage)]
-struct TestActor {
-    identifiers: Arc<Mutex<Vec<String>>>,
+enum TestActor {
+    Test(Arc<Mutex<Vec<String>>>),
 }
 
 impl Actor for TestActor {
@@ -40,9 +40,11 @@ impl Handler<TestMessage> for TestActor {
             .map(|res, act, _ctx| match res {
                 Ok(res) => match res {
                     Ok(addr_res) => match addr_res {
-                        AddrResponse::ResolveRec(identifer) => {
-                            act.identifiers.lock().unwrap().push(identifer)
-                        }
+                        AddrResponse::ResolveRec(identifer) => match act {
+                            TestActor::Test(identifiers) => {
+                                identifiers.lock().unwrap().push(identifer)
+                            }
+                        },
                         _ => panic!("Wrong Response returned!"),
                     },
                     Err(_) => panic!("Couldn't resolve Addr!"),
@@ -57,10 +59,7 @@ impl Handler<TestMessage> for TestActor {
 async fn addr_resolver_registers_and_resolves_addr() {
     let identifier = "testActor".to_string();
     let identifiers = Arc::new(Mutex::new(vec![]));
-    let ta = TestActor {
-        identifiers: identifiers.clone(),
-    }
-    .start();
+    let ta = TestActor::Test(identifiers.clone()).start();
     AddrResolver::from_registry().do_send(AddrRequest::Register(
         ta.clone().recipient(),
         identifier.clone(),
@@ -79,7 +78,7 @@ async fn addr_resolver_registers_and_resolves_addr() {
 fn addr_representation_eq_not_key() {
     let own = AddrRepresentation::NetworkInterface;
     let other1 = AddrRepresentation::NetworkInterface;
-    let other2 = AddrRepresentation::Gossip;
+    let other2 = AddrRepresentation::Connector;
     let other3 = AddrRepresentation::Key("test".to_string());
 
     assert!(own.eq(&other1));
@@ -306,4 +305,33 @@ async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
             .socket_addr,
         remote_addr.node.socket_addr
     );
+}
+
+#[derive(RemoteMessage, Serialize, Deserialize)]
+struct FakeMessage {}
+
+#[actix_rt::test]
+async fn addr_resolver_does_not_panic_wrong_id() {
+    testing_logger::setup();
+    let listening_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let _cluster = Cluster::new(listening_ip.clone(), vec![]);
+    let fake_addr = RemoteAddr::new(
+        Node::new(listening_ip, None),
+        AddrRepresentation::Key("test".to_string()),
+    );
+    let fake_wrapper = RemoteWrapper::new(fake_addr, FakeMessage {}, None);
+    AddrResolver::from_registry()
+        .send(fake_wrapper)
+        .await
+        .unwrap();
+    testing_logger::validate(|captured_logs| {
+        let warnings_count = captured_logs
+            .iter()
+            .filter(|l| l.level == log::Level::Warn)
+            .filter(|l| l.body.contains("Message is abandoned."))
+            .count();
+        assert_eq!(warnings_count, 1);
+    });
 }

@@ -1,6 +1,6 @@
 use crate::test_utils::cluster_listener::TestClusterListener;
 use crate::{
-    Cluster, ClusterListener, ClusterLog, CustomSystemService, Gossip, NetworkInterface,
+    Cluster, ClusterListener, ClusterLog, Connector, CustomSystemService, NetworkInterface,
     NodeResolving,
 };
 use actix::prelude::*;
@@ -58,7 +58,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
     fn handle(&mut self, msg: ClusterLog, ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             ClusterLog::NewMember(_node) => {
-                Gossip::from_custom_registry()
+                Connector::from_custom_registry()
                     .send(NodeResolving {
                         addrs: vec![self.asking.clone()],
                     })
@@ -76,7 +76,7 @@ impl Handler<ClusterLog> for OwnListenerAskingGossip {
                     .wait(ctx);
             }
             ClusterLog::MemberLeft(addr) => {
-                Gossip::from_custom_registry()
+                Connector::from_custom_registry()
                     .send(NodeResolving { addrs: vec![addr] })
                     .into_actor(self)
                     .map(
@@ -136,7 +136,11 @@ async fn gossip_adds_member_and_resolves_it() {
     let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
         .parse()
         .unwrap();
-    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _cluster = Cluster::new_with_connection_protocol(
+        local_ip.clone(),
+        vec![],
+        crate::ConnectionProtocol::Gossip,
+    );
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {
         asking: other_ip.clone(),
@@ -156,7 +160,11 @@ async fn gossip_removes_member() {
     let other_ip: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
         .parse()
         .unwrap();
-    let _cluster = Cluster::new(local_ip.clone(), vec![]);
+    let _cluster = Cluster::new_with_connection_protocol(
+        local_ip.clone(),
+        vec![],
+        crate::ConnectionProtocol::Gossip,
+    );
     let addrs = Arc::new(Mutex::new(vec![]));
     let _own_listener = OwnListenerAskingGossip {
         asking: other_ip.clone(),
@@ -236,4 +244,50 @@ async fn build_cluster(
     sleep(Duration::from_millis(delay)).await;
     assert_eq!((*(addrs.lock().unwrap())).len(), expect);
     sleep(Duration::from_millis(end)).await;
+}
+
+#[test]
+#[ignore] //github workflows don't get the timing right
+fn cluster_reconnects_to_left_node() {
+    env_logger::init();
+    let ip1: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+    let ip2: SocketAddr = format!("127.0.0.1:{}", request_open_port().unwrap_or(8000))
+        .parse()
+        .unwrap();
+
+    let variables = vec![
+        (ip1, vec![], false),
+        (ip2, vec![ip1], false),
+        (ip2, vec![ip1], true),
+    ];
+    let results: Vec<bool> = variables
+        .par_iter()
+        .map(|(own_ip, seed_node, delay)| {
+            build_cluster_and_maybe_leave(own_ip.clone(), seed_node.clone(), *delay)
+        })
+        .collect();
+
+    assert_eq!(results, vec![true, true, true]);
+}
+
+#[actix_rt::main]
+async fn build_cluster_and_maybe_leave(
+    own_ip: SocketAddr,
+    seed_nodes: Vec<SocketAddr>,
+    delay: bool,
+) -> bool {
+    if delay {
+        sleep(Duration::from_secs(2)).await;
+    }
+    let _cluster = Cluster::new(own_ip, seed_nodes.clone());
+    sleep(Duration::from_secs(1)).await;
+    if seed_nodes.len() > 0 && !delay {
+        System::current().stop();
+        return true;
+    }
+    sleep(Duration::from_secs(2)).await;
+
+    true
 }

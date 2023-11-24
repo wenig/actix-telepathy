@@ -47,13 +47,13 @@ impl RemoteAddr {
         }
     }
 
-    pub fn new_gossip(
+    pub fn new_connector(
         socket_addr: SocketAddr,
         network_interface: Option<Addr<NetworkInterface>>,
     ) -> Self {
         RemoteAddr::new(
             Node::new(socket_addr, network_interface),
-            AddrRepresentation::Gossip,
+            AddrRepresentation::Connector,
         )
     }
 
@@ -134,6 +134,7 @@ impl Hash for RemoteAddr {
     }
 }
 
+/// A helper Enum that can either be an [Addr](https://github.com/actix/actix/blob/master/actix/src/address/mod.rs) or a [RemoteAddr](https://github.com/wenig/actix-telepathy/blob/main/src/remote/addr/mod.rs).
 #[derive(Deserialize, Serialize)]
 pub enum AnyAddr<A: Actor> {
     #[serde(skip_serializing, skip_deserializing)]

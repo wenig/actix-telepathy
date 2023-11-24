@@ -13,7 +13,7 @@ const GOSSIP: &str = "gossip";
 #[derive(Serialize, Deserialize, Debug)]
 pub enum AddrRepresentation {
     NetworkInterface,
-    Gossip,
+    Connector,
     Key(String),
 }
 
@@ -21,7 +21,7 @@ impl ToString for AddrRepresentation {
     fn to_string(&self) -> String {
         match self {
             AddrRepresentation::NetworkInterface => String::from(NETWORKINTERFACE),
-            AddrRepresentation::Gossip => String::from(GOSSIP),
+            AddrRepresentation::Connector => String::from(GOSSIP),
             AddrRepresentation::Key(id) => id.clone(),
         }
     }
@@ -33,7 +33,7 @@ impl FromStr for AddrRepresentation {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(match s {
             NETWORKINTERFACE => AddrRepresentation::NetworkInterface,
-            GOSSIP => AddrRepresentation::Gossip,
+            GOSSIP => AddrRepresentation::Connector,
             _ => AddrRepresentation::Key(String::from(s)),
         })
     }
@@ -149,9 +149,12 @@ impl Handler<RemoteWrapper> for AddrResolver {
     type Result = ();
 
     fn handle(&mut self, msg: RemoteWrapper, _ctx: &mut Context<Self>) -> Self::Result {
-        let recipient = self.resolve_rec_from_addr_representation(msg.destination.id.clone())
-            .unwrap_or_else(|_| panic!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor?", msg.identifier));
-        recipient.do_send(msg);
+        if let Ok(recipient) = self.resolve_rec_from_addr_representation(msg.destination.id.clone())
+        {
+            recipient.do_send(msg);
+        } else {
+            warn!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor? Message is abandoned.", msg.identifier);
+        }
     }
 }
 

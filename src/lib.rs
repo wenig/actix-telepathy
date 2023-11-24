@@ -181,8 +181,6 @@
 
 #[cfg(feature = "derive")]
 pub use actix_telepathy_derive::*;
-#[cfg(feature = "protocols")]
-pub mod protocols;
 
 mod cluster;
 mod codec;
