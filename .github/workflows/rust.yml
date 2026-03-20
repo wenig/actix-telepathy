@@ -93,9 +93,15 @@ jobs:
         with:
           path: target
           key: '${{ runner.os }}-cargo-build-target-${{ hashFiles(''**/Cargo.lock'') }}'
-      - uses: actions-rs/cargo@v1
-        with:
-          command: package
+      - name: Publish actix_telepathy_derive (if not already published)
+        run: |
+          VERSION=$(cargo metadata --no-deps --manifest-path actix-telepathy-derive/Cargo.toml --format-version 1 | jq -r '.packages[0].version')
+          if curl -sf "https://crates.io/api/v1/crates/actix_telepathy_derive/${VERSION}" > /dev/null; then
+            echo "actix_telepathy_derive ${VERSION} already published, skipping"
+          else
+            cargo publish --token ${{ secrets.CRATES_TOKEN }} --manifest-path actix-telepathy-derive/Cargo.toml
+            sleep 20 # wait for actix_telepathy_derive to propagate on crates.io
+          fi
       - uses: actions-rs/cargo@v1
         with:
           command: publish

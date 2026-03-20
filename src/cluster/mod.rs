@@ -7,15 +7,15 @@ pub use self::listener::{ClusterListener, ClusterLog};
 pub use connector::NodeResolving;
 pub use connector::{gossip::Gossip, single_seed::SingleSeed};
 
+use crate::CustomSystemService;
 pub use crate::cluster::connector::ConnectionProtocol;
 pub use crate::cluster::connector::Connector;
 use crate::network::NetworkInterface;
 use crate::remote::Node;
-use crate::CustomSystemService;
 use actix::prelude::*;
 use actix_broker::BrokerIssue;
-use futures::executor::block_on;
 use futures::StreamExt;
+use futures::executor::block_on;
 use log::*;
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -94,7 +94,7 @@ impl Actor for Cluster {
         for node_addr in 0..addrs_len {
             self.add_node(*self.addrs.get(node_addr).unwrap(), true);
         }
-        debug!("Cluster started {}", self.ip_address.clone().to_string());
+        debug!("Cluster started {}", self.ip_address);
     }
 }
 

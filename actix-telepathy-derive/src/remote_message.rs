@@ -3,7 +3,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use serde_derive::{Deserialize, Serialize};
 use std::fs::File;
-use syn::{parse_macro_input, DeriveInput, Result};
+use syn::{DeriveInput, Result, parse_macro_input};
 
 const TELEPATHY_CONFIG_FILE: &str = "telepathy.yaml";
 const WITH_SOURCE: &str = "with_source";
@@ -28,7 +28,7 @@ fn load_config_yaml() -> Config {
             serde_yaml::from_reader(file_reader).expect("Config file is no valid YAML")
         }
         Err(e) => {
-            error!("{}, using default Config", e.to_string());
+            error!("{}, using default Config", e);
             Config::default()
         }
     }

@@ -33,7 +33,7 @@ impl ClusterMessage {
 
     pub fn set_buffer(&mut self, bytes: Vec<u8>) {
         match self {
-            Self::Message(ref mut wrapper) => wrapper.message_buffer = bytes,
+            Self::Message(wrapper) => wrapper.message_buffer = bytes,
             _ => panic!("set_buffer should not be used if not ClusterMessage::Message"),
         }
     }
@@ -62,7 +62,7 @@ impl Decoder for ConnectCodec {
                 let _s = src.split_to(11);
                 self.prefix = true;
             } else {
-                return Err(io::Error::new(io::ErrorKind::Other, "Prefix mismatch"));
+                return Err(io::Error::other("Prefix mismatch"));
             }
         }
 

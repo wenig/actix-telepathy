@@ -68,16 +68,16 @@ impl Gossip {
             node.socket_addr,
             node.network_interface.expect("Empty network interface"),
         );
-        debug!(target: &self.own_addr.to_string(), "Member {} added!", node.socket_addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Member {} added!", node.socket_addr);
     }
 
     fn remove_member(&mut self, addr: SocketAddr) {
         self.members.remove(&addr);
-        debug!(target: &self.own_addr.to_string(), "Member {} removed", addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Member {} removed", addr);
     }
 
     fn ignite_member_up(&self, new_addr: SocketAddr) {
-        debug!(target: &self.own_addr.to_string(), "Igniting member up {}", new_addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Igniting member up {}", new_addr);
         self.gossip_member_event(
             new_addr,
             GossipEvent::Join,
@@ -86,7 +86,7 @@ impl Gossip {
     }
 
     fn ignite_member_down(&self, leaving_addr: SocketAddr) {
-        debug!(target: &self.own_addr.to_string(), "Igniting member down {}", leaving_addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Igniting member down {}", leaving_addr);
         self.gossip_member_event(
             leaving_addr,
             GossipEvent::Leave,
@@ -95,7 +95,7 @@ impl Gossip {
     }
 
     fn gossip_member_event(&self, addr: SocketAddr, event: GossipEvent, seen: HashSet<SocketAddr>) {
-        debug!(target: &self.own_addr.to_string(), "Gossiping member event {} {:?} {:?}", addr.to_string(), event, seen);
+        debug!(target: &self.own_addr.to_string(), "Gossiping member event {} {:?} {:?}", addr, event, seen);
         let random_members = self.choose_random_members(3, &seen);
 
         let gossip_message = GossipMessage { event, addr, seen };
@@ -114,7 +114,7 @@ impl Gossip {
         self.members
             .iter()
             .filter(|(addr, _)| !except.contains(addr))
-            .choose_multiple(&mut rng, amount)
+            .sample(&mut rng, amount)
             .into_iter()
             .map(|(socket_addr, network_interface)| {
                 RemoteAddr::new_connector(*socket_addr, Some(network_interface.clone()))
@@ -213,7 +213,7 @@ impl Gossip {
     }
 
     fn share_info_with_joining_member(&self, node: Node) {
-        debug!(target: &self.own_addr.to_string(), "Sharing info with joining member {}", node.socket_addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Sharing info with joining member {}", node.socket_addr);
         node.get_remote_addr(CONNECTOR.to_string())
             .do_send(GossipJoining {
                 about_to_join: self.members.len(),

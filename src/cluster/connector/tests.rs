@@ -4,7 +4,7 @@ use actix_rt::System;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
-    test_utils::get_n_local_socket_addrs, Cluster, Connector, CustomSystemService, NodeResolving,
+    Cluster, Connector, CustomSystemService, NodeResolving, test_utils::get_n_local_socket_addrs,
 };
 
 const FAILED_TO_RESOLVE_NODES: &str = "Failed to resolve nodes";

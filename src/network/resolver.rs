@@ -14,11 +14,12 @@ use tokio::net::TcpStream;
 
 use actix::prelude::*;
 use futures::prelude::future::Either;
-use tokio::time::{sleep, Sleep};
-use trust_dns_resolver::config::{ResolverConfig, ResolverOpts};
-use trust_dns_resolver::error::ResolveError;
-use trust_dns_resolver::lookup_ip::LookupIp;
-use trust_dns_resolver::TokioAsyncResolver as AsyncResolver;
+use hickory_resolver::ResolveError;
+use hickory_resolver::TokioResolver as AsyncResolver;
+use hickory_resolver::config::{ResolverConfig, ResolverOpts};
+use hickory_resolver::lookup_ip::LookupIp;
+use hickory_resolver::name_server::TokioConnectionProvider;
+use tokio::time::{Sleep, sleep};
 
 #[derive(Eq, PartialEq, Debug)]
 pub struct Resolve {
@@ -61,19 +62,19 @@ impl Message for ConnectAddr {
 #[derive(Debug, Display)]
 pub enum ResolverError {
     /// Failed to resolve the hostname
-    #[display(fmt = "Failed resolving hostname: {}", _0)]
+    #[display("Failed resolving hostname: {}", _0)]
     Resolver(String),
 
     /// Address is invalid
-    #[display(fmt = "Invalid input: {}", _0)]
+    #[display("Invalid input: {}", _0)]
     InvalidInput(&'static str),
 
     /// Connecting took too long
-    #[display(fmt = "Timeout out while establishing connection")]
+    #[display("Timeout out while establishing connection")]
     Timeout,
 
     /// Connection io error
-    #[display(fmt = "{}", _0)]
+    #[display("{}", _0)]
     IoError(io::Error),
 }
 
@@ -95,19 +96,28 @@ impl Actor for Resolver {
                     |cfg, this, _| -> Pin<Box<dyn ActorFuture<Self, Output = _>>> {
                         if let Some(cfg) = cfg {
                             return Box::pin(
-                                async { AsyncResolver::tokio(cfg.0, cfg.1) }.into_actor(this),
+                                async move {
+                                    AsyncResolver::builder_with_config(
+                                        cfg.0,
+                                        TokioConnectionProvider::default(),
+                                    )
+                                    .with_options(cfg.1)
+                                    .build()
+                                }
+                                .into_actor(this),
                             );
                         }
                         Box::pin(
                             async {
-                                match AsyncResolver::tokio_from_system_conf() {
-                                    Ok(resolver) => resolver,
+                                match AsyncResolver::builder_tokio() {
+                                    Ok(builder) => builder.build(),
                                     Err(err) => {
                                         warn!("Can not create system dns resolver: {}", err);
-                                        AsyncResolver::tokio(
+                                        AsyncResolver::builder_with_config(
                                             ResolverConfig::default(),
-                                            ResolverOpts::default(),
+                                            TokioConnectionProvider::default(),
                                         )
+                                        .build()
                                     }
                                 }
                             }

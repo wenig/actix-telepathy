@@ -61,10 +61,10 @@ pub trait CustomSystemService: Actor<Context = Context<Self>> + SystemService {
             .entry(sys.id())
             .or_insert_with(|| PatchedSystemRegistry::new(sys.arbiter().clone()));
 
-        if let Some(addr) = reg.registry.get(&TypeId::of::<Self>()) {
-            if let Some(addr) = addr.downcast_ref::<Addr<Self>>() {
-                return addr.clone();
-            }
+        if let Some(addr) = reg.registry.get(&TypeId::of::<Self>())
+            && let Some(addr) = addr.downcast_ref::<Addr<Self>>()
+        {
+            return addr.clone();
         }
 
         panic!("Please start Actor before asking for it in registry!");

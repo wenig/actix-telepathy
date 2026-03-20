@@ -1,4 +1,4 @@
-use super::{messages::SingleSeedMembers, ConnectorVariant};
+use super::{ConnectorVariant, messages::SingleSeedMembers};
 use crate::{
     Cluster, ConnectToNode, CustomSystemService, NetworkInterface, Node, NodeEvent, RemoteAddr,
 };
@@ -35,12 +35,12 @@ impl SingleSeed {
     fn add_member(&mut self, node: &Node) {
         self.members
             .insert(node.socket_addr, node.clone().network_interface.unwrap());
-        debug!(target: &self.own_addr.to_string(), "Member {} added!", node.socket_addr.to_string());
+        debug!(target: &self.own_addr.to_string(), "Member {} added!", node.socket_addr);
     }
 
     fn remove_member(&mut self, addr: SocketAddr) {
         self.members.remove(&addr);
-        debug!("Member {} removed", addr.to_string());
+        debug!("Member {} removed", addr);
     }
 
     fn give_information(&mut self, member_addr: SocketAddr) {

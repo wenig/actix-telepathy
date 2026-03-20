@@ -16,16 +16,11 @@ pub mod single_seed;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub enum ConnectionProtocol {
     SingleSeed,
+    #[default]
     Gossip,
-}
-
-impl Default for ConnectionProtocol {
-    fn default() -> Self {
-        Self::Gossip
-    }
 }
 
 #[derive(RemoteActor)]

@@ -7,12 +7,12 @@ use std::io::Error;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
+use crate::Node;
 use crate::cluster::{Cluster, NodeEvent};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
 use crate::remote::{AddrRepresentation, AddrResolver, RemoteWrapper};
-use crate::Node;
 use crate::{ConnectionApproval, ConnectionApprovalResponse, Connector, CustomSystemService};
 use actix::io::WriteHandler;
 use std::fmt;
@@ -104,10 +104,7 @@ impl NetworkInterface {
             .map(|res, act, ctx| match res {
                 Ok(stream) => {
                     if let Ok(stream) = stream {
-                        debug!(
-                            "Connected to network node: {}",
-                            act.addr.clone().to_string()
-                        );
+                        debug!("Connected to network node: {}", act.addr);
 
                         let (r, w) = stream.into_split();
 
@@ -126,7 +123,7 @@ impl NetworkInterface {
                     }
                 }
                 Err(err) => {
-                    error!("{} | {}", err.to_string(), act.addr.to_string());
+                    error!("{} | {}", err, act.addr);
                     act.counter += 1;
                     sleep(Duration::from_secs(1));
                     ctx.stop();
@@ -140,7 +137,7 @@ impl NetworkInterface {
 
         match self.own_addr.clone() {
             Some(addr) => {
-                debug!(target: &self.own_ip.to_string(), "finish connecting to {}", self.addr.to_string());
+                debug!(target: &self.own_ip.to_string(), "finish connecting to {}", self.addr);
                 let node = Node::new(self.addr, Some(addr));
                 Cluster::from_custom_registry().do_send(NodeEvent::MemberUp(node, self_is_seed));
             }

@@ -1,5 +1,5 @@
-use crate::codec::ConnectCodec;
 use crate::ClusterMessage;
+use crate::codec::ConnectCodec;
 use actix::io::{FramedWrite, WriteHandler};
 use actix::prelude::*;
 use std::io::Error;
