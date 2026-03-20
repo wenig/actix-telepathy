@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::__private::Span;
 use syn::parse::Parser;
-use syn::{parse_macro_input, DeriveInput, Result};
+use syn::{DeriveInput, Result, parse_macro_input};
 type AttributeArgs = syn::punctuated::Punctuated<syn::Meta, syn::Token![,]>;
 
 const REMOTE_MESSAGES: &str = "remote_messages";
@@ -92,7 +92,7 @@ fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<s
                     return Err(syn::Error::new_spanned(
                         attr,
                         format!("The correct syntax is #[{}(Message, Message, ...)]", ident),
-                    ))
+                    ));
                 }
             };
             Ok(args.iter().map(|m| meta_item_to_struct(m).ok()).collect())
@@ -112,7 +112,7 @@ fn get_message_types_attr(ast: &DeriveInput, ident: &str) -> Result<Vec<Option<s
 
 fn meta_item_to_struct(meta_item: &syn::Meta) -> syn::Result<syn::Type> {
     match meta_item {
-        syn::Meta::Path(ref path) => match path.get_ident() {
+        syn::Meta::Path(path) => match path.get_ident() {
             Some(ident) => syn::parse_str::<syn::Type>(&ident.to_string())
                 .map_err(|_| syn::Error::new_spanned(ident, "Expect Message")),
             None => Err(syn::Error::new_spanned(path, "Expect Message")),

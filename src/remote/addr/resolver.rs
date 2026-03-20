@@ -3,7 +3,7 @@ use actix::prelude::*;
 use log::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 
@@ -17,12 +17,12 @@ pub enum AddrRepresentation {
     Key(String),
 }
 
-impl ToString for AddrRepresentation {
-    fn to_string(&self) -> String {
+impl Display for AddrRepresentation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AddrRepresentation::NetworkInterface => String::from(NETWORKINTERFACE),
-            AddrRepresentation::Connector => String::from(GOSSIP),
-            AddrRepresentation::Key(id) => id.clone(),
+            AddrRepresentation::NetworkInterface => f.write_str(NETWORKINTERFACE),
+            AddrRepresentation::Connector => f.write_str(GOSSIP),
+            AddrRepresentation::Key(id) => f.write_str(id),
         }
     }
 }
@@ -153,7 +153,10 @@ impl Handler<RemoteWrapper> for AddrResolver {
         {
             recipient.do_send(msg);
         } else {
-            warn!("Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor? Message is abandoned.", msg.identifier);
+            warn!(
+                "Could not resolve Recipient '{}' for RemoteMessage. Is this receiver a RemoteActor? Message is abandoned.",
+                msg.identifier
+            );
         }
     }
 }
@@ -164,7 +167,7 @@ impl Handler<AddrRequest> for AddrResolver {
     fn handle(&mut self, msg: AddrRequest, _ctx: &mut Context<Self>) -> Self::Result {
         match msg {
             AddrRequest::Register(rec, identifier) => {
-                let is_new = self.rec2str.get(&rec).is_none();
+                let is_new = !self.rec2str.contains_key(&rec);
 
                 if is_new {
                     self.str2rec.insert(identifier.clone(), rec.clone());

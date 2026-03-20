@@ -11,7 +11,7 @@ use port_scanner::{local_port_available, request_open_port};
 use rayon::prelude::*;
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 type SocketTestClusterListener = TestClusterListener<Arc<Mutex<Vec<SocketAddr>>>>;
 
@@ -116,14 +116,18 @@ async fn cluster_adds_node_and_from_stream() {
     )
     .start();
     sleep(Duration::from_secs(1)).await;
-    assert!(connections
-        .lock()
-        .unwrap()
-        .contains(&("127.0.0.1:1993".parse().unwrap())));
-    assert!(connections
-        .lock()
-        .unwrap()
-        .contains(&("127.0.0.1:1992".parse().unwrap())));
+    assert!(
+        connections
+            .lock()
+            .unwrap()
+            .contains(&("127.0.0.1:1993".parse().unwrap()))
+    );
+    assert!(
+        connections
+            .lock()
+            .unwrap()
+            .contains(&("127.0.0.1:1992".parse().unwrap()))
+    );
 }
 
 // Gossip

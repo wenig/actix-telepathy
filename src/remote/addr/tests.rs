@@ -1,5 +1,5 @@
-use crate::{prelude::*, Node};
 use crate::{AddrRepresentation, AddrRequest, AddrResolver, AddrResponse};
+use crate::{Node, prelude::*};
 use actix::prelude::*;
 use actix_broker::BrokerSubscribe;
 use actix_telepathy_derive::{RemoteActor, RemoteMessage};

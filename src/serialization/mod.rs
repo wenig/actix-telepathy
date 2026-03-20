@@ -50,7 +50,7 @@ pub trait CustomSerialization {
         T: ?Sized + Serialize;
     fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, CustomSerializationError>
     where
-        T: ?Sized + Deserialize<'a>;
+        T: Deserialize<'a>;
 }
 
 /// Occurs if either the serialization or the deserialization fails for the `CustomSerialization`
@@ -87,7 +87,7 @@ impl CustomSerialization for DefaultSerialization {
 
     fn deserialize<'a, T>(&self, s: &'a [u8]) -> Result<T, CustomSerializationError>
     where
-        T: ?Sized + Deserialize<'a>,
+        T: Deserialize<'a>,
     {
         match flexbuffers::from_slice(s) {
             Ok(val) => Ok(val),
