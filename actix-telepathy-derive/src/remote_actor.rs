@@ -26,11 +26,28 @@ pub fn remote_actor_remote_messages_macro(input: TokenStream) -> TokenStream {
         let name = attr.as_ref().unwrap();
         let matching = quote! {
             #name::IDENTIFIER => {
-                let mut deserialized_msg: #name = #name::generate_serializer().deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialized #name message");
-                if msg.source.clone().is_some() {
-                    deserialized_msg.set_source(msg.source.unwrap());
+                let serializer = #name::generate_serializer();
+                let mut deserialized_msg: #name = serializer.deserialize(&(msg.message_buffer)[..]).expect("Cannot deserialize #name message");
+                if msg.source.is_some() {
+                    deserialized_msg.set_source(msg.source.clone().unwrap());
                 }
-                ctx.address().do_send(deserialized_msg);
+                // assumes source is set if a conversation_id set
+                // we are implying that a conversation_id indicates a response is wanted
+                if let Some(id) = msg.conversation_id {
+                    let addr = ctx.address().clone();
+                    ctx.spawn(async move {
+                        addr.send(deserialized_msg).await
+                    }
+                    .into_actor(self)
+                    .map(move |res, _act, _ctx| {
+                        if let Ok(response) = res {
+                            let serialized_resp = serializer.serialize(&response).expect("Cannot serialize #name response");
+                            msg.source.clone().unwrap().do_send(RemoteResponse(id, serialized_resp));
+                        };
+                    }));
+                } else {
+                    ctx.address().do_send(deserialized_msg)
+                }
             },
         };
         match_statement = quote! {

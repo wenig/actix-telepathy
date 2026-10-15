@@ -1,4 +1,4 @@
-use crate::remote::RemoteWrapper;
+use crate::remote::{RemoteResponse, RemoteWrapper};
 use actix::prelude::*;
 use byteorder::{ByteOrder, NetworkEndian};
 use bytes::{Buf, BufMut, BytesMut};
@@ -17,6 +17,7 @@ pub enum ClusterMessage {
     Request(u16, bool),
     Response,
     Message(RemoteWrapper),
+    MessageResponse(RemoteResponse),
     Decline,
 }
 

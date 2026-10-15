@@ -2,18 +2,21 @@ mod resolver;
 mod writer;
 
 use actix::prelude::*;
+use futures::channel::oneshot::{Sender, channel};
 use log::*;
+use uuid::Uuid;
+use std::collections::HashMap;
 use std::io::Error;
 use std::net::SocketAddr;
 use tokio::net::TcpStream;
 
-use crate::Node;
 use crate::cluster::{Cluster, NodeEvent};
 use crate::codec::{ClusterMessage, ConnectCodec};
 use crate::network::resolver::{Connect, Resolver};
 use crate::network::writer::Writer;
 use crate::remote::{AddrRepresentation, AddrResolver, RemoteWrapper};
 use crate::{ConnectionApproval, ConnectionApprovalResponse, Connector, CustomSystemService};
+use crate::{Node, RemoteResponse};
 use actix::io::WriteHandler;
 use std::fmt;
 use std::thread::sleep;
@@ -29,6 +32,7 @@ pub struct NetworkInterface {
     counter: i8,
     seed: bool,
     writer: Option<Addr<Writer>>,
+    futures: HashMap<Uuid,Sender<Vec<u8>>>
 }
 
 impl Actor for NetworkInterface {
@@ -73,6 +77,7 @@ impl NetworkInterface {
             counter: 0,
             seed,
             writer: None,
+            futures: HashMap::new()
         }
     }
 
@@ -149,6 +154,10 @@ impl NetworkInterface {
         self.writer.as_ref().unwrap().do_send(msg);
     }
 
+    fn wait_transmit_message(&mut self, msg: ClusterMessage)-> ResponseFuture<Result<(), MailboxError>>  {
+        Box::pin(self.writer.as_ref().unwrap().send(msg))
+    }
+
     fn received_message(&mut self, mut msg: RemoteWrapper) {
         msg.source = self.own_addr.clone();
         match msg.destination.id {
@@ -157,6 +166,12 @@ impl NetworkInterface {
             }
             AddrRepresentation::Connector => Connector::from_custom_registry().do_send(msg),
             AddrRepresentation::Key(_) => AddrResolver::from_registry().do_send(msg),
+        }
+    }
+
+    fn received_reply(&mut self, msg: RemoteResponse) {
+        if let Some(fut) = self.futures.remove(&msg.0) {
+            let _ = fut.send(msg.1);
         }
     }
 
@@ -195,6 +210,7 @@ impl StreamHandler<Result<ClusterMessage, Error>> for NetworkInterface {
                 }
                 ClusterMessage::Response => self.finish_connecting(false),
                 ClusterMessage::Message(remote_message) => self.received_message(remote_message),
+                ClusterMessage::MessageResponse(remote_response) => self.received_reply(remote_response),
                 ClusterMessage::Decline => ctx.stop(),
             },
             Err(err) => warn!("{}", err),
@@ -210,15 +226,44 @@ impl Handler<ClusterMessage> for NetworkInterface {
     }
 }
 
+impl Handler<RemoteResponse> for NetworkInterface {
+    type Result = ();
+
+    fn handle(&mut self, msg: RemoteResponse, _ctx: &mut Context<Self>) -> Self::Result {
+        self.transmit_message(ClusterMessage::MessageResponse(msg));
+    }
+}
+
 #[derive(Message)]
-#[rtype(result = "Result<(), MailboxError>")]
+#[rtype(result = "Result<Vec<u8>, MailboxError>")]
 pub struct WrappedClusterMessage(pub(crate) ClusterMessage);
 
 impl Handler<WrappedClusterMessage> for NetworkInterface {
-    type Result = ResponseFuture<Result<(), MailboxError>>;
+    type Result = ResponseActFuture<Self, Result<Vec<u8>, MailboxError>>;
 
-    fn handle(&mut self, msg: WrappedClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
-        Box::pin(self.writer.as_ref().unwrap().send(msg.0))
+    fn handle(&mut self, wmsg: WrappedClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
+        let msg = wmsg.0;
+        let id = get_converstation_id(&msg);
+        let send = self.wait_transmit_message(msg);
+
+        let (sender, receiver) = channel::<Vec<u8>>();
+        if let Some(id) = id {
+            self.futures.insert(id, sender);
+        }
+
+        Box::pin(
+            async move {
+                let sent = send.await;
+                if sent.is_err() {
+                    Err(sent.unwrap_err())
+                } else if id.is_some()  {
+                    Ok(receiver.await.unwrap()) // todo: add timeout in config yaml return MailboxError::timeout and select! between the timeout and the receiver
+                } else {
+                    Ok(Vec::new()) // placeholder for wait_send(), not to be deserialized
+                }
+            }
+            .into_actor(self)
+        )
     }
 }
 
@@ -228,5 +273,13 @@ impl Supervised for NetworkInterface {}
 impl fmt::Debug for NetworkInterface {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "NetworkInterface({})", self.addr)
+    }
+}
+
+fn get_converstation_id(msg: &ClusterMessage) -> Option<Uuid> {
+    if let ClusterMessage::Message(rem) = msg {
+        rem.conversation_id
+    } else {
+        None
     }
 }

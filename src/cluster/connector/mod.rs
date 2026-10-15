@@ -1,6 +1,6 @@
 pub use crate::cluster::connector::messages::NodeResolving;
 use crate::cluster::connector::messages::{GossipJoining, GossipMessage};
-use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteWrapper};
+use crate::{CustomSerialization, RemoteActor, RemoteMessage, RemoteResponse, RemoteWrapper};
 use crate::{CustomSystemService, Gossip, NetworkInterface, NodeEvent, SingleSeed};
 use actix::prelude::*;
 use log::*;

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::marker::PhantomData;
 
 #[derive(Serialize, Deserialize, RemoteMessage)]
+#[rtype(result = "()")]
 struct MyRemoteMessage<T: Serialize + Send> {
     value: T,
 }
