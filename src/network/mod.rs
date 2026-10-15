@@ -239,7 +239,7 @@ impl Handler<RemoteResponse> for NetworkInterface {
 pub struct WrappedClusterMessage(pub(crate) ClusterMessage);
 
 impl Handler<WrappedClusterMessage> for NetworkInterface {
-    type Result = ResponseActFuture<Self, Result<Vec<u8>, MailboxError>>;
+    type Result = ResponseFuture<Result<Vec<u8>, MailboxError>>;
 
     fn handle(&mut self, wmsg: WrappedClusterMessage, _ctx: &mut Self::Context) -> Self::Result {
         let msg = wmsg.0;
@@ -262,7 +262,6 @@ impl Handler<WrappedClusterMessage> for NetworkInterface {
                     Ok(Vec::new()) // placeholder for wait_send(), not to be deserialized
                 }
             }
-            .into_actor(self)
         )
     }
 }
