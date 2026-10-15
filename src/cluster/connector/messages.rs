@@ -18,6 +18,7 @@ pub enum GossipEvent {
 }
 
 #[derive(RemoteMessage, Serialize, Deserialize, Debug, Clone)]
+#[rtype(result = "()")]
 pub struct GossipMessage {
     pub event: GossipEvent,
     pub addr: SocketAddr,
@@ -25,9 +26,11 @@ pub struct GossipMessage {
 }
 
 #[derive(RemoteMessage, Serialize, Deserialize, Debug, Clone)]
+#[rtype(result = "()")]
 pub struct GossipJoining {
     pub about_to_join: usize,
 }
 
 #[derive(RemoteMessage, Serialize, Deserialize, Debug, Clone)]
+#[rtype(result = "()")]
 pub struct SingleSeedMembers(pub Vec<SocketAddr>);

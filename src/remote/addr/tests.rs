@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
+#[rtype(result = "()")]
 #[with_source(source)]
 struct TestMessage {
     source: RemoteAddr,
@@ -308,6 +309,7 @@ async fn build_cluster_2(own_ip: SocketAddr, other_ip: Vec<SocketAddr>) {
 }
 
 #[derive(RemoteMessage, Serialize, Deserialize)]
+#[rtype(result = "()")]
 struct FakeMessage {}
 
 #[actix_rt::test]

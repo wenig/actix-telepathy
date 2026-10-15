@@ -3,11 +3,13 @@ use std::net::SocketAddr;
 use std::str::FromStr;
 
 use actix::prelude::*;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::codec::ClusterMessage;
 use crate::remote::{AddrRepresentation, RemoteMessage, RemoteWrapper};
-use crate::{NetworkInterface, WrappedClusterMessage};
+use crate::{CustomSerialization, NetworkInterface, WrappedClusterMessage};
 use actix::dev::ToEnvelope;
 
 pub use self::node::Node;
@@ -80,14 +82,27 @@ impl RemoteAddr {
     pub fn try_send<T: RemoteMessage + Serialize>(
         &self,
         _msg: T,
-    ) -> RecipientRequest<ClusterMessage> {
+    ) -> Result<(), SendError<WrappedClusterMessage>> {
+        // todo: need to decide what try should check, should this be async, and ensure the message has been sent like wait send?
         unimplemented!("So far, it is not possible to use this method!")
     }
 
-    pub fn send<T: RemoteMessage + Serialize>(&self, _msg: T) {
-        unimplemented!(
-            "So far, it is not possible to receive responses from remote destinations as futures!"
-        )
+    pub async fn send<T: RemoteMessage + Serialize>(&self, msg: T) -> Result<T::Result, MailboxError>
+    where <T as actix::Message>::Result: DeserializeOwned
+    {
+        let serializer = msg.get_serializer();
+        self.node
+            .network_interface
+            .as_ref()
+            .expect("Network interface must be set!")
+            .send(WrappedClusterMessage(ClusterMessage::Message(RemoteWrapper::new(
+                self.clone(),
+                msg,
+                Some(Uuid::new_v4()),
+            ))))
+            .await
+            .flatten() // flatten NetworkInterface MailboxError with the one we return as part of the WrappedClusterMessage response
+            .map(|buff|serializer.deserialize(buff.as_ref()).unwrap())
     }
 
     pub fn wait_send<T: RemoteMessage + Serialize>(

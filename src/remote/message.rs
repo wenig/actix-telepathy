@@ -24,7 +24,7 @@ impl RemoteWrapper {
         message: T,
         conversation_id: Option<Uuid>,
     ) -> RemoteWrapper {
-        let serializer = message.get_serializer();
+        let serializer: Box<<T as RemoteMessage>::Serializer> = message.get_serializer();
         RemoteWrapper {
             destination,
             message_buffer: serializer
@@ -67,3 +67,7 @@ where
 
     fn set_source(&mut self, source: Addr<NetworkInterface>);
 }
+
+#[derive(Message, Serialize, Deserialize, Debug)]
+#[rtype(result = "()")]
+pub struct RemoteResponse(pub Uuid, pub Vec<u8>);
